@@ -1,26 +1,136 @@
+/* ============================================================================
+ * GLOBAL STYLES for the ASRS Initiatives Reporting System
+ * ============================================================================
+ * This file sets up the base theme: light beige background, ASRS brand colors,
+ * and Tailwind CSS utilities. All components inherit these base styles.
+ * ============================================================================ */
+
 @import "tailwindcss";
 
+/* --------------------------------------------------------------------------
+ * CSS Custom Properties (Variables)
+ * These define our color palette. Components reference these variables
+ * so that if we ever need to change the brand colors, we change them here ONCE.
+ * -------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* The main light beige background color */
+  --color-bg-primary: #FAF6F0;
+  /* A slightly darker beige for cards and panels */
+  --color-bg-secondary: #F5EDE3;
+  /* The darkest beige for hover states and borders */
+  --color-bg-tertiary: #E8DDD0;
+  /* ASRS brand colors extracted from the logo */
+  --color-asrs-red: #C0392B;
+  --color-asrs-orange: #E67E22;
+  --color-asrs-yellow: #F39C12;
+  --color-asrs-dark: #4A4A4A;
+  /* Text colors */
+  --color-text-primary: #2C2C2C;
+  --color-text-secondary: #5A5A5A;
+  --color-text-light: #8A8A8A;
+  /* Accent colors for charts */
+  --color-chart-1: #C0392B;
+  --color-chart-2: #E67E22;
+  --color-chart-3: #F39C12;
+  --color-chart-4: #27AE60;
+  --color-chart-5: #2980B9;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --------------------------------------------------------------------------
+ * Base HTML & Body Styles
+ * Sets the beige background on the entire page and default font settings.
+ * -------------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* Per requirement REP036: minimum 14px font for mobile devices */
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------------
+ * Scrollbar Styling (Optional - makes scrollbars match the beige theme)
+ * -------------------------------------------------------------------------- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--color-bg-tertiary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-asrs-orange); }
+
+/* --------------------------------------------------------------------------
+ * Utility Classes for ASRS Brand
+ * These can be used throughout components with className="asrs-card" etc.
+ * -------------------------------------------------------------------------- */
+.asrs-card {
+  background-color: white;
+  border: 1px solid var(--color-bg-tertiary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.asrs-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.asrs-btn-primary {
+  background: linear-gradient(135deg, var(--color-asrs-red), var(--color-asrs-orange));
+  color: white;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+.asrs-btn-primary:hover { opacity: 0.9; transform: scale(1.02); }
+
+.asrs-btn-secondary {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  border: 1px solid var(--color-bg-tertiary);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.asrs-btn-secondary:hover { background-color: var(--color-bg-tertiary); }
+
+/* --------------------------------------------------------------------------
+ * Responsive Table → Card Layout (per requirement REP036)
+ * On mobile devices, data tables convert to a card-like layout.
+ * -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .responsive-table thead { display: none; }
+  .responsive-table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid var(--color-bg-tertiary);
+  }
+  .responsive-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-bg-secondary);
+    /* REP036: minimum 14px font on mobile */
+    font-size: 14px;
+  }
+  .responsive-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
 }

@@ -1,0 +1,46 @@
+{
+  "initiatives": [
+    {
+      "id": 1,
+      "name": "E-Gaming and Careers",
+      "description": "Elite Gaming Live Curriculum — exploring career pathways through competitive gaming and esports education.",
+      "attributes": ["Grade", "School", "Interest Level", "Career Awareness", "Participation Count", "Session Rating", "Completion Status"]
+    },
+    {
+      "id": 2,
+      "name": "Drive Safe Robotics",
+      "description": "Teaching safe driving principles through hands-on robotics projects.",
+      "attributes": ["Grade", "School", "Safety Score", "Project Completion", "Team Size", "Robot Performance", "Attendance Rate"]
+    },
+    {
+      "id": 3,
+      "name": "ELA Achievement & Attendance",
+      "description": "English Language Arts achievement and attendance awards program.",
+      "attributes": ["Grade", "School", "Reading Level", "Attendance Rate", "Award Type", "Improvement Score", "Semester"]
+    },
+    {
+      "id": 4,
+      "name": "Bags2School Initiative",
+      "description": "Awards program promoting school supplies and backpack donations.",
+      "attributes": ["Grade", "School", "Bags Collected", "Families Helped", "Volunteer Count", "Donation Value", "Event Date"]
+    },
+    {
+      "id": 5,
+      "name": "PSLA Modified Track Team",
+      "description": "Modified track and field team for PSLA students.",
+      "attributes": ["Grade", "School", "Event Type", "Personal Best", "Team Placement", "Practice Attendance", "Season"]
+    },
+    {
+      "id": 6,
+      "name": "Organization Proposals",
+      "description": "Recognition awards for outstanding organizational proposals.",
+      "attributes": ["Grade", "School", "Proposal Topic", "Score", "Award Level", "Reviewer Rating", "Submission Date"]
+    },
+    {
+      "id": 7,
+      "name": "Amazon Product Reimagining",
+      "description": "Students reimagine and redesign Amazon products for real-world learning.",
+      "attributes": ["Grade", "School", "Product Category", "Innovation Score", "Presentation Rating", "Feasibility Score", "Team Size"]
+    }
+  ]
+}
