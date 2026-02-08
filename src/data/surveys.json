@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1770508739559",
+    "title": "test",
+    "description": "test survey",
+    "questions": [
+      {
+        "id": 1770508739559.5942,
+        "text": "test survey 1"
+      },
+      {
+        "id": 1770508739559.5764,
+        "text": "test survey question 2"
+      },
+      {
+        "id": 1770508739559.171,
+        "text": "test survey question 4"
+      }
+    ],
+    "createdAt": "2026-02-07T23:58:59.559Z",
+    "published": true
+  }
+]
