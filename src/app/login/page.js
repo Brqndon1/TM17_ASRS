@@ -1,98 +1,91 @@
-import Image from 'next/image';
+'use client';
+
+import Header from '@/components/Header';
+import { useState } from 'react';
 
 export default function LoginPage() {
-    return (
-      <div>
-        {/* Orange bar at the top */}
-        <div style={{ 
-          width: '100%', 
-          height: '110px', 
-          backgroundColor: '#D9940B',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          zIndex: 1000
-        }}>
-          <div style={{ position: 'absolute', top: '10px', left: '20px' }}>
-            <Image 
-              src="/asrs.png" 
-              alt="Logo" 
-              width={200} 
-              height={200}
-            />
-          </div>
-        </div>
+  const [userRole, setUserRole] = useState('public');
 
-        {/* Main content area */}
-        <div style={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          backgroundColor: '#f5f5f5',
-          paddingTop: '60px'
-        }}>
-        <div style={{ 
-          backgroundColor: 'white',
-          padding: '40px', 
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          width: '100%',
-          maxWidth: '400px'
-        }}>
-          <h1 style={{ marginBottom: '30px', color: 'black', scale: '2', textAlign: 'center' }}>Admin/Staff Login</h1>
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+      <Header userRole={userRole} onRoleChange={setUserRole} />
+
+      <main style={{ maxWidth: '460px', margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <div className="asrs-card">
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem', textAlign: 'center' }}>
+            Admin / Staff Login
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem', textAlign: 'center' }}>
+            Sign in to access staff and admin features.
+          </p>
+
           <form>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: 'black', marginBottom: '5px', fontWeight: '500' }}>
-                Email:
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{
+                display: 'block',
+                color: 'var(--color-text-primary)',
+                marginBottom: '0.4rem',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}>
+                Email
               </label>
-              <input 
-                type="email" 
-                style={{ 
-                  width: '100%', 
-                  padding: '10px', 
-                  border: '3px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '16px',
-                  color: 'black'
+              <input
+                type="email"
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem',
+                  border: '1px solid var(--color-bg-tertiary)',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: 'black', marginBottom: '5px', fontWeight: '500' }}>
-                Password:
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                color: 'var(--color-text-primary)',
+                marginBottom: '0.4rem',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}>
+                Password
               </label>
-              <input 
-                type="password" 
-                style={{ 
-                  width: '100%', 
-                  padding: '10px',
-                  border: '3px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '16px',
-                  color: 'black'
+              <input
+                type="password"
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem',
+                  border: '1px solid var(--color-bg-tertiary)',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
-            <button 
-              type="submit" 
-              style={{ 
+
+            <button
+              type="submit"
+              className="asrs-btn-primary"
+              style={{
                 width: '100%',
-                padding: '12px', 
-                backgroundColor: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                fontWeight: '500'
+                padding: '0.75rem',
+                fontSize: '1rem',
               }}
             >
               Login
             </button>
           </form>
         </div>
-      </div>
-      </div>
-    );
-  }
+      </main>
+    </div>
+  );
+}

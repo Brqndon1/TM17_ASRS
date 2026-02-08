@@ -1,57 +1,55 @@
-import pool, { initializeDatabase } from '@/lib/db';
+import db, { initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 // GET - Fetch all reports (or a single report by ?surveyId=)
 export async function GET(request) {
   try {
-    await initializeDatabase();
+    initializeDatabase();
 
     const { searchParams } = new URL(request.url);
     const surveyId = searchParams.get('surveyId');
 
     if (surveyId) {
       // ---------- Single report ----------
-      const result = await pool.query(
+      const row = db.prepare(
         `SELECT r.id, r.survey_id, r.report_data, r.created_at,
                 s.name, s.email
          FROM reports r
          JOIN surveys s ON r.survey_id = s.id
-         WHERE r.survey_id = $1`,
-        [surveyId]
-      );
+         WHERE r.survey_id = ?`
+      ).get(surveyId);
 
-      if (result.rows.length === 0) {
+      if (!row) {
         return NextResponse.json({ error: 'Report not found' }, { status: 404 });
       }
 
-      const row = result.rows[0];
       return NextResponse.json({
         report: {
           id: row.id,
           surveyId: row.survey_id,
           surveyName: row.name,
           surveyEmail: row.email,
-          reportData: row.report_data,
+          reportData: JSON.parse(row.report_data),
           createdAt: row.created_at,
         },
       });
     }
 
     // ---------- All reports ----------
-    const result = await pool.query(`
+    const rows = db.prepare(`
       SELECT r.id, r.survey_id, r.report_data, r.created_at,
              s.name, s.email
       FROM reports r
       JOIN surveys s ON r.survey_id = s.id
       ORDER BY r.created_at DESC
-    `);
+    `).all();
 
-    const formattedReports = result.rows.map((row) => ({
+    const formattedReports = rows.map((row) => ({
       id: row.id,
       surveyId: row.survey_id,
       surveyName: row.name,
       surveyEmail: row.email,
-      reportData: row.report_data,
+      reportData: JSON.parse(row.report_data),
       createdAt: row.created_at,
     }));
 

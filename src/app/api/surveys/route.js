@@ -1,11 +1,11 @@
-import pool, { initializeDatabase } from '@/lib/db';
+import db, { initializeDatabase } from '@/lib/db';
 import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
 
 // POST - Submit a survey
 export async function POST(request) {
   try {
-    await initializeDatabase();
+    initializeDatabase();
 
     const body = await request.json();
     const { name, email, responses } = body;
@@ -18,47 +18,39 @@ export async function POST(request) {
       );
     }
 
-    const client = await pool.connect();
-    try {
-      // Begin transaction so survey + report are atomic
-      await client.query('BEGIN');
+    // Generate basic statistics
+    const basicStats = generateBasicStats(responses);
 
-      // Insert survey into database
-      const surveyResult = await client.query(
-        `INSERT INTO surveys (name, email, responses)
-         VALUES ($1, $2, $3)
-         RETURNING id, submitted_at`,
-        [name, email, JSON.stringify(responses)]
-      );
+    // Generate AI-enhanced report using GPT-4
+    const reportData = await generateAIReport(responses, basicStats);
 
-      const surveyId = surveyResult.rows[0].id;
+    // Use a transaction so survey + report are atomic
+    const insertSurveyAndReport = db.transaction((name, email, responsesJSON, reportJSON) => {
+      const surveyInfo = db.prepare(
+        `INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)`
+      ).run(name, email, responsesJSON);
 
-      // Generate basic statistics
-      const basicStats = generateBasicStats(responses);
+      const surveyId = surveyInfo.lastInsertRowid;
 
-      // Generate AI-enhanced report using GPT-4
-      const reportData = await generateAIReport(responses, basicStats);
+      db.prepare(
+        `INSERT INTO reports (survey_id, report_data) VALUES (?, ?)`
+      ).run(surveyId, reportJSON);
 
-      // Insert report into database
-      await client.query(
-        `INSERT INTO reports (survey_id, report_data)
-         VALUES ($1, $2)`,
-        [surveyId, JSON.stringify(reportData)]
-      );
+      return surveyId;
+    });
 
-      await client.query('COMMIT');
+    const surveyId = insertSurveyAndReport(
+      name,
+      email,
+      JSON.stringify(responses),
+      JSON.stringify(reportData)
+    );
 
-      return NextResponse.json({
-        success: true,
-        surveyId,
-        report: reportData,
-      });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    return NextResponse.json({
+      success: true,
+      surveyId: Number(surveyId),
+      report: reportData,
+    });
   } catch (error) {
     console.error('Error submitting survey:', error);
     return NextResponse.json(
@@ -71,9 +63,9 @@ export async function POST(request) {
 // GET - Fetch all surveys and reports
 export async function GET() {
   try {
-    await initializeDatabase();
+    initializeDatabase();
 
-    const result = await pool.query(`
+    const rows = db.prepare(`
       SELECT
         s.id,
         s.name,
@@ -85,15 +77,15 @@ export async function GET() {
       FROM surveys s
       LEFT JOIN reports r ON s.id = r.survey_id
       ORDER BY s.submitted_at DESC
-    `);
+    `).all();
 
-    const formattedSurveys = result.rows.map((survey) => ({
+    const formattedSurveys = rows.map((survey) => ({
       id: survey.id,
       name: survey.name,
       email: survey.email,
-      responses: survey.responses,
+      responses: JSON.parse(survey.responses),
       submittedAt: survey.submitted_at,
-      report: survey.report_data || null,
+      report: survey.report_data ? JSON.parse(survey.report_data) : null,
       reportCreatedAt: survey.report_created_at,
     }));
 

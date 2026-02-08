@@ -1,9 +1,14 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily initialize OpenAI client (only when an API key is available)
+let _openai = null;
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) return null;
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 /**
  * Generate an enhanced report using GPT-4 based on survey responses
@@ -12,6 +17,18 @@ const openai = new OpenAI({
  * @returns {Promise<Object>} Enhanced report with AI-generated insights
  */
 export async function generateAIReport(responses, basicStats) {
+  const openai = getOpenAI();
+  if (!openai) {
+    // No API key configured — return basic stats only
+    return {
+      ...basicStats,
+      aiGenerated: false,
+      error: 'OpenAI API key not configured',
+      summary: `Survey completed with ${basicStats.completionRate}% completion rate (${basicStats.answeredQuestions}/${basicStats.totalQuestions} questions answered).`,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   try {
     // Prepare the prompt for GPT-4
     const prompt = `Analyze the following survey responses and generate a comprehensive report with insights, trends, and recommendations.
@@ -83,4 +100,4 @@ Format your response as a JSON object with the following structure:
   }
 }
 
-export default openai;
+export default getOpenAI;

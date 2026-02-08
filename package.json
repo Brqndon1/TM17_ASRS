@@ -9,9 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "next": "16.1.6",
     "openai": "^4.67.0",
-    "pg": "^8.13.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0"

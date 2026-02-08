@@ -18,10 +18,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Header from '@/frontend/asrs-reporting-ui/components/Header';
-import InitiativeSelector from '@/frontend/asrs-reporting-ui/components/InitiativeSelector';
-import ReportDashboard from '@/frontend/asrs-reporting-ui/components/ReportDashboard';
-import { getInitiatives, getReportData, getTrendData } from '@/frontend/asrs-reporting-ui/lib/dataService';
+import Header from '@/components/Header';
+import InitiativeSelector from '@/components/InitiativeSelector';
+import ReportDashboard from '@/components/ReportDashboard';
+import { getInitiatives, getReportData, getTrendData } from '@/lib/data-service';
 
 export default function ReportingPage() {
   // ---- STATE VARIABLES ----

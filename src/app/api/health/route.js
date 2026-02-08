@@ -1,4 +1,4 @@
-import pool, { initializeDatabase } from '@/lib/db';
+import db, { initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -10,12 +10,12 @@ export async function GET() {
 
   try {
     // Ensure tables exist
-    await initializeDatabase();
+    initializeDatabase();
 
     // Verify the connection with a simple query
-    const result = await pool.query('SELECT NOW() AS now');
+    const row = db.prepare("SELECT datetime('now') AS now").get();
     health.database = 'connected';
-    health.dbTime = result.rows[0].now;
+    health.dbTime = row.now;
   } catch (error) {
     health.status = 'degraded';
     health.database = 'disconnected';
