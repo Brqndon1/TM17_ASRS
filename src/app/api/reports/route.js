@@ -1,63 +1,42 @@
-import db, { initializeDatabase } from '@/lib/db';
-import { NextResponse } from 'next/server';
-
-// GET - Fetch all reports (or a single report by ?surveyId=)
-export async function GET(request) {
+// POST - Create a report (used by Report Creation tab)
+export async function POST(request) {
   try {
     initializeDatabase();
 
-    const { searchParams } = new URL(request.url);
-    const surveyId = searchParams.get('surveyId');
+    const body = await request.json();
 
-    if (surveyId) {
-      // ---------- Single report ----------
-      const row = db.prepare(
-        `SELECT r.id, r.survey_id, r.report_data, r.created_at,
-                s.name, s.email
-         FROM reports r
-         JOIN surveys s ON r.survey_id = s.id
-         WHERE r.survey_id = ?`
-      ).get(surveyId);
+    const initiativeId =
+      body.initiativeId || body.surveyId || body.initiative_id;
 
-      if (!row) {
-        return NextResponse.json({ error: 'Report not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({
-        report: {
-          id: row.id,
-          surveyId: row.survey_id,
-          surveyName: row.name,
-          surveyEmail: row.email,
-          reportData: JSON.parse(row.report_data),
-          createdAt: row.created_at,
-        },
-      });
+    if (!initiativeId) {
+      return NextResponse.json(
+        { error: 'initiativeId is required' },
+        { status: 400 }
+      );
     }
 
-    // ---------- All reports ----------
-    const rows = db.prepare(`
-      SELECT r.id, r.survey_id, r.report_data, r.created_at,
-             s.name, s.email
-      FROM reports r
-      JOIN surveys s ON r.survey_id = s.id
-      ORDER BY r.created_at DESC
-    `).all();
+    const reportData = {
+      ...body,
+      generatedAt: new Date().toISOString(),
+    };
 
-    const formattedReports = rows.map((row) => ({
-      id: row.id,
-      surveyId: row.survey_id,
-      surveyName: row.name,
-      surveyEmail: row.email,
-      reportData: JSON.parse(row.report_data),
-      createdAt: row.created_at,
-    }));
+    const result = db.prepare(
+      `INSERT INTO reports (initiative_id, report_data, created_at)
+       VALUES (?, ?, ?)`
+    ).run(
+      initiativeId,
+      JSON.stringify(reportData),
+      new Date().toISOString()
+    );
 
-    return NextResponse.json({ reports: formattedReports });
+    return NextResponse.json({
+      success: true,
+      reportId: result.lastInsertRowid,
+    });
   } catch (error) {
-    console.error('Error fetching reports:', error);
+    console.error('Error creating report:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch reports', details: error.message },
+      { error: 'Failed to create report', details: error.message },
       { status: 500 }
     );
   }
