@@ -145,16 +145,34 @@ export default function Header() {
             </>
           ) : null}
           
-          {/* Show Login button when not logged in, Logout when logged in */}
+          {/* Show Survey + Login buttons when not logged in, Logout when logged in */}
           {!isLoggedIn ? (
-            <Link 
-              href="/login" 
-              style={getNavLinkStyle('/login')}
-              onMouseEnter={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-              onMouseLeave={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-            >
-              Login
-            </Link>
+            <>
+              <Link 
+                href="/" 
+                style={getNavLinkStyle('/')}
+                onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Home
+              </Link>
+              <Link 
+                href="/survey" 
+                style={getNavLinkStyle('/survey')}
+                onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Take Survey
+              </Link>
+              <Link 
+                href="/login" 
+                style={getNavLinkStyle('/login')}
+                onMouseEnter={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Login
+              </Link>
+            </>
           ) : (
             <button 
               onClick={handleLogout} 
