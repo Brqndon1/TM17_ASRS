@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import SurveyForm from '@/components/SurveyForm';
 import { useState } from 'react';
 
 export default function SurveyPage() {
@@ -111,209 +112,28 @@ export default function SurveyPage() {
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
-      <main style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <div className="asrs-card">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
             Take a Survey
           </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.75rem' }}>
-            Share your feedback on the initiative. All fields marked with <span style={{ color: 'var(--color-asrs-red)' }}>*</span> are required.
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem' }}>
+            Select an initiative and fill out the available survey form. Your responses are stored and used for reporting.
           </p>
 
-          {/* ---- Success State ---- */}
-          {submitted ? (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-                Thank You!
-              </h2>
-              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                Your survey response has been submitted successfully.<br />
-                Your feedback helps improve future initiatives.
-              </p>
-              <button
-                onClick={handleReset}
-                className="asrs-btn-primary"
-                style={{ padding: '0.7rem 2rem', fontSize: '0.95rem' }}
-              >
-                Submit Another Response
-              </button>
-            </div>
-          ) : (
-            /* ---- Survey Form ---- */
-            <form onSubmit={handleSubmit}>
-              {/* Error banner */}
-              {error && (
-                <div style={{
-                  backgroundColor: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  padding: '0.75rem 1rem',
-                  marginBottom: '1.25rem',
-                  color: '#b91c1c',
-                  fontSize: '0.9rem',
-                  fontWeight: '500',
-                }}>
-                  {error}
-                </div>
-              )}
-
-              {/* ---- Section: Personal Information ---- */}
-              <div style={{
-                borderBottom: '1px solid var(--color-bg-tertiary)',
-                paddingBottom: '1.25rem',
-                marginBottom: '1.25rem',
-              }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
-                  Personal Information
-                </h2>
-
-                {/* First Name & Last Name – side by side */}
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
-                    <label style={labelStyle}>
-                      First Name <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      style={inputStyle}
-                      required
-                    />
-                  </div>
-                  <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
-                    <label style={labelStyle}>
-                      Last Name <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      style={inputStyle}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div style={fieldGroupStyle}>
-                  <label style={labelStyle}>
-                    Email Address <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    style={inputStyle}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* ---- Section: Initiative Feedback ---- */}
-              <div style={{
-                borderBottom: '1px solid var(--color-bg-tertiary)',
-                paddingBottom: '1.25rem',
-                marginBottom: '1.5rem',
-              }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
-                  Initiative Feedback
-                </h2>
-
-                {/* Rating question */}
-                <div style={fieldGroupStyle}>
-                  <label style={labelStyle}>
-                    How do you like your initiative? <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                  </label>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.65rem' }}>
-                    Select the option that best describes your experience.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {ratingOptions.map((option) => (
-                      <label
-                        key={option.value}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.65rem',
-                          padding: '0.6rem 0.85rem',
-                          borderRadius: '8px',
-                          border: initiativeRating === option.value
-                            ? '2px solid var(--color-asrs-orange)'
-                            : '1px solid var(--color-bg-tertiary)',
-                          backgroundColor: initiativeRating === option.value
-                            ? '#fdf4e8'
-                            : 'var(--color-bg-primary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="initiativeRating"
-                          value={option.value}
-                          checked={initiativeRating === option.value}
-                          onChange={(e) => setInitiativeRating(e.target.value)}
-                          style={{ accentColor: 'var(--color-asrs-orange)' }}
-                        />
-                        <span style={{ fontSize: '1.15rem' }}>{option.emoji}</span>
-                        <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
-                          {option.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Additional comments */}
-                <div style={fieldGroupStyle}>
-                  <label style={labelStyle}>
-                    Additional Comments
-                  </label>
-                  <textarea
-                    placeholder="Share any additional thoughts or suggestions…"
-                    value={initiativeComments}
-                    onChange={(e) => setInitiativeComments(e.target.value)}
-                    rows={4}
-                    style={{
-                      ...inputStyle,
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* ---- Submit Button ---- */}
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="asrs-btn-secondary"
-                  disabled={isSubmitting}
-                >
-                  Clear Form
-                </button>
-                <button
-                  type="submit"
-                  className="asrs-btn-primary"
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '0.65rem 2rem',
-                    fontSize: '0.95rem',
-                    opacity: isSubmitting ? 0.7 : 1,
-                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {isSubmitting ? 'Submitting…' : 'Submit Survey'}
-                </button>
-              </div>
-            </form>
-          )}
+          <div style={{
+            border: '2px dashed var(--color-bg-tertiary)',
+            borderRadius: '12px',
+            padding: '4rem 2rem',
+            textAlign: 'center',
+            color: 'var(--color-text-light)',
+          }}>
+            <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Survey Form</p>
+            <p style={{ fontSize: '0.9rem' }}>
+              This page will display the active survey form for a selected initiative.
+              Users fill in the dynamically rendered fields and submit their responses.
+            </p>
+          </div>
         </div>
       </main>
     </div>

@@ -1,0 +1,154 @@
+"use client";
+import { useState } from "react";
+
+export default function SurveyForm() {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""] }]);
+  const [saving, setSaving] = useState(false);
+
+  const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""] }]);
+  
+  const updateQuestion = (idx, field, value) => {
+    const copy = [...questions];
+    copy[idx][field] = value;
+    if (field === 'type' && value === 'choice' && (!copy[idx].options || copy[idx].options.length === 0)) {
+      copy[idx].options = [""];
+    }
+    setQuestions(copy);
+  };
+  
+  const removeQuestion = (idx) => setQuestions(questions.filter((_, i) => i !== idx));
+  const addOption = (qIdx) => {
+    const copy = [...questions];
+    if (!copy[qIdx].options) copy[qIdx].options = [];
+    copy[qIdx].options.push("");
+    setQuestions(copy);
+  };
+  const updateOption = (qIdx, oIdx, val) => {
+    const copy = [...questions];
+    copy[qIdx].options[oIdx] = val;
+    setQuestions(copy);
+  };
+  const removeOption = (qIdx, oIdx) => {
+    const copy = [...questions];
+    copy[qIdx].options = copy[qIdx].options.filter((_, i) => i !== oIdx);
+    setQuestions(copy);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!title.trim()) return alert("Please enter a title");
+    if (!description.trim()) return alert("Please enter a description");
+    
+    const validQuestions = questions.filter((q) => q.question.trim());
+    if (validQuestions.length === 0) return alert("Please add at least one question");
+    
+    for (let i = 0; i < questions.length; i++) {
+      if (!questions[i].question.trim()) return alert(`Please enter text for Question ${i + 1}`);
+      if (questions[i].type === 'choice') {
+        const validOptions = questions[i].options.filter(opt => opt.trim());
+        if (validOptions.length === 0) {
+          return alert(`Question ${i + 1} is multiple choice but has no options. Please add at least one option.`);
+        }
+      }
+    }
+    
+    setSaving(true);
+    try {
+      const payload = {
+        title,
+        description,
+        questions: validQuestions.map(q => ({
+          question: q.question,
+          type: q.type,
+          options: q.type === 'choice' ? q.options.filter(opt => opt.trim()) : undefined
+        }))
+      };
+      
+      const res = await fetch("/api/surveys/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!res.ok) throw new Error((await res.json()).error || "Unknown error");
+      
+      const data = await res.json();
+      alert(`Survey template created successfully!`);
+      
+      setTitle("");
+      setDescription("");
+      setQuestions([{ question: "", type: "text", options: [""] }]);
+    } catch (err) {
+      alert("Error creating survey template: " + (err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = { width: "100%", padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem' };
+  const labelStyle = { display: "block", fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-primary)' };
+
+  return (
+    <div style={{ justifyContent: 'center', alignItems: 'center', display: 'flex' }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 900, width: '100%' }}>
+        <div className="asrs-card" style={{ padding: '1.5rem' }}>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Survey Title *</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Enter survey title" style={inputStyle} />
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Description *</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Provide a brief description of this survey" rows={3} style={{...inputStyle, resize: 'vertical'}} />
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={labelStyle}>Questions *</label>
+            
+            {questions.map((q, i) => (
+              <div key={i} style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--color-bg-tertiary)', borderRadius: 8, backgroundColor: 'var(--color-bg-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>Question {i + 1} *</span>
+                  <div style={{ flex: 1 }}></div>
+                  <button type="button" onClick={() => removeQuestion(i)} disabled={questions.length === 1} className="asrs-btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.875rem' }}>Remove</button>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  <input value={q.question} onChange={(e) => updateQuestion(i, 'question', e.target.value)} required placeholder={`Enter question ${i + 1}`} style={{ flex: '1 1 60%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem' }} />
+                  <select value={q.type} onChange={(e) => updateQuestion(i, 'type', e.target.value)} style={{ flex: '1 1 35%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem', cursor: 'pointer' }}>
+                    <option value="text">Text Response</option>
+                    <option value="numeric">Numeric</option>
+                    <option value="choice">Multiple Choice</option>
+                  </select>
+                </div>
+
+                {q.type === 'choice' && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: 6, border: '1px dashed var(--color-bg-tertiary)' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Answer Options *</span>
+                    {q.options && q.options.map((option, oIdx) => (
+                      <div key={oIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <input value={option} onChange={(e) => updateOption(i, oIdx, e.target.value)} placeholder={`Option ${oIdx + 1}`} style={{ flex: 1, padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)', fontSize: '0.9rem' }} />
+                        <button type="button" onClick={() => removeOption(i, oIdx)} disabled={q.options.length === 1} className="asrs-btn-secondary" style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}>✕</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => addOption(i)} className="asrs-btn-secondary" style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', marginTop: '0.25rem' }}>+ Add Option</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            <button type="button" onClick={addQuestion} className="asrs-btn-secondary">+ Add Question</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--color-bg-tertiary)' }}>
+            <button type="submit" disabled={saving} className="asrs-btn-primary">{saving ? "Creating..." : "Create Survey Template"}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
