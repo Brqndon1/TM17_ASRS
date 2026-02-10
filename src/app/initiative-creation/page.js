@@ -50,7 +50,7 @@ export default function InitiativeCreationPage() {
   const [selectedAttributes, setSelectedAttributes] = useState([]);
   const [addQuestions, setAddQuestions] = useState(false);
   const [questions, setQuestions] = useState(['']);
-  const [status, setStatus] = useState('draft'); // draft, active, archived
+  const [status, setStatus] = useState('Active'); // active, archived
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -124,7 +124,7 @@ export default function InitiativeCreationPage() {
         setSelectedAttributes([]);
         setAddQuestions(false);
         setQuestions(['']);
-        setStatus('draft');
+        setStatus('Active');
         setIsPublic(false);
         setTimeout(() => {
           router.push('/');
@@ -329,7 +329,6 @@ export default function InitiativeCreationPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <option value="draft">Draft</option>
                   <option value="active">Active</option>
                   <option value="archived">Archived</option>
                 </select>
