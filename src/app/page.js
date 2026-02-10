@@ -1,6 +1,5 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 
@@ -34,16 +33,30 @@ const routes = [
     href: '/login',
     label: 'Login',
     description: 'Sign in to access staff and admin features.',
+    showOnlyWhenLoggedOut: true, // Only show this when not logged in
   },
 ];
 
 export default function Home() {
-  const [userRole, setUserRole] = useState('public');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const user = localStorage.getItem('user');
+    setIsLoggedIn(!!user);
+  }, []);
+
+  // Filter routes based on login status
+  const visibleRoutes = routes.filter(route => {
+    if (route.showOnlyWhenLoggedOut) {
+      return !isLoggedIn; // Only show if NOT logged in
+    }
+    return true; // Show all other routes
+  });
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
-
+      <Header />
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <div className="asrs-card" style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
@@ -53,13 +66,12 @@ export default function Home() {
             Select a section to get started.
           </p>
         </div>
-
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: '1rem',
         }}>
-          {routes.map(({ href, label, description }) => (
+          {visibleRoutes.map(({ href, label, description }) => (
             <Link
               key={href}
               href={href}

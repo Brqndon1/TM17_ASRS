@@ -1,27 +1,65 @@
 /**
  * ============================================================================
- * HEADER COMPONENT — The top navigation bar of the reporting system.
+ * HEADER COMPONENT – The top navigation bar of the reporting system.
  * ============================================================================
  * Displays:
  * - The ASRS logo (loaded from /public/asrs-logo.png)
  * - The system title
- * - A role selector (Public/Staff/Admin) for testing different user views
- *
- * Props:
- * - userRole: string — The currently selected role ('public', 'staff', 'admin')
- * - onRoleChange: function — Called when the user changes the role dropdown
- *
- * [API ADJUSTMENT] When real authentication is implemented:
- * - REMOVE the role selector dropdown entirely.
- * - Instead, read the user's role from the authentication session/token.
- * - The role would come from the user_type table in the database.
+ * - Navigation tabs (shown only when logged in) with active highlighting
+ * - Login/Logout button
+ * - User info when logged in
  * ============================================================================
  */
 'use client';
 
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
-export default function Header({ userRole, onRoleChange }) {
+export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [user, setUser] = useState(null);
+
+  // Check for logged-in user on component mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    router.push('/login');
+  };
+
+  const isLoggedIn = !!user;
+
+  // Helper function to check if a route is active
+  const isActive = (href) => {
+    if (href === '/') {
+      return pathname === '/';
+    }
+    return pathname.startsWith(href);
+  };
+
+  // Navigation link style with active state
+  const getNavLinkStyle = (href) => ({
+    padding: '0.4rem 1rem',
+    borderRadius: '6px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    backgroundColor: isActive(href) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+    color: 'white',
+    fontSize: '0.85rem',
+    fontWeight: isActive(href) ? '700' : '600',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+    boxShadow: isActive(href) ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+  });
+
   return (
     <header style={{
       background: 'linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%)',
@@ -39,8 +77,6 @@ export default function Header({ userRole, onRoleChange }) {
     }}>
       {/* ---- Left Section: Logo + Title ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        {/* ASRS Logo — loads from the public/ folder */}
-        {/* Next.js serves anything in /public at the root URL path */}
         <img
           src="/asrs-logo.png"
           alt="ASRS Logo"
@@ -60,67 +96,102 @@ export default function Header({ userRole, onRoleChange }) {
         </div>
       </div>
 
-      {/* ---- Right Section: Role Selector ---- */}
-      {/*
-       * [API ADJUSTMENT] REMOVE this entire div when real login is implemented.
-       * The user's role will be determined by authentication, not a dropdown.
-       * The login system will read from the user_type table in the database
-       * and set the role automatically.
-       */}
+      {/* ---- Right Section: Navigation ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <nav style={{ display: 'flex', gap: '0.5rem' }}>
-          {[
-            { href: '/', label: 'Home' },
-            { href: '/form-creation', label: 'Form Creation' },
-            { href: '/survey', label: 'Survey' },
-            { href: '/report-creation', label: 'Report Creation' },
-            { href: '/reporting', label: 'Reporting' },
-            { href: '/login', label: 'Login' },
-          ].map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                padding: '0.4rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.3)',
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                fontSize: '0.85rem',
-                fontWeight: '600',
-                textDecoration: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'}
+          {/* Show all navigation tabs only when logged in */}
+          {isLoggedIn ? (
+            <>
+              <Link 
+                href="/" 
+                style={getNavLinkStyle('/')}
+                onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Home
+              </Link>
+              <Link 
+                href="/form-creation" 
+                style={getNavLinkStyle('/form-creation')}
+                onMouseEnter={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Form Creation
+              </Link>
+              <Link 
+                href="/survey" 
+                style={getNavLinkStyle('/survey')}
+                onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Survey
+              </Link>
+              <Link 
+                href="/report-creation" 
+                style={getNavLinkStyle('/report-creation')}
+                onMouseEnter={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Report Creation
+              </Link>
+              <Link 
+                href="/reporting" 
+                style={getNavLinkStyle('/reporting')}
+                onMouseEnter={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Reporting
+              </Link>
+            </>
+          ) : null}
+          
+          {/* Show Login button when not logged in, Logout when logged in */}
+          {!isLoggedIn ? (
+            <Link 
+              href="/login" 
+              style={getNavLinkStyle('/login')}
+              onMouseEnter={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+              onMouseLeave={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
             >
-              {label}
+              Login
             </Link>
-          ))}
+          ) : (
+            <button 
+              onClick={handleLogout} 
+              style={logoutButtonStyle}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'}
+            >
+              Logout
+            </button>
+          )}
         </nav>
-        <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
-        <label style={{ fontSize: '0.85rem', opacity: 0.9 }}>
-          Viewing as:
-        </label>
-        <select
-          value={userRole}
-          onChange={(e) => onRoleChange(e.target.value)}
-          style={{
-            padding: '0.4rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid rgba(255,255,255,0.3)',
-            backgroundColor: 'rgba(255,255,255,0.15)',
-            color: 'white',
-            fontSize: '0.85rem',
-            cursor: 'pointer'
-          }}
-        >
-          <option value="public" style={{ color: '#2C2C2C' }}>Public User</option>
-          <option value="staff" style={{ color: '#2C2C2C' }}>Staff User</option>
-          <option value="admin" style={{ color: '#2C2C2C' }}>Admin User</option>
-        </select>
+
+        {/* Show user info when logged in */}
+        {isLoggedIn && (
+          <>
+            <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
+            <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>
+              {user.first_name} {user.last_name}
+              <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                {user.user_type}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </header>
   );
 }
+
+const logoutButtonStyle = {
+  padding: '0.4rem 1rem',
+  borderRadius: '6px',
+  border: '1px solid rgba(255,255,255,0.3)',
+  backgroundColor: 'rgba(255,255,255,0.25)',
+  color: 'white',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease',
+};
