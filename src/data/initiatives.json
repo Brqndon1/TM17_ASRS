@@ -97,6 +97,24 @@
         "Feasibility Score",
         "Team Size"
       ]
+    },
+    {
+      "id": 8,
+      "name": "Test123",
+      "description": "This is a test initiative.",
+      "attributes": [
+        "Grade",
+        "School",
+        "Interest Level"
+      ],
+      "questions": [
+        "What is your favorite part of this initiative?",
+        "Any changes you would recommend for the initiative?"
+      ],
+      "settings": {
+        "status": "Active",
+        "isPublic": true
+      }
     }
   ]
 }
