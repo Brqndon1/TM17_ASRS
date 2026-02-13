@@ -2,10 +2,20 @@
 
 import Header from '@/components/Header';
 import SurveyForm from '@/components/SurveyForm';
-import { useState } from 'react';
+import QRCodeManager from '@/components/QRCodeManager';
+import { useState, useEffect } from 'react';
 
 export default function SurveyPage() {
   const [userRole, setUserRole] = useState('public');
+
+  // Check for logged-in user and set their role
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setUserRole(user.user_type || 'public');
+    }
+  }, []);
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -110,7 +120,7 @@ export default function SurveyPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
+      <Header />
 
       <main style={{ 
         maxWidth: userRole === 'public' ? '680px' : '1100px', 
@@ -323,15 +333,15 @@ export default function SurveyPage() {
             )}
           </div>
         ) : (
-          // Staff/Admin user view - Create Survey
+          // Staff/Admin user view - Create Survey & QR Code Management
           <section>
-            <div style={{ 
-              justifyContent: 'center', 
-              textAlign: 'center', 
-              alignItems: 'center', 
-              display: 'flex', 
-              gap: '1rem', 
-              marginBottom: '1rem' 
+            <div style={{
+              justifyContent: 'center',
+              textAlign: 'center',
+              alignItems: 'center',
+              display: 'flex',
+              gap: '1rem',
+              marginBottom: '1rem'
             }}>
               <div>
                 <h1 style={{ margin: 0, fontWeight: 'bold' }}>Create Survey</h1>
@@ -340,7 +350,17 @@ export default function SurveyPage() {
                 </p>
               </div>
             </div>
+
+            {/* Survey Template Creation Form */}
             <SurveyForm />
+
+            {/* QR Code Generator & Management */}
+            <div style={{ marginTop: '2rem' }}>
+              <QRCodeManager
+                qrType="survey"
+                showStats={true}
+              />
+            </div>
           </section>
         )}
       </main>
