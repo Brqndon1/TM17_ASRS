@@ -128,6 +128,16 @@ export default function Header() {
               >
                 Survey
               </Link>
+              {isAdmin && (
+                <Link 
+                  href="/survey-distribution" 
+                  style={getNavLinkStyle('/survey-distribution')}
+                  onMouseEnter={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                  onMouseLeave={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                >
+                  Distribute
+                </Link>
+              )}
               <Link 
                 href="/report-creation" 
                 style={getNavLinkStyle('/report-creation')}
