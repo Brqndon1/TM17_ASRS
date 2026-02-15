@@ -160,6 +160,21 @@ function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Survey distribution table (US-010: distribute surveys with deadlines)
+
+    CREATE TABLE IF NOT EXISTS survey_distribution (
+      distribution_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      survey_template_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','closed')),
+      recipient_emails TEXT NOT NULL DEFAULT '[]',
+      response_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      created_by_user_id INTEGER REFERENCES user(user_id)
+    );
+
     -- Indexes
 
     CREATE INDEX IF NOT EXISTS idx_submission_initiative_date ON submission(initiative_id, submitted_at DESC);
@@ -169,6 +184,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_surveys_submitted_at ON surveys(submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reports_survey_id ON reports(survey_id);
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
+    CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
   `);
 
   // ── Seed data ────────────────────────────────────────
