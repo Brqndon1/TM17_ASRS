@@ -261,6 +261,23 @@ function initializeDatabase() {
     }
   }
 
+  // ── Seed test accounts ──────────────────────────────
+  // These are auto-created so teammates can log in immediately after cloning.
+  // The /data directory is gitignored, so the DB is recreated locally for each dev.
+
+  const adminType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'admin'").get();
+  const staffType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'staff'").get();
+
+  const insertUser = db.prepare(
+    'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id) VALUES (?, ?, ?, ?, ?)'
+  );
+  if (adminType) {
+    insertUser.run('Test', 'Admin', 'admin@test.com', 'admin123', adminType.user_type_id);
+  }
+  if (staffType) {
+    insertUser.run('Test', 'Staff', 'staff@test.com', 'staff123', staffType.user_type_id);
+  }
+
   _initialized = true;
   console.log('[db] SQLite database initialized at', DB_PATH);
 }
