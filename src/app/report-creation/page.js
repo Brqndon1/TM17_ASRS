@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import { getInitiatives } from '@/lib/data-service';
 
 export default function ReportCreationPage() {
@@ -69,6 +70,7 @@ export default function ReportCreationPage() {
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+        <BackButton />
         <div className="asrs-card">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700 }}>
             Report Creation

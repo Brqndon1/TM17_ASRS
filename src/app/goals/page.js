@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -214,6 +215,8 @@ export default function GoalsPage() {
       <Header />
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+        <BackButton />
+
         <div className="asrs-card" style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
             Initiative Goals & Scoring

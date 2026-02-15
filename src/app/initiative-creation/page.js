@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -138,6 +139,8 @@ export default function InitiativeCreationPage() {
       <Header />
 
       <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <BackButton />
+
         {/* Page Header */}
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{

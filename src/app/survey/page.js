@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import SurveyForm from '@/components/SurveyForm';
 import QRCodeManager from '@/components/QRCodeManager';
 import { useState, useEffect } from 'react';
@@ -127,6 +128,7 @@ export default function SurveyPage() {
         margin: '0 auto', 
         padding: userRole === 'public' ? '2rem 1.5rem' : '1.5rem' 
       }}>
+        <BackButton />
         {userRole === 'public' ? (
           // Public user view - Take a Survey (completed form)
           <div className="asrs-card">

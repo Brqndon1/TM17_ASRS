@@ -19,6 +19,7 @@
 
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
 import { getInitiatives, getReportData, getTrendData } from '@/lib/data-service';
@@ -96,6 +97,11 @@ export default function ReportingPage() {
     >
       {/* ---- HEADER ---- */}
       <Header userRole={userRole} onRoleChange={setUserRole} />
+
+      {/* ---- BACK BUTTON ---- */}
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
+        <BackButton />
+      </div>
 
       {/* ---- INITIATIVE SELECTOR ---- */}
       <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem' }}>
