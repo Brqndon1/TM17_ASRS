@@ -168,10 +168,20 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <strong>Test Login:</strong><br />
-            Email: test@gmail.com<br />
-            Password: testing
+          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '8px', fontSize: '0.85rem', lineHeight: '1.6' }}>
+            <strong>Test Accounts:</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div style={{ padding: '0.5rem 0.75rem', backgroundColor: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
+                <div style={{ fontWeight: '600', color: 'var(--color-asrs-red)', marginBottom: '0.25rem' }}>Admin</div>
+                <div>Email: <code style={{ fontSize: '0.8rem' }}>admin@test.com</code></div>
+                <div>Password: <code style={{ fontSize: '0.8rem' }}>admin123</code></div>
+              </div>
+              <div style={{ padding: '0.5rem 0.75rem', backgroundColor: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
+                <div style={{ fontWeight: '600', color: 'var(--color-asrs-orange)', marginBottom: '0.25rem' }}>Staff</div>
+                <div>Email: <code style={{ fontSize: '0.8rem' }}>staff@test.com</code></div>
+                <div>Password: <code style={{ fontSize: '0.8rem' }}>staff123</code></div>
+              </div>
+            </div>
           </div>
         </div>
       </main>

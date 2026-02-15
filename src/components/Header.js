@@ -145,16 +145,26 @@ export default function Header() {
                 Reporting
               </Link>
 
-              {/* Admin-only: User Management tab */}
+              {/* Admin-only tabs */}
               {isAdmin && (
-                <Link 
-                  href="/admin/users" 
-                  style={getNavLinkStyle('/admin/users')}
-                  onMouseEnter={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                  onMouseLeave={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                >
-                  User Management
-                </Link>
+                <>
+                  <Link 
+                    href="/goals" 
+                    style={getNavLinkStyle('/goals')}
+                    onMouseEnter={(e) => !isActive('/goals') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                    onMouseLeave={(e) => !isActive('/goals') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                  >
+                    Goals
+                  </Link>
+                  <Link 
+                    href="/admin/users" 
+                    style={getNavLinkStyle('/admin/users')}
+                    onMouseEnter={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                    onMouseLeave={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                  >
+                    User Management
+                  </Link>
+                </>
               )}
             </>
           ) : null}
