@@ -1,11 +1,12 @@
 /**
  * ============================================================================
- * HEADER COMPONENT – The top navigation bar of the reporting system.
+ * HEADER COMPONENT — The top navigation bar of the reporting system.
  * ============================================================================
  * Displays:
  * - The ASRS logo (loaded from /public/asrs-logo.png)
  * - The system title
  * - Navigation tabs (shown only when logged in) with active highlighting
+ * - "User Management" tab (shown only for admin users)
  * - Login/Logout button
  * - User info when logged in
  * ============================================================================
@@ -36,6 +37,7 @@ export default function Header() {
   };
 
   const isLoggedIn = !!user;
+  const isAdmin = isLoggedIn && user.user_type === 'admin';
 
   // Helper function to check if a route is active
   const isActive = (href) => {
@@ -142,6 +144,18 @@ export default function Header() {
               >
                 Reporting
               </Link>
+
+              {/* Admin-only: User Management tab */}
+              {isAdmin && (
+                <Link 
+                  href="/admin/users" 
+                  style={getNavLinkStyle('/admin/users')}
+                  onMouseEnter={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                  onMouseLeave={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                >
+                  User Management
+                </Link>
+              )}
             </>
           ) : null}
           
