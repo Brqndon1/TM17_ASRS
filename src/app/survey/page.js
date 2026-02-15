@@ -30,6 +30,38 @@ export default function SurveyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
 
+  // Distribution / auto-close state (public users only)
+  const [surveyOpen, setSurveyOpen] = useState(null); // null = loading, true = open, false = closed
+  const [activeDistribution, setActiveDistribution] = useState(null);
+
+  // Check for an active distribution on mount (public users only)
+  useEffect(() => {
+    if (userRole !== 'public') return;
+
+    fetch('/api/surveys/distributions')
+      .then((res) => res.json())
+      .then((data) => {
+        const dists = data.distributions || [];
+        const today = new Date().toISOString().split('T')[0];
+
+        // Find a distribution that is active and whose end_date hasn't passed
+        const active = dists.find(
+          (d) => d.status === 'active' && d.end_date >= today
+        );
+
+        if (active) {
+          setSurveyOpen(true);
+          setActiveDistribution(active);
+        } else {
+          setSurveyOpen(false);
+        }
+      })
+      .catch(() => {
+        // If the API fails, default to allowing the survey (graceful degradation)
+        setSurveyOpen(true);
+      });
+  }, [userRole]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -132,12 +164,42 @@ export default function SurveyPage() {
         {userRole === 'public' ? (
           // Public user view - Take a Survey (completed form)
           <div className="asrs-card">
+            {/* ---- Loading distribution check ---- */}
+            {surveyOpen === null ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>
+                  Checking survey availability…
+                </p>
+              </div>
+            ) : !surveyOpen ? (
+              /* ---- Survey Closed State ---- */
+              <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
+                  Survey Closed
+                </h2>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: '0.5rem', lineHeight: 1.6 }}>
+                  This survey is no longer accepting responses.<br />
+                  The submission deadline has passed.
+                </p>
+                <p style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
+                  If you believe this is an error, please contact the survey administrator.
+                </p>
+              </div>
+            ) : (
+              /* ---- Survey Open — show form ---- */
+              <>
             <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
               Take a Survey
             </h1>
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.75rem' }}>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '0.25rem' }}>
               Share your feedback on the initiative. All fields marked with <span style={{ color: 'var(--color-asrs-red)' }}>*</span> are required.
             </p>
+            {activeDistribution && (
+              <p style={{ color: 'var(--color-text-light)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>
+                📅 Open until <strong>{activeDistribution.end_date}</strong>
+              </p>
+            )}
 
             {/* ---- Success State ---- */}
             {submitted ? (
@@ -332,6 +394,8 @@ export default function SurveyPage() {
                   </button>
                 </div>
               </form>
+            )}
+              </>
             )}
           </div>
         ) : (
