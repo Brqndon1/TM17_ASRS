@@ -41,6 +41,7 @@ function initializeDatabase() {
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
       phone_number TEXT,
       user_type_id INTEGER REFERENCES user_type(user_type_id)
     );
@@ -175,8 +176,27 @@ function initializeDatabase() {
       created_by_user_id INTEGER REFERENCES user(user_id)
     );
 
+    -- Initiative goals table (US-014: set goals with scoring criteria)
+
+    CREATE TABLE IF NOT EXISTS initiative_goal (
+      goal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      goal_name TEXT NOT NULL,
+      description TEXT,
+      target_metric TEXT NOT NULL,
+      target_value REAL NOT NULL,
+      current_value REAL NOT NULL DEFAULT 0,
+      weight REAL NOT NULL DEFAULT 1.0,
+      scoring_method TEXT NOT NULL DEFAULT 'linear'
+        CHECK (scoring_method IN ('linear','threshold','binary')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      created_by_user_id INTEGER REFERENCES user(user_id)
+    );
+
     -- Indexes
 
+    CREATE INDEX IF NOT EXISTS idx_goal_initiative ON initiative_goal(initiative_id);
     CREATE INDEX IF NOT EXISTS idx_submission_initiative_date ON submission(initiative_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_form_date ON submission(form_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_value_submission ON submission_value(submission_id);
@@ -220,6 +240,7 @@ function initializeDatabase() {
   insertFeature.run('REPORT_VIEW', 'View Reports', 'View generated reports');
   insertFeature.run('REPORT_CREATE_DEFAULT', 'Create Reports', 'Create and run report templates');
   insertFeature.run('ADMIN_USERS', 'Manage Users', 'Manage user accounts and permissions');
+  insertFeature.run('GOAL_MANAGE', 'Manage Goals', 'Set and manage initiative goals with scoring criteria');
 
   // Set feature access ranks
   const featureRows = db.prepare('SELECT feature_id, key FROM feature').all();
@@ -229,6 +250,7 @@ function initializeDatabase() {
     REPORT_VIEW: 10,
     REPORT_CREATE_DEFAULT: 50,
     ADMIN_USERS: 100,
+    GOAL_MANAGE: 100,
   };
   const insertAccess = db.prepare(
     'INSERT OR IGNORE INTO feature_access (feature_id, min_access_rank) VALUES (?, ?)'
@@ -237,6 +259,23 @@ function initializeDatabase() {
     if (rankMap[row.key] !== undefined) {
       insertAccess.run(row.feature_id, rankMap[row.key]);
     }
+  }
+
+  // ── Seed test accounts ──────────────────────────────
+  // These are auto-created so teammates can log in immediately after cloning.
+  // The /data directory is gitignored, so the DB is recreated locally for each dev.
+
+  const adminType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'admin'").get();
+  const staffType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'staff'").get();
+
+  const insertUser = db.prepare(
+    'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id) VALUES (?, ?, ?, ?, ?)'
+  );
+  if (adminType) {
+    insertUser.run('Test', 'Admin', 'admin@test.com', 'admin123', adminType.user_type_id);
+  }
+  if (staffType) {
+    insertUser.run('Test', 'Staff', 'staff@test.com', 'staff123', staffType.user_type_id);
   }
 
   _initialized = true;

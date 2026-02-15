@@ -1,9 +1,10 @@
 'use client';
 
 import Header from '@/components/Header';
+import BackButton from '@/components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-// Attribute catalog - common attributes available for initiatives
+
 const ATTRIBUTE_CATALOG = [
   'Grade',
   'School',
@@ -44,21 +45,20 @@ const ATTRIBUTE_CATALOG = [
 
 export default function InitiativeCreationPage() {
   const router = useRouter();
-  const [userRole, setUserRole] = useState('staff');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedAttributes, setSelectedAttributes] = useState([]);
   const [addQuestions, setAddQuestions] = useState(false);
   const [questions, setQuestions] = useState(['']);
-  const [status, setStatus] = useState('Active'); // active, archived
+  const [status, setStatus] = useState('Active');
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAttributeToggle = (attribute) => {
-    setSelectedAttributes(prev => 
+    setSelectedAttributes((prev) =>
       prev.includes(attribute)
-        ? prev.filter(a => a !== attribute)
+        ? prev.filter((a) => a !== attribute)
         : [...prev, attribute]
     );
   };
@@ -68,18 +68,16 @@ export default function InitiativeCreationPage() {
     updated[index] = value;
     setQuestions(updated);
   };
-  
+
   const addQuestionField = () => {
     setQuestions([...questions, '']);
   };
-  
+
   const removeQuestionField = (index) => {
     setQuestions(questions.filter((_, i) => i !== index));
   };
-  
 
   const handleSubmit = async (e) => {
-    let file_submitted = false;
     e.preventDefault();
     setMessage('');
     setIsSubmitting(true);
@@ -96,8 +94,9 @@ export default function InitiativeCreationPage() {
       return;
     }
 
-    const cleanedQuestions = addQuestions ? questions.map(q => q.trim()).filter(Boolean): [];
-
+    const cleanedQuestions = addQuestions
+      ? questions.map((q) => q.trim()).filter(Boolean)
+      : [];
 
     try {
       const response = await fetch('/api/initiatives', {
@@ -108,10 +107,7 @@ export default function InitiativeCreationPage() {
           description: description.trim(),
           attributes: selectedAttributes,
           questions: cleanedQuestions,
-          settings: {
-            status,
-            isPublic,
-          },
+          settings: { status, isPublic },
         }),
       });
 
@@ -126,9 +122,7 @@ export default function InitiativeCreationPage() {
         setQuestions(['']);
         setStatus('Active');
         setIsPublic(false);
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
+        setTimeout(() => router.push('/'), 2000);
       } else {
         setMessage(`${data.error || 'Failed to create initiative'}`);
       }
@@ -142,41 +136,48 @@ export default function InitiativeCreationPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
+      <Header />
 
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <div className="asrs-card">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-            Initiative Creation
+      <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <BackButton />
+
+        {/* Page Header */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{
+            fontSize: '1.75rem',
+            fontWeight: '700',
+            color: 'var(--color-text-primary)',
+            marginBottom: '0.4rem',
+          }}>
+            Create Initiative
           </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem' }}>
-            Create and configure new ASRS initiatives. Define the initiative name, description, attributes, and associated settings.
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+            Define a new ASRS initiative with its name, description, attributes, and settings.
           </p>
+        </div>
 
-          {/* {message && (
-            <div style={{
-              padding: '0.75rem',
-              marginBottom: '1.5rem',
-              backgroundColor: message.includes('') ? '#e8f5e9' : '#ffebee',
-              border: `1px solid ${message.includes('') ? '#c8e6c9' : '#ffcdd2'}`,
-              borderRadius: '8px',
-              color: message.includes('') ? '#2e7d32' : '#c62828',
-              fontSize: '0.9rem',
-            }}>
-              {message}
-            </div>
-          )} */}
+        {/* Status Message */}
+        {message && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            marginBottom: '1.5rem',
+            backgroundColor: message.includes('successfully') ? '#e8f5e9' : '#ffebee',
+            border: `1px solid ${message.includes('successfully') ? '#c8e6c9' : '#ffcdd2'}`,
+            borderRadius: '8px',
+            color: message.includes('successfully') ? '#2e7d32' : '#c62828',
+            fontSize: '0.9rem',
+          }}>
+            {message}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit}>
-            {/* Initiative Name */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.5rem',
-                fontWeight: '600',
-                fontSize: '0.95rem',
-              }}>
+        <form onSubmit={handleSubmit}>
+          {/* ── Name & Description ─────────────────────── */}
+          <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+            <h2 style={sectionHeadingStyle}>Basic Information</h2>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>
                 Initiative Name <span style={{ color: '#c62828' }}>*</span>
               </label>
               <input
@@ -185,286 +186,238 @@ export default function InitiativeCreationPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., E-Gaming and Careers"
                 required
-                style={{
-                  width: '100%',
-                  padding: '0.625rem 0.75rem',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  color: 'var(--color-text-primary)',
-                  backgroundColor: 'white',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                style={inputStyle}
               />
             </div>
 
-            {/* Description */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.5rem',
-                fontWeight: '600',
-                fontSize: '0.95rem',
-              }}>
-                Description
-              </label>
+            <div>
+              <label style={labelStyle}>Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the initiative's purpose and goals..."
-                rows={4}
-                style={{
-                  width: '100%',
-                  padding: '0.625rem 0.75rem',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  color: 'var(--color-text-primary)',
-                  backgroundColor: 'white',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                }}
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
               />
             </div>
+          </div>
 
-            {/* Attribute Selection */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.5rem',
-                fontWeight: '600',
-                fontSize: '0.95rem',
+          {/* ── Attributes ─────────────────────────────── */}
+          <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+            <h2 style={sectionHeadingStyle}>
+              Attributes{' '}
+              <span style={{ color: '#c62828', fontSize: '0.85rem' }}>*</span>
+              <span style={{
+                fontSize: '0.8rem',
+                fontWeight: '400',
+                color: 'var(--color-text-light)',
+                marginLeft: '0.5rem',
               }}>
-                Attributes <span style={{ color: '#c62828' }}>*</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400', color: 'var(--color-text-secondary)', marginLeft: '0.5rem' }}>
-                  ({selectedAttributes.length} selected)
-                </span>
-              </label>
+                {selectedAttributes.length} selected
+              </span>
+            </h2>
+
+            <div style={{
+              maxHeight: '240px',
+              overflowY: 'auto',
+              border: '1px solid var(--color-bg-tertiary)',
+              borderRadius: '8px',
+              padding: '0.5rem',
+              backgroundColor: 'var(--color-bg-primary)',
+            }}>
               <div style={{
-                border: '1px solid var(--color-bg-tertiary)',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                maxHeight: '200px',
-                overflowY: 'auto',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                gap: '0.25rem',
               }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                  gap: '0.5rem',
-                }}>
-                  {ATTRIBUTE_CATALOG.map((attribute) => (
+                {ATTRIBUTE_CATALOG.map((attribute) => {
+                  const isSelected = selectedAttributes.includes(attribute);
+                  return (
                     <label
                       key={attribute}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         cursor: 'pointer',
-                        padding: '0.5rem',
+                        padding: '0.4rem 0.6rem',
                         borderRadius: '6px',
-                        backgroundColor: selectedAttributes.includes(attribute) 
-                          ? 'var(--color-bg-secondary)' 
-                          : 'transparent',
-                        transition: 'background-color 0.2s',
+                        backgroundColor: isSelected ? 'var(--color-bg-secondary)' : 'transparent',
+                        border: isSelected ? '1px solid var(--color-bg-tertiary)' : '1px solid transparent',
+                        transition: 'all 0.15s ease',
+                        fontSize: '0.85rem',
                       }}
                     >
                       <input
                         type="checkbox"
-                        checked={selectedAttributes.includes(attribute)}
+                        checked={isSelected}
                         onChange={() => handleAttributeToggle(attribute)}
-                        style={{
-                          marginRight: '0.5rem',
-                          cursor: 'pointer',
-                        }}
+                        style={{ marginRight: '0.5rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
                       />
-                      <span style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
-                        {attribute}
-                      </span>
+                      <span style={{ color: 'var(--color-text-primary)' }}>{attribute}</span>
                     </label>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
+          </div>
 
-            {/* Initiative-Level Settings */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.75rem',
-                fontWeight: '600',
-                fontSize: '0.95rem',
-              }}>
-                Initiative-Level Settings
-              </label>
-              
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: '0.5rem',
-                  fontWeight: '500',
-                  fontSize: '0.9rem',
-                }}>
-                  Status
-                </label>
+          {/* ── Settings ───────────────────────────────── */}
+          <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+            <h2 style={sectionHeadingStyle}>Settings</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={labelStyle}>Status</label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.625rem 0.75rem',
-                    border: '1px solid var(--color-bg-tertiary)',
-                    borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    color: 'var(--color-text-primary)',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    cursor: 'pointer',
-                  }}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
                 >
                   <option value="active">Active</option>
                   <option value="archived">Archived</option>
                 </select>
               </div>
-
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-bg-secondary)',
-                transition: 'background-color 0.2s',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
-                  style={{
-                    marginRight: '0.75rem',
-                    cursor: 'pointer',
-                  }}
-                />
-                <span style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
-                  Make this initiative publicly visible
-                </span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  padding: '0.625rem 0.75rem',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-bg-tertiary)',
+                  width: '100%',
+                  transition: 'background-color 0.15s ease',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    style={{ marginRight: '0.6rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
+                  />
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
+                    Publicly visible
+                  </span>
+                </label>
+              </div>
             </div>
+          </div>
 
-            {/* Initiative Questions */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{
-                display: 'block',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.75rem',
-                fontWeight: '600',
-                fontSize: '0.95rem',
-              }}>
-                Initiative Questions
-              </label>
-
+          {/* ── Questions ──────────────────────────────── */}
+          <div className="asrs-card" style={{ marginBottom: '1.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: addQuestions ? '1rem' : 0 }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>Questions</h2>
               <label style={{
                 display: 'flex',
                 alignItems: 'center',
                 cursor: 'pointer',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-bg-secondary)',
-                marginBottom: '0.75rem',
+                fontSize: '0.85rem',
+                color: 'var(--color-text-secondary)',
               }}>
                 <input
                   type="checkbox"
                   checked={addQuestions}
                   onChange={(e) => setAddQuestions(e.target.checked)}
-                  style={{ marginRight: '0.75rem' }}
+                  style={{ marginRight: '0.4rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
                 />
-                <span style={{ fontSize: '0.9rem' }}>
-                  Add Questions
-                </span>
+                Add questions
               </label>
-
-              {addQuestions && (
-                <div>
-                  {questions.map((q, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <input
-                        type="text"
-                        value={q}
-                        onChange={(e) => handleQuestionChange(i, e.target.value)}
-                        placeholder={`Question ${i + 1}`}
-                        style={{
-                          flex: 1,
-                          padding: '0.625rem 0.75rem',
-                          border: '1px solid var(--color-bg-tertiary)',
-                          borderRadius: '8px',
-                          fontSize: '0.95rem',
-                          backgroundColor: 'white',
-                        }}
-                      />
-
-                      {questions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeQuestionField(i)}
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            border: '1px solid #ccc',
-                            background: '#fff',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={addQuestionField}
-                    style={{
-                      marginTop: '0.5rem',
-                      padding: '0.5rem 0.75rem',
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-bg-tertiary)',
-                      background: 'white',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    + Add another question
-                  </button>
-                </div>
-              )}
             </div>
 
+            {addQuestions && (
+              <div>
+                {questions.map((q, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={q}
+                      onChange={(e) => handleQuestionChange(i, e.target.value)}
+                      placeholder={`Question ${i + 1}`}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    {questions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeQuestionField(i)}
+                        style={{
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '6px',
+                          border: '1px solid var(--color-bg-tertiary)',
+                          background: 'white',
+                          cursor: 'pointer',
+                          color: '#c62828',
+                          fontWeight: '600',
+                          fontSize: '0.85rem',
+                          transition: 'background-color 0.15s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fff5f5'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addQuestionField}
+                  className="asrs-btn-secondary"
+                  style={{ marginTop: '0.25rem', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                >
+                  + Add another question
+                </button>
+              </div>
+            )}
+          </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="asrs-btn-primary"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                fontSize: '1rem',
-                opacity: isSubmitting ? 0.6 : 1,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isSubmitting ? 'Creating...' : 'Create Initiative'}
-            </button>
-          </form>
-        </div>
+          {/* ── Submit ─────────────────────────────────── */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="asrs-btn-primary"
+            style={{
+              width: '100%',
+              padding: '0.85rem',
+              fontSize: '1rem',
+              opacity: isSubmitting ? 0.6 : 1,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Initiative'}
+          </button>
+        </form>
       </main>
     </div>
   );
 }
+
+// ── Shared styles ────────────────────────────────────────
+
+const sectionHeadingStyle = {
+  fontSize: '1rem',
+  fontWeight: '700',
+  color: 'var(--color-text-primary)',
+  marginBottom: '1rem',
+  paddingBottom: '0.5rem',
+  borderBottom: '1px solid var(--color-bg-tertiary)',
+};
+
+const labelStyle = {
+  display: 'block',
+  color: 'var(--color-text-primary)',
+  marginBottom: '0.4rem',
+  fontWeight: '600',
+  fontSize: '0.9rem',
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.625rem 0.75rem',
+  border: '1px solid var(--color-bg-tertiary)',
+  borderRadius: '8px',
+  fontSize: '0.9rem',
+  color: 'var(--color-text-primary)',
+  backgroundColor: 'white',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
