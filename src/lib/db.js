@@ -210,6 +210,21 @@ function initializeDatabase() {
 
   // ── Seed data ────────────────────────────────────────
 
+  function addColumnIfNotExists(table, columnDef) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+    } catch (err) {
+      if (!err.message.includes('duplicate column name')) {
+        throw err;
+      }
+    }
+  }
+  // Add new initiative columns if they don't exist
+  addColumnIfNotExists('initiative', 'description TEXT');
+  addColumnIfNotExists('initiative', "attributes TEXT DEFAULT '[]'");
+  addColumnIfNotExists('initiative', "questions TEXT DEFAULT '[]'");
+  addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
+
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
   );

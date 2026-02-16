@@ -167,6 +167,14 @@ export default function Header() {
                     Goals
                   </Link>
                   <Link 
+                    href="/initiative-creation" 
+                    style={getNavLinkStyle('/initiative-creation')}
+                    onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                    onMouseLeave={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                  >
+                    Initiative Creation
+                  </Link>
+                  <Link 
                     href="/admin/users" 
                     style={getNavLinkStyle('/admin/users')}
                     onMouseEnter={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
