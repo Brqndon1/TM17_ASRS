@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import {db, initializeDatabase} from '@/lib/db';
 import path from 'path';
-import {verifyAdmin} from '@/lib/auth';
 
 const INITIATIVES_PATH = path.join(process.cwd(), 'src', 'data', 'initiatives.json');
 
