@@ -4,10 +4,11 @@ import { useState } from "react";
 export default function SurveyForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""] }]);
+  const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""], required: false }]);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
-  const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""] }]);
+  const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""], required: false }]);
   
   const updateQuestion = (idx, field, value) => {
     const copy = [...questions];
@@ -63,6 +64,7 @@ export default function SurveyForm() {
         questions: validQuestions.map(q => ({
           question: q.question,
           type: q.type,
+          required: !!q.required,
           options: q.type === 'choice' ? q.options.filter(opt => opt.trim()) : undefined
         }))
       };
@@ -80,7 +82,7 @@ export default function SurveyForm() {
       
       setTitle("");
       setDescription("");
-      setQuestions([{ question: "", type: "text", options: [""] }]);
+      setQuestions([{ question: "", type: "text", options: [""], required: false }]);
     } catch (err) {
       alert("Error creating survey template: " + (err.message || err));
     } finally {
@@ -126,6 +128,13 @@ export default function SurveyForm() {
                   </select>
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
+                    <input type="checkbox" checked={!!q.required} onChange={(e) => updateQuestion(i, 'required', e.target.checked)} />
+                    Required
+                  </label>
+                </div>
+
                 {q.type === 'choice' && (
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: 6, border: '1px dashed var(--color-bg-tertiary)' }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Answer Options *</span>
@@ -145,10 +154,43 @@ export default function SurveyForm() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--color-bg-tertiary)' }}>
+            <button type="button" onClick={() => setPreviewOpen(true)} className="asrs-btn-secondary">Preview</button>
             <button type="submit" disabled={saving} className="asrs-btn-primary">{saving ? "Creating..." : "Create Survey Template"}</button>
           </div>
         </div>
       </form>
+      {previewOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ width: '90%', maxWidth: 800, maxHeight: '90%', overflow: 'auto', background: 'var(--color-bg-primary)', padding: '1.25rem', borderRadius: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Survey Preview</h3>
+              <button type="button" onClick={() => setPreviewOpen(false)} className="asrs-btn-secondary">Close</button>
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{title || 'Untitled Survey'}</div>
+              <div style={{ color: 'var(--color-text-secondary)' }}>{description || 'No description provided.'}</div>
+            </div>
+            <div>
+              {questions.filter(q => q.question && q.question.trim()).map((q, i) => (
+                <div key={i} style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
+                  <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{q.question}{q.required ? ' *' : ''}</div>
+                  {q.type === 'text' && <input disabled placeholder="Text response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'numeric' && <input disabled type="number" placeholder="Numeric response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'choice' && q.options && (
+                    <div>
+                      {q.options.filter(o => o && o.trim()).map((opt, oIdx) => (
+                        <label key={oIdx} style={{ display: 'block', marginBottom: '0.25rem' }}>
+                          <input type="radio" name={`preview-${i}`} disabled style={{ marginRight: '0.5rem' }} />{opt}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
