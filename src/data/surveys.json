@@ -30,6 +30,7 @@
     "published": true
   },
   {
+<<<<<<< HEAD
     "id": "1771189037682",
     "title": "TEST ",
     "description": "Testing",
@@ -52,6 +53,45 @@
       }
     ],
     "createdAt": "2026-02-15T20:57:17.682Z",
+=======
+    "id": "1771203452791",
+    "title": "Testing QR",
+    "description": "Testing Survey for testing QR Code implementation",
+    "questions": [
+      {
+        "id": 1771203452791.8662,
+        "text": {
+          "question": "Is it working?",
+          "type": "choice",
+          "options": [
+            "Yes?",
+            "No?"
+          ]
+        }
+      }
+    ],
+    "createdAt": "2026-02-16T00:57:32.791Z",
+    "published": true
+  },
+  {
+    "id": "1771203573623",
+    "title": "Testing QR Code",
+    "description": "Testing the QR code feature",
+    "questions": [
+      {
+        "id": 1771203573623.4138,
+        "text": {
+          "question": "Does it work?",
+          "type": "choice",
+          "options": [
+            "Yes?",
+            "No?"
+          ]
+        }
+      }
+    ],
+    "createdAt": "2026-02-16T00:59:33.623Z",
+>>>>>>> origin
     "published": true
   }
 ]

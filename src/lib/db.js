@@ -157,6 +157,12 @@ function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       survey_id INTEGER REFERENCES surveys(id) ON DELETE CASCADE,
+      initiative_id INTEGER REFERENCES initiative(initiative_id),
+      name TEXT NOT NULL DEFAULT '',
+      description TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'completed'
+        CHECK (status IN ('generating','completed','failed')),
+      created_by TEXT DEFAULT '',
       report_data TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -203,12 +209,28 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_submission_value_field ON submission_value(field_id);
     CREATE INDEX IF NOT EXISTS idx_surveys_submitted_at ON surveys(submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reports_survey_id ON reports(survey_id);
+    CREATE INDEX IF NOT EXISTS idx_reports_initiative_id ON reports(initiative_id);
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
   `);
 
   // ── Seed data ────────────────────────────────────────
+
+  function addColumnIfNotExists(table, columnDef) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+    } catch (err) {
+      if (!err.message.includes('duplicate column name')) {
+        throw err;
+      }
+    }
+  }
+  // Add new initiative columns if they don't exist
+  addColumnIfNotExists('initiative', 'description TEXT');
+  addColumnIfNotExists('initiative', "attributes TEXT DEFAULT '[]'");
+  addColumnIfNotExists('initiative', "questions TEXT DEFAULT '[]'");
+  addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
 
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
