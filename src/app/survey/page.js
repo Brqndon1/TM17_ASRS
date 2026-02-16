@@ -34,9 +34,25 @@ export default function SurveyPage() {
   const [surveyOpen, setSurveyOpen] = useState(null); // null = loading, true = open, false = closed
   const [activeDistribution, setActiveDistribution] = useState(null);
 
+  // QR code tracking
+  const [qrCodeKey, setQrCodeKey] = useState(null);
+  const [scanId, setScanId] = useState(null);
+
+  // Survey template loading
+  const [surveyTemplate, setSurveyTemplate] = useState(null);
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateResponses, setTemplateResponses] = useState({});
+
   // Check for an active distribution on mount (public users only)
   useEffect(() => {
     if (userRole !== 'public') return;
+
+    // Bypass distribution check when arriving via QR code link
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('qr')) {
+      setSurveyOpen(true);
+      return;
+    }
 
     fetch('/api/surveys/distributions')
       .then((res) => res.json())
@@ -62,29 +78,117 @@ export default function SurveyPage() {
       });
   }, [userRole]);
 
+  // Load survey template if ?template= parameter is present
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateParam = urlParams.get('template');
+    if (!templateParam) return;
+
+    setTemplateLoading(true);
+    fetch(`/api/surveys/templates/${templateParam}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Template not found');
+        return res.json();
+      })
+      .then((templateData) => {
+        setSurveyTemplate(templateData);
+      })
+      .catch((err) => {
+        console.error('Error loading survey template:', err);
+        setError('Survey template not found. The link may be invalid or expired.');
+      })
+      .finally(() => {
+        setTemplateLoading(false);
+      });
+  }, []);
+
+  // Track QR code scan if ?qr= parameter is present
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const qrParam = urlParams.get('qr');
+    if (!qrParam) return;
+
+    setQrCodeKey(qrParam);
+
+    fetch('/api/qr-codes/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qrCodeKey: qrParam, convertedToSubmission: false }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.scan) {
+          setScanId(data.scan.scanId);
+        }
+        if (data.qrCode && !data.qrCode.isActive) {
+          setError('This QR code has been deactivated. Please contact support.');
+        } else if (data.qrCode && data.qrCode.isExpired) {
+          setError('This QR code has expired. Please use a current link.');
+        }
+      })
+      .catch((err) => {
+        console.error('Error recording QR scan:', err);
+      });
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    // Basic client-side validation
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !initiativeRating) {
-      setError('Please fill out all required fields.');
+    // Validate personal info
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      setError('Please fill out all required personal information fields.');
       return;
+    }
+
+    if (surveyTemplate) {
+      // Template survey: validate all template questions are answered
+      const questions = surveyTemplate.questions || [];
+      const unanswered = questions.filter((q) => {
+        const qId = q.id;
+        return !templateResponses[qId] || !String(templateResponses[qId]).trim();
+      });
+      if (unanswered.length > 0) {
+        setError('Please answer all questions before submitting.');
+        return;
+      }
+    } else {
+      // Default survey: validate initiative rating
+      if (!initiativeRating) {
+        setError('Please fill out all required fields.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        name: `${firstName.trim()} ${lastName.trim()}`,
-        email: email.trim(),
-        responses: {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          initiativeRating,
-          initiativeComments: initiativeComments.trim(),
-        },
-      };
+      let payload;
+
+      if (surveyTemplate) {
+        payload = {
+          name: `${firstName.trim()} ${lastName.trim()}`,
+          email: email.trim(),
+          responses: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            templateId: surveyTemplate.id,
+            templateTitle: surveyTemplate.title,
+            templateAnswers: templateResponses,
+          },
+        };
+      } else {
+        payload = {
+          name: `${firstName.trim()} ${lastName.trim()}`,
+          email: email.trim(),
+          responses: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            initiativeRating,
+            initiativeComments: initiativeComments.trim(),
+          },
+        };
+      }
 
       const res = await fetch('/api/surveys', {
         method: 'POST',
@@ -96,6 +200,15 @@ export default function SurveyPage() {
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to submit survey.');
+      }
+
+      // Track QR code conversion
+      if (qrCodeKey && scanId) {
+        fetch('/api/qr-codes/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrCodeKey, convertedToSubmission: true }),
+        }).catch(() => {});
       }
 
       setSubmitted(true);
@@ -112,6 +225,7 @@ export default function SurveyPage() {
     setEmail('');
     setInitiativeRating('');
     setInitiativeComments('');
+    setTemplateResponses({});
     setSubmitted(false);
     setError(null);
   };
@@ -189,15 +303,27 @@ export default function SurveyPage() {
             ) : (
               /* ---- Survey Open — show form ---- */
               <>
+            {/* Show loading state while template is being fetched */}
+            {templateLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>
+                  Loading survey...
+                </p>
+              </div>
+            ) : (
+              <>
             <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
-              Take a Survey
+              {surveyTemplate ? surveyTemplate.title : 'Take a Survey'}
             </h1>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: '0.25rem' }}>
-              Share your feedback on the initiative. All fields marked with <span style={{ color: 'var(--color-asrs-red)' }}>*</span> are required.
+              {surveyTemplate
+                ? (surveyTemplate.description || 'Please complete the survey below.')
+                : <>Share your feedback on the initiative. All fields marked with <span style={{ color: 'var(--color-asrs-red)' }}>*</span> are required.</>
+              }
             </p>
             {activeDistribution && (
               <p style={{ color: 'var(--color-text-light)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>
-                📅 Open until <strong>{activeDistribution.end_date}</strong>
+                Open until <strong>{activeDistribution.end_date}</strong>
               </p>
             )}
 
@@ -295,79 +421,183 @@ export default function SurveyPage() {
                   </div>
                 </div>
 
-                {/* ---- Section: Initiative Feedback ---- */}
-                <div style={{
-                  borderBottom: '1px solid var(--color-bg-tertiary)',
-                  paddingBottom: '1.25rem',
-                  marginBottom: '1.5rem',
-                }}>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
-                    Initiative Feedback
-                  </h2>
+                {surveyTemplate ? (
+                  /* ---- Section: Template Questions ---- */
+                  <div style={{
+                    borderBottom: '1px solid var(--color-bg-tertiary)',
+                    paddingBottom: '1.25rem',
+                    marginBottom: '1.5rem',
+                  }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
+                      Survey Questions
+                    </h2>
 
-                  {/* Rating question */}
-                  <div style={fieldGroupStyle}>
-                    <label style={labelStyle}>
-                      How do you like your initiative? <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                    </label>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.65rem' }}>
-                      Select the option that best describes your experience.
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {ratingOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.65rem',
-                            padding: '0.6rem 0.85rem',
-                            borderRadius: '8px',
-                            border: initiativeRating === option.value
-                              ? '2px solid var(--color-asrs-orange)'
-                              : '1px solid var(--color-bg-tertiary)',
-                            backgroundColor: initiativeRating === option.value
-                              ? '#fdf4e8'
-                              : 'var(--color-bg-primary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="initiativeRating"
-                            value={option.value}
-                            checked={initiativeRating === option.value}
-                            onChange={(e) => setInitiativeRating(e.target.value)}
-                            style={{ accentColor: 'var(--color-asrs-orange)' }}
-                          />
-                          <span style={{ fontSize: '1.15rem' }}>{option.emoji}</span>
-                          <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
-                            {option.label}
-                          </span>
-                        </label>
-                      ))}
+                    {(surveyTemplate.questions || []).map((q, index) => {
+                      // Handle both formats:
+                      // Old: { id, text: { question, type, options } }
+                      // New: { id, question, type, options }
+                      const questionText = q.text?.question || q.question || '';
+                      const questionType = q.text?.type || q.type || 'text';
+                      const questionOptions = q.text?.options || q.options || [];
+                      const qId = q.id;
+
+                      return (
+                        <div key={qId} style={fieldGroupStyle}>
+                          <label style={labelStyle}>
+                            {index + 1}. {questionText} <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
+                          </label>
+
+                          {questionType === 'text' && (
+                            <textarea
+                              value={templateResponses[qId] || ''}
+                              onChange={(e) => setTemplateResponses({
+                                ...templateResponses,
+                                [qId]: e.target.value,
+                              })}
+                              rows={3}
+                              placeholder="Enter your response..."
+                              style={{
+                                ...inputStyle,
+                                resize: 'vertical',
+                                fontFamily: 'inherit',
+                              }}
+                              required
+                            />
+                          )}
+
+                          {questionType === 'numeric' && (
+                            <input
+                              type="number"
+                              value={templateResponses[qId] || ''}
+                              onChange={(e) => setTemplateResponses({
+                                ...templateResponses,
+                                [qId]: e.target.value,
+                              })}
+                              placeholder="Enter a number"
+                              style={inputStyle}
+                              required
+                            />
+                          )}
+
+                          {questionType === 'choice' && questionOptions.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              {questionOptions.map((option) => (
+                                <label
+                                  key={option}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.65rem',
+                                    padding: '0.6rem 0.85rem',
+                                    borderRadius: '8px',
+                                    border: templateResponses[qId] === option
+                                      ? '2px solid var(--color-asrs-orange)'
+                                      : '1px solid var(--color-bg-tertiary)',
+                                    backgroundColor: templateResponses[qId] === option
+                                      ? '#fdf4e8'
+                                      : 'var(--color-bg-primary)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`question_${qId}`}
+                                    value={option}
+                                    checked={templateResponses[qId] === option}
+                                    onChange={(e) => setTemplateResponses({
+                                      ...templateResponses,
+                                      [qId]: e.target.value,
+                                    })}
+                                    style={{ accentColor: 'var(--color-asrs-orange)' }}
+                                    required
+                                  />
+                                  <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
+                                    {option}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* ---- Section: Default Initiative Feedback ---- */
+                  <div style={{
+                    borderBottom: '1px solid var(--color-bg-tertiary)',
+                    paddingBottom: '1.25rem',
+                    marginBottom: '1.5rem',
+                  }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
+                      Initiative Feedback
+                    </h2>
+
+                    {/* Rating question */}
+                    <div style={fieldGroupStyle}>
+                      <label style={labelStyle}>
+                        How do you like your initiative? <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
+                      </label>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.65rem' }}>
+                        Select the option that best describes your experience.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {ratingOptions.map((option) => (
+                          <label
+                            key={option.value}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.6rem 0.85rem',
+                              borderRadius: '8px',
+                              border: initiativeRating === option.value
+                                ? '2px solid var(--color-asrs-orange)'
+                                : '1px solid var(--color-bg-tertiary)',
+                              backgroundColor: initiativeRating === option.value
+                                ? '#fdf4e8'
+                                : 'var(--color-bg-primary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name="initiativeRating"
+                              value={option.value}
+                              checked={initiativeRating === option.value}
+                              onChange={(e) => setInitiativeRating(e.target.value)}
+                              style={{ accentColor: 'var(--color-asrs-orange)' }}
+                            />
+                            <span style={{ fontSize: '1.15rem' }}>{option.emoji}</span>
+                            <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
+                              {option.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Additional comments */}
+                    <div style={fieldGroupStyle}>
+                      <label style={labelStyle}>
+                        Additional Comments
+                      </label>
+                      <textarea
+                        placeholder="Share any additional thoughts or suggestions..."
+                        value={initiativeComments}
+                        onChange={(e) => setInitiativeComments(e.target.value)}
+                        rows={4}
+                        style={{
+                          ...inputStyle,
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
                     </div>
                   </div>
-
-                  {/* Additional comments */}
-                  <div style={fieldGroupStyle}>
-                    <label style={labelStyle}>
-                      Additional Comments
-                    </label>
-                    <textarea
-                      placeholder="Share any additional thoughts or suggestions…"
-                      value={initiativeComments}
-                      onChange={(e) => setInitiativeComments(e.target.value)}
-                      rows={4}
-                      style={{
-                        ...inputStyle,
-                        resize: 'vertical',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
-                </div>
+                )}
 
                 {/* ---- Submit Button ---- */}
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -390,10 +620,12 @@ export default function SurveyPage() {
                       cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {isSubmitting ? 'Submitting…' : 'Submit Survey'}
+                    {isSubmitting ? 'Submitting...' : 'Submit Survey'}
                   </button>
                 </div>
               </form>
+            )}
+              </>
             )}
               </>
             )}
