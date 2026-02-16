@@ -56,6 +56,24 @@ export default function InitiativeCreationPage() {
     }
   }, []);
 
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        if (response.ok) {
+          setCategories(data.categories || []);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -66,12 +84,23 @@ export default function InitiativeCreationPage() {
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   const handleAttributeToggle = (attribute) => {
     setSelectedAttributes((prev) =>
       prev.includes(attribute)
         ? prev.filter((a) => a !== attribute)
         : [...prev, attribute]
+    );
+  };
+
+  const handleCategoryToggle = (categoryId) => {
+    setSelectedCategories((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((c) => c !== categoryId)
+        : [...prev, categoryId]
     );
   };
 
@@ -126,6 +155,23 @@ export default function InitiativeCreationPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Link the initiative to selected categories
+        const initiativeId = data.initiative.initiative_id;
+        for (const categoryId of selectedCategories) {
+          try {
+            await fetch('/api/initiative-categories', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                initiative_id: initiativeId,
+                category_id: categoryId,
+              }),
+            });
+          } catch (error) {
+            console.error(`Error linking category ${categoryId}:`, error);
+          }
+        }
+
         setMessage('Initiative created successfully!');
         setName('');
         setDescription('');
@@ -134,6 +180,7 @@ export default function InitiativeCreationPage() {
         setQuestions(['']);
         setStatus('Active');
         setIsPublic(false);
+        setSelectedCategories([]);
         setTimeout(() => router.push('/'), 2000);
       } else {
         setMessage(`${data.error || 'Failed to create initiative'}`);
@@ -275,6 +322,74 @@ export default function InitiativeCreationPage() {
                 </div>
               </div>
 
+              {/* ── Categories ────────────────────────────── */}
+              <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+                <h2 style={sectionHeadingStyle}>
+                  Categories
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: '400',
+                    color: 'var(--color-text-light)',
+                    marginLeft: '0.5rem',
+                  }}>
+                    {selectedCategories.length} selected
+                  </span>
+                </h2>
+
+                {loadingCategories ? (
+                  <div style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
+                    Loading categories...
+                  </div>
+                ) : categories.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
+                    No categories available. Create categories first.
+                  </div>
+                ) : (
+                  <div style={{
+                    maxHeight: '240px',
+                    overflowY: 'auto',
+                    border: '1px solid var(--color-bg-tertiary)',
+                    borderRadius: '8px',
+                    padding: '0.5rem',
+                    backgroundColor: 'var(--color-bg-primary)',
+                  }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                      gap: '0.25rem',
+                    }}>
+                      {categories.map((category) => {
+                        const isSelected = selectedCategories.includes(category.category_id);
+                        return (
+                          <label
+                            key={category.category_id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '6px',
+                              backgroundColor: isSelected ? 'var(--color-bg-secondary)' : 'transparent',
+                              border: isSelected ? '1px solid var(--color-bg-tertiary)' : '1px solid transparent',
+                              transition: 'all 0.15s ease',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleCategoryToggle(category.category_id)}
+                              style={{ marginRight: '0.5rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
+                            />
+                            <span style={{ color: 'var(--color-text-primary)' }}>{category.category_name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* ── Settings ───────────────────────────────── */}
               <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
                 <h2 style={sectionHeadingStyle}>Settings</h2>
@@ -399,11 +514,28 @@ export default function InitiativeCreationPage() {
               >
                 {isSubmitting ? 'Creating...' : 'Create Initiative'}
               </button>
+
+              {/* ── Manage Categories ──────────────────────── */}
+                <button
+                  type="button"
+                  onClick={() => router.push('/categories')}
+                  className="asrs-btn-primary"
+                  style={{
+                    marginTop: '1rem',
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                  }}
+                >
+                  Manage initiative categories
+                </button>
             </form>
+              
           </>
         ) : (
           <div className="asrs-card">
-            {/* Survey Closed State */}
+            {/* Cannot access this page */}
             <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
               <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>

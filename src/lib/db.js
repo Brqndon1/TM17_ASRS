@@ -200,9 +200,32 @@ function initializeDatabase() {
       created_by_user_id INTEGER REFERENCES user(user_id)
     );
 
+    -- Categories table (global categories for organizing data)
+
+    CREATE TABLE IF NOT EXISTS category (
+      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Junction table for many-to-many relationship between initiatives and categories
+
+    CREATE TABLE IF NOT EXISTS initiative_category (
+      initiative_category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES category(category_id) ON DELETE CASCADE,
+      added_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(initiative_id, category_id)
+    );
+
     -- Indexes
 
     CREATE INDEX IF NOT EXISTS idx_goal_initiative ON initiative_goal(initiative_id);
+    CREATE INDEX IF NOT EXISTS idx_category_name ON category(category_name);
+    CREATE INDEX IF NOT EXISTS idx_initiative_category_initiative ON initiative_category(initiative_id);
+    CREATE INDEX IF NOT EXISTS idx_initiative_category_category ON initiative_category(category_id);
     CREATE INDEX IF NOT EXISTS idx_submission_initiative_date ON submission(initiative_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_form_date ON submission(form_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_value_submission ON submission_value(submission_id);

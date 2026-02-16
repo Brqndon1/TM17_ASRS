@@ -128,15 +128,15 @@ export async function POST(request) {
       return NextResponse.json({error: "Missing required field: name"}, {status: 400});
     }
     // Prepare to insert data into the database in this specific order. 
-    const stmt = db.prepare('INSERT INTO initiative (initiative_name, description, settings) VALUES (?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO initiative (initiative_name, description, attributes, questions, settings) VALUES (?, ?, ?, ?, ?)');
 
     // Insert the data into the database. 
     const result = stmt.run(
       name.trim(),
       description || '',
       JSON.stringify(attributes || []),
-      JSON.stringify(settings || {}),
       JSON.stringify(questions || []),
+      JSON.stringify(settings || {}),
     );
 
     // Store in the document still

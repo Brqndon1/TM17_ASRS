@@ -172,7 +172,7 @@ export default function Header() {
                     onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                     onMouseLeave={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
                   >
-                    Initiative Creation
+                    Initiatives
                   </Link>
                   <Link 
                     href="/admin/users" 
