@@ -1,121 +1,38 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
-import { getInitiatives, getReportData } from '@/lib/data-service';
-
-import WizardStepIndicator from '@/components/wizard/WizardStepIndicator';
-import StepConfig from '@/components/wizard/StepConfig';
-import StepFilters from '@/components/wizard/StepFilters';
-import StepExpressions from '@/components/wizard/StepExpressions';
-import StepSorting from '@/components/wizard/StepSorting';
-import StepPreview from '@/components/wizard/StepPreview';
-
-const TOTAL_STEPS = 5;
+import { getInitiatives } from '@/lib/data-service';
 
 export default function ReportCreationPage() {
   const [userRole, setUserRole] = useState('staff');
 
-  // ---- DATA ----
   const [initiatives, setInitiatives] = useState([]);
-  const [tableData, setTableData] = useState([]);
+  const [selectedInitiative, setSelectedInitiative] = useState(null);
 
-  // ---- WIZARD STATE ----
-  const [currentStep, setCurrentStep] = useState(0);
-  const [wizardData, setWizardData] = useState({
-    selectedInitiative: null,
-    reportName: '',
-    description: '',
-    filters: {},
-    expressions: [],
-    sorts: [],
-  });
+  const [reportName, setReportName] = useState('');
+  const [description, setDescription] = useState('');
+  const [format, setFormat] = useState('pdf');
 
-  // ---- UI STATE ----
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // ---- REPORT HISTORY ----
-  const [reports, setReports] = useState([]);
-  const [loadingReports, setLoadingReports] = useState(true);
-
-  // Load initiatives on mount
   useEffect(() => {
     async function loadInitiatives() {
       const data = await getInitiatives();
       setInitiatives(data);
-      if (data.length > 0) {
-        setWizardData(prev => ({ ...prev, selectedInitiative: data[0] }));
-      }
+      if (data.length > 0) setSelectedInitiative(data[0]);
     }
     loadInitiatives();
-    fetchReports();
   }, []);
 
-  // Load table data when initiative changes
-  useEffect(() => {
-    async function loadTableData() {
-      if (!wizardData.selectedInitiative) {
-        setTableData([]);
-        return;
-      }
-      const data = await getReportData(wizardData.selectedInitiative.id);
-      setTableData(data?.tableData || []);
+  async function handleCreateReport() {
+    if (!reportName) {
+      setErrorMessage('Report name is required.');
+      return;
     }
-    loadTableData();
-  }, [wizardData.selectedInitiative]);
 
-  async function fetchReports() {
-    setLoadingReports(true);
-    try {
-      const res = await fetch('/api/reports');
-      const data = await res.json();
-      setReports(data.reports || []);
-    } catch {
-      setReports([]);
-    } finally {
-      setLoadingReports(false);
-    }
-  }
-
-  // ---- WIZARD NAVIGATION ----
-  function updateWizardData(partial) {
-    setWizardData(prev => ({ ...prev, ...partial }));
-  }
-
-  function canProceed() {
-    if (currentStep === 0) {
-      return wizardData.selectedInitiative && wizardData.reportName.trim().length > 0;
-    }
-    return true; // Steps 1-3 are optional, step 4 is the last
-  }
-
-  function handleNext() {
-    if (currentStep < TOTAL_STEPS - 1) {
-      setCurrentStep(prev => prev + 1);
-      setErrorMessage('');
-    }
-  }
-
-  function handleBack() {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-      setErrorMessage('');
-    }
-  }
-
-  function handleSkip() {
-    // Steps 1-3 can be skipped
-    if (currentStep >= 1 && currentStep <= 3) {
-      handleNext();
-    }
-  }
-
-  // ---- GENERATE REPORT ----
-  async function handleGenerate() {
     setIsSubmitting(true);
     setErrorMessage('');
     setSuccessMessage('');
@@ -125,280 +42,188 @@ export default function ReportCreationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          initiativeId: wizardData.selectedInitiative.id,
-          name: wizardData.reportName,
-          description: wizardData.description,
+          initiativeId: selectedInitiative.id,
+          name: reportName,
+          description,
           createdBy: userRole,
-          filters: wizardData.filters,
-          expressions: wizardData.expressions,
-          sorts: wizardData.sorts,
+          format,
         }),
       });
 
       if (!res.ok) throw new Error();
 
-      // Reset wizard
-      setCurrentStep(0);
-      setWizardData({
-        selectedInitiative: initiatives.length > 0 ? initiatives[0] : null,
-        reportName: '',
-        description: '',
-        filters: {},
-        expressions: [],
-        sorts: [],
-      });
-      setSuccessMessage('Report generated and published to Reporting.');
-      fetchReports();
+      const blob = await res.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportName}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setSuccessMessage(`Report generated as ${format.toUpperCase()}.`);
+      setReportName('');
+      setDescription('');
     } catch {
-      setErrorMessage('Failed to generate report. Please try again.');
+      setErrorMessage('Failed to generate report.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // ---- HELPERS ----
-  function formatDate(dateStr) {
-    if (!dateStr) return '\u2014';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-
-  const statusBadge = (status) => {
-    const colors = {
-      completed: { bg: '#d1fae5', text: '#065f46', border: '#a7f3d0' },
-      generating: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
-      failed: { bg: '#fee2e2', text: '#991b1b', border: '#fecaca' },
-    };
-    const c = colors[status] || colors.completed;
-    return {
-      display: 'inline-block',
-      padding: '0.2rem 0.65rem',
-      borderRadius: '999px',
-      fontSize: '0.75rem',
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: '0.03em',
-      backgroundColor: c.bg,
-      color: c.text,
-      border: `1px solid ${c.border}`,
-    };
-  };
-
-  // ---- RENDER CURRENT STEP ----
-  function renderStep() {
-    switch (currentStep) {
-      case 0:
-        return (
-          <StepConfig
-            initiatives={initiatives}
-            wizardData={wizardData}
-            onChange={updateWizardData}
-          />
-        );
-      case 1:
-        return (
-          <StepFilters
-            wizardData={wizardData}
-            onChange={updateWizardData}
-            tableData={tableData}
-          />
-        );
-      case 2:
-        return (
-          <StepExpressions
-            wizardData={wizardData}
-            onChange={updateWizardData}
-            tableData={tableData}
-          />
-        );
-      case 3:
-        return (
-          <StepSorting
-            wizardData={wizardData}
-            onChange={updateWizardData}
-          />
-        );
-      case 4:
-        return (
-          <StepPreview
-            wizardData={wizardData}
-            tableData={tableData}
-            onGenerate={handleGenerate}
-            isSubmitting={isSubmitting}
-          />
-        );
-      default:
-        return null;
-    }
-  }
-
-  const isOptionalStep = currentStep >= 1 && currentStep <= 3;
-
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+    <div style={{ backgroundColor: 'var(--color-bg-primary)', minHeight: '100vh' }}>
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-        <div className="asrs-card">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700 }}>
-            Report Creation
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-            Create and publish reports from collected survey data.
-          </p>
-
-          {/* Step Indicator */}
-          <WizardStepIndicator currentStep={currentStep} />
-
-          {/* Active Step Content */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            {renderStep()}
+      <main
+        style={{
+          maxWidth: '720px',
+          margin: '0 auto',
+          padding: '3rem 1.5rem',
+        }}
+      >
+        <div
+          className="asrs-card"
+          style={{
+            padding: '2.5rem',
+            borderRadius: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2rem',
+          }}
+        >
+          {/* Header */}
+          <div>
+            <h1
+              style={{
+                fontSize: '1.75rem',
+                fontWeight: 700,
+                marginBottom: '0.5rem',
+              }}
+            >
+              Report Creation
+            </h1>
+            <p style={{ color: 'var(--color-text-secondary)' }}>
+              Generate and export reports from collected survey data.
+            </p>
           </div>
 
-          {/* Navigation Buttons (not shown on preview step — it has its own Generate button) */}
-          {currentStep < TOTAL_STEPS - 1 && (
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', paddingTop: '1rem',
-              borderTop: '1px solid var(--color-bg-tertiary)',
-            }}>
-              <button
-                onClick={handleBack}
-                disabled={currentStep === 0}
-                className="asrs-btn-secondary"
-                style={{
-                  opacity: currentStep === 0 ? 0.4 : 1,
-                  cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
-                }}
+          {/* Form */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.75rem',
+            }}
+          >
+            {/* Initiative */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label className="asrs-label">Initiative</label>
+              <select
+                className="asrs-input"
+                value={selectedInitiative?.id || ''}
+                onChange={(e) =>
+                  setSelectedInitiative(
+                    initiatives.find(i => i.id === Number(e.target.value))
+                  )
+                }
               >
-                Back
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                {isOptionalStep && (
-                  <button
-                    onClick={handleSkip}
-                    className="asrs-btn-secondary"
-                    style={{ color: 'var(--color-text-light)' }}
-                  >
-                    Skip
-                  </button>
-                )}
-                <button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                  style={{
-                    padding: '0.6rem 1.5rem',
-                    backgroundColor: canProceed() ? 'var(--color-asrs-orange)' : 'var(--color-bg-tertiary)',
-                    color: canProceed() ? '#fff' : 'var(--color-text-light)',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: canProceed() ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  Next
-                </button>
-              </div>
+                {initiatives.map(i => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {/* Back button on preview step */}
-          {currentStep === TOTAL_STEPS - 1 && (
-            <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-bg-tertiary)' }}>
-              <button onClick={handleBack} className="asrs-btn-secondary">
-                Back
-              </button>
+            {/* Report Name */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label className="asrs-label">Report Name</label>
+              <input
+                className="asrs-input"
+                placeholder="e.g. Q2 Safety Trends"
+                value={reportName}
+                onChange={(e) => setReportName(e.target.value)}
+              />
             </div>
-          )}
+
+            {/* Export Format */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label className="asrs-label">Export Format</label>
+              <select
+                className="asrs-input"
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+              >
+                <option value="pdf">PDF</option>
+                <option value="csv">CSV</option>
+                <option value="xlsx">Excel (.xlsx)</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
+
+            {/* Description */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label className="asrs-label">Description</label>
+              <textarea
+                className="asrs-input"
+                rows={4}
+                placeholder="Optional description for reporting dashboard"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Button */}
+          <button
+            onClick={handleCreateReport}
+            disabled={isSubmitting}
+            style={{
+              width: '100%',
+              padding: '1rem',
+              backgroundColor: 'var(--color-asrs-orange)',
+              color: '#fff',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '1rem',
+              border: 'none',
+              cursor: 'pointer',
+              opacity: isSubmitting ? 0.7 : 1,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isSubmitting ? 'Generating…' : `Generate ${format.toUpperCase()} Report`}
+          </button>
 
           {/* Messages */}
           {errorMessage && (
-            <p style={{ marginTop: '1rem', color: 'var(--color-error)' }}>
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255,0,0,0.08)',
+                color: 'var(--color-error)',
+                fontSize: '0.9rem',
+              }}
+            >
               {errorMessage}
-            </p>
+            </div>
           )}
+
           {successMessage && (
-            <p style={{ marginTop: '1rem', color: 'var(--color-success)' }}>
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(0,180,0,0.08)',
+                color: 'var(--color-success)',
+                fontSize: '0.9rem',
+              }}
+            >
               {successMessage}
-            </p>
-          )}
-        </div>
-
-        {/* ── Report History ── */}
-        <div className="asrs-card" style={{ marginTop: '2rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
-            Report History
-          </h2>
-
-          {loadingReports ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1rem' }}>
-              Loading reports...
-            </p>
-          ) : reports.length === 0 ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1.5rem' }}>
-              No reports yet. Generate your first one above.
-            </p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                    {['Report Name', 'Initiative', 'Created By', 'Date', 'Status'].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: 'left',
-                          padding: '0.6rem 0.75rem',
-                          fontWeight: '600',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '0.8rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.03em',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((r) => (
-                    <tr
-                      key={r.id}
-                      style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}
-                    >
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: '500' }}>
-                        <Link
-                          href={`/report-creation/${r.id}`}
-                          style={{
-                            color: 'var(--color-asrs-orange)',
-                            textDecoration: 'none',
-                            fontWeight: '600',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                        >
-                          {r.name || '(Untitled)'}
-                        </Link>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {r.initiative_name || '\u2014'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {r.created_by || '\u2014'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {formatDate(r.created_at)}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <span style={statusBadge(r.status)}>{r.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
