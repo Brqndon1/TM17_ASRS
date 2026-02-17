@@ -2,117 +2,56 @@
  * ============================================================================
  * DATA SERVICE — The central hub for all data retrieval in the application.
  * ============================================================================
- *
- * HOW THIS WORKS RIGHT NOW (DUMMY DATA MODE):
- * - This file imports data directly from JSON files stored in src/data/.
- * - The JSON files contain fake/sample data so we can test the UI.
- * - Each function below returns data in the exact format our components expect.
- *
- * ============================================================================
- * [API ADJUSTMENT] — WHAT TO CHANGE WHEN THE DATABASE & API ARE READY:
- * ============================================================================
- * When your team builds the backend API, you will:
- *
- * 1. REMOVE the three import lines at the top (the ones importing JSON files).
- *
- * 2. REPLACE each function's body with a "fetch" call to your API endpoint.
- *    For example, instead of:
- *      return initiativesData.initiatives;
- *    You would write:
- *      const response = await fetch('https://your-api-url.com/api/initiatives');
- *      const data = await response.json();
- *      return data.initiatives;
- *
- * 3. Make sure each function is marked as "async" (they already are).
- *
- * 4. The API should return JSON in the SAME STRUCTURE as the dummy JSON files.
- *    If the API returns a different structure, you'll need to transform the
- *    data inside these functions before returning it to the components.
+ * All data is fetched from the Next.js API routes which read from SQLite.
  * ============================================================================
  */
-
-// These three lines import our dummy JSON data files.
-// [API ADJUSTMENT] DELETE these three lines when switching to real API calls.
-import initiativesData from '@/data/initiatives.json';
-import reportDataFile from '@/data/reportData.json';
-import trendDataFile from '@/data/trendData.json';
 
 /**
  * getInitiatives()
  * Returns the list of all ASRS initiatives (id, name, description, attributes).
- * Components use this to populate the initiative selector cards.
- *
- * [API ADJUSTMENT] Replace the body with:
- *   const response = await fetch('https://your-api-url.com/api/initiatives');
- *   const data = await response.json();
- *   return data.initiatives;
  */
 export async function getInitiatives() {
-  return initiativesData.initiatives;
+  const response = await fetch('/api/initiatives');
+  const data = await response.json();
+  return data.initiatives;
 }
 
 /**
  * getReportData(initiativeId)
  * Returns the full report data for one specific initiative.
  * This includes: summary stats, chart data, and table data.
- *
- * @param {number|string} initiativeId - The ID of the initiative (1-7).
- *
- * [API ADJUSTMENT] Replace the body with:
- *   const response = await fetch(`https://your-api-url.com/api/reports/${initiativeId}`);
- *   const data = await response.json();
- *   return data;
  */
 export async function getReportData(initiativeId) {
-  return reportDataFile.reports[String(initiativeId)] || null;
+  const response = await fetch(`/api/initiatives/${initiativeId}/report-data`);
+  if (!response.ok) return null;
+  return response.json();
 }
 
 /**
  * getTrendData(initiativeId)
  * Returns the trend analysis data for one specific initiative.
  * Only returns trends where enabledDisplay is true.
- *
- * @param {number|string} initiativeId - The ID of the initiative (1-7).
- *
- * [API ADJUSTMENT] Replace the body with:
- *   const response = await fetch(`https://your-api-url.com/api/trends/${initiativeId}`);
- *   const data = await response.json();
- *   return data.filter(trend => trend.enabledDisplay);
  */
 export async function getTrendData(initiativeId) {
-  const allTrends = trendDataFile.trends[String(initiativeId)] || [];
-  // Only return trends that are enabled for display (per requirement REP010/REP028)
-  return allTrends.filter(trend => trend.enabledDisplay);
+  const response = await fetch(`/api/trends/${initiativeId}`);
+  const data = await response.json();
+  return data.trends || [];
 }
 
 /**
  * getFilteredReportData(initiativeId, filters)
  * Returns report table data filtered by the given criteria.
- * Filters is an object like { grade: "7th", school: "Lincoln MS" }.
- *
- * @param {number|string} initiativeId - The initiative to get data for.
- * @param {Object} filters - Key-value pairs of attribute names and their filter values.
- *
- * [API ADJUSTMENT] Replace the body with:
- *   const queryParams = new URLSearchParams(filters).toString();
- *   const response = await fetch(
- *     `https://your-api-url.com/api/reports/${initiativeId}/filter?${queryParams}`
- *   );
- *   const data = await response.json();
- *   return data;
+ * Fetches from API then filters client-side.
  */
 export async function getFilteredReportData(initiativeId, filters) {
-  const report = reportDataFile.reports[String(initiativeId)];
+  const report = await getReportData(initiativeId);
   if (!report) return [];
 
-  // Apply filters to the table data locally (simulating database WHERE clauses)
   let filteredData = [...report.tableData];
 
-  // Loop through each filter the user has selected
   Object.entries(filters).forEach(([key, value]) => {
     if (value && value !== 'All') {
       filteredData = filteredData.filter(row => {
-        // Convert the key from display format to camelCase to match JSON keys
         const camelKey = key.charAt(0).toLowerCase() + key.slice(1).replace(/\s/g, '');
         return String(row[camelKey]).toLowerCase().includes(String(value).toLowerCase());
       });

@@ -52,13 +52,13 @@ export async function GET() {
 
       // Pull data and map rows and dictionaries to necessary variables. 
       const initiatives = db.prepare('SELECT * FROM initiative').all().map(row => ({
-        ...row,
+        id: row.initiative_id,
+        name: row.initiative_name,
+        description: row.description || '',
         attributes: row.attributes ? JSON.parse(row.attributes) : [],
         questions: row.questions ? JSON.parse(row.questions) : [],
         settings: row.settings ? JSON.parse(row.settings) : {},
-      }
-      )
-      );
+      }));
       return NextResponse.json({initiatives});
     }
     catch(error)

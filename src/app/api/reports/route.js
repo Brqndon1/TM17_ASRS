@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
 import { processReportData } from '@/lib/report-engine';
+import { queryTableData } from '@/lib/query-helpers';
 import fs from 'fs';
 import path from 'path';
-
-// Load static JSON data for snapshot generation
-function loadJsonData(filename) {
-  const filePath = path.join(process.cwd(), 'src', 'data', filename);
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-}
 
 // GET - List reports (optionally filtered by initiativeId)
 export async function GET(request) {
@@ -63,22 +58,32 @@ export async function POST(request) {
       );
     }
 
-    // Load data sources
-    const reportDataFile = loadJsonData('reportData.json');
-    const trendDataFile = loadJsonData('trendData.json');
-    const initiativesFile = loadJsonData('initiatives.json');
+    // Load data from database
+    const initiative = db.prepare(
+      'SELECT initiative_id, initiative_name, description, attributes, summary_json, chart_data_json FROM initiative WHERE initiative_id = ?'
+    ).get(Number(initiativeId));
 
-    const rawReport = reportDataFile.reports[String(initiativeId)];
-    const initiative = initiativesFile.initiatives.find(i => i.id === Number(initiativeId));
-    const trendData = (trendDataFile.trends[String(initiativeId)] || [])
-      .filter(t => t.enabledDisplay);
-
-    if (!rawReport || !initiative) {
+    if (!initiative) {
       return NextResponse.json(
         { error: 'No data found for this initiative' },
         { status: 404 }
       );
     }
+
+    const tableData = queryTableData(db, Number(initiativeId));
+    const summary = initiative.summary_json ? JSON.parse(initiative.summary_json) : {};
+    const chartData = initiative.chart_data_json ? JSON.parse(initiative.chart_data_json) : {};
+    const attributes = initiative.attributes ? JSON.parse(initiative.attributes) : [];
+
+    // Trends are computed analytics — read from JSON file
+    const trendFilePath = path.join(process.cwd(), 'src', 'data', 'trendData.json');
+    let trendData = [];
+    try {
+      const trendDataFile = JSON.parse(fs.readFileSync(trendFilePath, 'utf-8'));
+      trendData = (trendDataFile.trends[String(initiativeId)] || []).filter(t => t.enabledDisplay);
+    } catch { /* no trend data available */ }
+
+    const rawReport = { tableData, summary, chartData };
 
     // Extract wizard config from request body
     const filters = body.filters || {};
@@ -87,11 +92,11 @@ export async function POST(request) {
 
     // Run the full pipeline
     const { filteredData, metrics } = processReportData(
-      rawReport.tableData,
+      tableData,
       filters,
       expressions,
       sorts,
-      initiative.attributes
+      attributes
     );
 
     // Build the versioned snapshot
@@ -99,7 +104,7 @@ export async function POST(request) {
       version: 1,
       config: {
         initiativeId,
-        initiativeName: initiative.name,
+        initiativeName: initiative.initiative_name,
         filters,
         expressions,
         sorts,
@@ -107,12 +112,12 @@ export async function POST(request) {
       results: {
         metrics,
         filteredTableData: filteredData,
-        chartData: rawReport.chartData,
+        chartData,
         trendData,
-        summary: rawReport.summary,
-        reportId: rawReport.reportId,
-        initiativeName: rawReport.initiativeName,
-        generatedDate: rawReport.generatedDate,
+        summary,
+        reportId: `RPT-db-${initiativeId}`,
+        initiativeName: initiative.initiative_name,
+        generatedDate: new Date().toISOString().slice(0, 10),
       },
       generatedAt: new Date().toISOString(),
     };
