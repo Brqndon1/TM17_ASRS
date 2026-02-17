@@ -4,17 +4,13 @@ import { processReportData } from '@/lib/report-engine';
 import fs from 'fs';
 import path from 'path';
 
-// ---------------------------------------------
-// Utility: Load static JSON snapshot data
-// ---------------------------------------------
+// Load static JSON data for snapshot generation
 function loadJsonData(filename) {
   const filePath = path.join(process.cwd(), 'src', 'data', filename);
   return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 }
 
-// ---------------------------------------------
-// GET - List reports
-// ---------------------------------------------
+// GET - List reports (optionally filtered by initiativeId)
 export async function GET(request) {
   try {
     initializeDatabase();
@@ -23,7 +19,6 @@ export async function GET(request) {
     const initiativeId = searchParams.get('initiativeId');
 
     let rows;
-
     if (initiativeId) {
       rows = db.prepare(
         `SELECT r.*, i.initiative_name
@@ -42,10 +37,8 @@ export async function GET(request) {
     }
 
     return NextResponse.json({ reports: rows });
-
   } catch (error) {
     console.error('Error fetching reports:', error);
-
     return NextResponse.json(
       { error: 'Failed to fetch reports', details: error.message },
       { status: 500 }
@@ -53,15 +46,12 @@ export async function GET(request) {
   }
 }
 
-// ---------------------------------------------
-// POST - Create + Export Report
-// ---------------------------------------------
+// POST - Create a report with full wizard config and snapshot generation
 export async function POST(request) {
   try {
     initializeDatabase();
 
     const body = await request.json();
-    const format = body.format || 'pdf';
 
     const initiativeId =
       body.initiativeId || body.surveyId || body.initiative_id;
@@ -73,18 +63,13 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------------------
-    // Load Data Sources
-    // -----------------------------------------
+    // Load data sources
     const reportDataFile = loadJsonData('reportData.json');
     const trendDataFile = loadJsonData('trendData.json');
     const initiativesFile = loadJsonData('initiatives.json');
 
     const rawReport = reportDataFile.reports[String(initiativeId)];
-    const initiative = initiativesFile.initiatives.find(
-      i => i.id === Number(initiativeId)
-    );
-
+    const initiative = initiativesFile.initiatives.find(i => i.id === Number(initiativeId));
     const trendData = (trendDataFile.trends[String(initiativeId)] || [])
       .filter(t => t.enabledDisplay);
 
@@ -95,13 +80,12 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------------------
-    // Process Report Pipeline
-    // -----------------------------------------
+    // Extract wizard config from request body
     const filters = body.filters || {};
     const expressions = body.expressions || [];
     const sorts = body.sorts || [];
 
+    // Run the full pipeline
     const { filteredData, metrics } = processReportData(
       rawReport.tableData,
       filters,
@@ -110,9 +94,7 @@ export async function POST(request) {
       initiative.attributes
     );
 
-    // -----------------------------------------
-    // Build Snapshot
-    // -----------------------------------------
+    // Build the versioned snapshot
     const snapshot = {
       version: 1,
       config: {
@@ -128,16 +110,15 @@ export async function POST(request) {
         chartData: rawReport.chartData,
         trendData,
         summary: rawReport.summary,
+        reportId: rawReport.reportId,
+        initiativeName: rawReport.initiativeName,
+        generatedDate: rawReport.generatedDate,
       },
       generatedAt: new Date().toISOString(),
     };
 
-    // -----------------------------------------
-    // Save to Database
-    // -----------------------------------------
     const result = db.prepare(
-      `INSERT INTO reports 
-        (initiative_id, name, description, status, created_by, report_data, created_at)
+      `INSERT INTO reports (initiative_id, name, description, status, created_by, report_data, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       initiativeId,
@@ -149,87 +130,15 @@ export async function POST(request) {
       new Date().toISOString()
     );
 
-    const reportName = body.name || `Report-${result.lastInsertRowid}`;
-
-    // -----------------------------------------
-    // FORMAT EXPORTS
-    // -----------------------------------------
-
-    // ---------- JSON ----------
-    if (format === 'json') {
-      return new Response(JSON.stringify(snapshot, null, 2), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Disposition': `attachment; filename="${reportName}.json"`,
-        },
-      });
-    }
-
-    // ---------- CSV ----------
-    if (format === 'csv' || format === 'xlsx') {
-      const headers = Object.keys(filteredData[0] || {});
-      const rows = filteredData.map(row =>
-        headers.map(h => `"${row[h] ?? ''}"`).join(',')
-      );
-
-      const csvContent = [headers.join(','), ...rows].join('\n');
-
-      return new Response(csvContent, {
-        status: 200,
-        headers: {
-          'Content-Type':
-            format === 'csv'
-              ? 'text/csv'
-              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="${reportName}.${format}"`,
-        },
-      });
-    }
-
-    // ---------- PDF (Text-based safe fallback) ----------
-    const basicText = `
-Report: ${reportName}
-Initiative: ${initiative.name}
-Generated: ${new Date().toISOString()}
-
------------------------
-METRICS
------------------------
-${JSON.stringify(metrics, null, 2)}
-
------------------------
-SUMMARY
------------------------
-${rawReport.summary || 'No summary available.'}
-
------------------------
-ROWS INCLUDED
------------------------
-${filteredData.length}
-`;
-
-    return new Response(basicText, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${reportName}.pdf"`,
-      },
+    return NextResponse.json({
+      success: true,
+      reportId: result.lastInsertRowid,
     });
-
   } catch (error) {
     console.error('Error creating report:', error);
-
-    // 🔥 Safe fallback — NEVER break frontend
-    return new Response(
-      `Basic Report Generated\n\nTimestamp: ${new Date().toISOString()}`,
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="Report.pdf"`,
-        },
-      }
+    return NextResponse.json(
+      { error: 'Failed to create report', details: error.message },
+      { status: 500 }
     );
   }
 }
