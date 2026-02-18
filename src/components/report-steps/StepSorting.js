@@ -2,8 +2,8 @@
 
 import SortPanel from '@/components/SortPanel';
 
-export default function StepSorting({ wizardData, onChange }) {
-  const attributes = wizardData.selectedInitiative?.attributes || [];
+export default function StepSorting({ reportConfig, onChange }) {
+  const attributes = reportConfig.selectedInitiative?.attributes || [];
 
   return (
     <div>
@@ -16,7 +16,7 @@ export default function StepSorting({ wizardData, onChange }) {
 
       <SortPanel
         attributes={attributes}
-        activeSorts={wizardData.sorts}
+        activeSorts={reportConfig.sorts}
         onSortsChange={(sorts) => onChange({ sorts })}
       />
     </div>

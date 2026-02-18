@@ -6,12 +6,12 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import { getInitiatives, getReportData } from '@/lib/data-service';
 
-import WizardStepIndicator from '@/components/wizard/WizardStepIndicator';
-import StepConfig from '@/components/wizard/StepConfig';
-import StepFilters from '@/components/wizard/StepFilters';
-import StepExpressions from '@/components/wizard/StepExpressions';
-import StepSorting from '@/components/wizard/StepSorting';
-import StepPreview from '@/components/wizard/StepPreview';
+import StepIndicator from '@/components/report-steps/StepIndicator';
+import StepConfig from '@/components/report-steps/StepConfig';
+import StepFilters from '@/components/report-steps/StepFilters';
+import StepExpressions from '@/components/report-steps/StepExpressions';
+import StepSorting from '@/components/report-steps/StepSorting';
+import StepPreview from '@/components/report-steps/StepPreview';
 
 const TOTAL_STEPS = 5;
 
@@ -22,9 +22,9 @@ export default function ReportCreationPage() {
   const [initiatives, setInitiatives] = useState([]);
   const [tableData, setTableData] = useState([]);
 
-  // ---- WIZARD STATE ----
+  // ---- REPORT CONFIG ----
   const [currentStep, setCurrentStep] = useState(0);
-  const [wizardData, setWizardData] = useState({
+  const [reportConfig, setReportConfig] = useState({
     selectedInitiative: null,
     reportName: '',
     description: '',
@@ -48,7 +48,7 @@ export default function ReportCreationPage() {
       const data = await getInitiatives();
       setInitiatives(data);
       if (data.length > 0) {
-        setWizardData(prev => ({ ...prev, selectedInitiative: data[0] }));
+        setReportConfig(prev => ({ ...prev, selectedInitiative: data[0] }));
       }
     }
     loadInitiatives();
@@ -58,15 +58,15 @@ export default function ReportCreationPage() {
   // Load table data when initiative changes
   useEffect(() => {
     async function loadTableData() {
-      if (!wizardData.selectedInitiative) {
+      if (!reportConfig.selectedInitiative) {
         setTableData([]);
         return;
       }
-      const data = await getReportData(wizardData.selectedInitiative.id);
+      const data = await getReportData(reportConfig.selectedInitiative.id);
       setTableData(data?.tableData || []);
     }
     loadTableData();
-  }, [wizardData.selectedInitiative]);
+  }, [reportConfig.selectedInitiative]);
 
   async function fetchReports() {
     setLoadingReports(true);
@@ -81,14 +81,14 @@ export default function ReportCreationPage() {
     }
   }
 
-  // ---- WIZARD NAVIGATION ----
-  function updateWizardData(partial) {
-    setWizardData(prev => ({ ...prev, ...partial }));
+  // ---- STEP NAVIGATION ----
+  function updateConfig(partial) {
+    setReportConfig(prev => ({ ...prev, ...partial }));
   }
 
   function canProceed() {
     if (currentStep === 0) {
-      return wizardData.selectedInitiative && wizardData.reportName.trim().length > 0;
+      return reportConfig.selectedInitiative && reportConfig.reportName.trim().length > 0;
     }
     return true; // Steps 1-3 are optional, step 4 is the last
   }
@@ -125,21 +125,21 @@ export default function ReportCreationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          initiativeId: wizardData.selectedInitiative.id,
-          name: wizardData.reportName,
-          description: wizardData.description,
+          initiativeId: reportConfig.selectedInitiative.id,
+          name: reportConfig.reportName,
+          description: reportConfig.description,
           createdBy: userRole,
-          filters: wizardData.filters,
-          expressions: wizardData.expressions,
-          sorts: wizardData.sorts,
+          filters: reportConfig.filters,
+          expressions: reportConfig.expressions,
+          sorts: reportConfig.sorts,
         }),
       });
 
       if (!res.ok) throw new Error();
 
-      // Reset wizard
+      // Reset form
       setCurrentStep(0);
-      setWizardData({
+      setReportConfig({
         selectedInitiative: initiatives.length > 0 ? initiatives[0] : null,
         reportName: '',
         description: '',
@@ -191,37 +191,37 @@ export default function ReportCreationPage() {
         return (
           <StepConfig
             initiatives={initiatives}
-            wizardData={wizardData}
-            onChange={updateWizardData}
+            reportConfig={reportConfig}
+            onChange={updateConfig}
           />
         );
       case 1:
         return (
           <StepFilters
-            wizardData={wizardData}
-            onChange={updateWizardData}
+            reportConfig={reportConfig}
+            onChange={updateConfig}
             tableData={tableData}
           />
         );
       case 2:
         return (
           <StepExpressions
-            wizardData={wizardData}
-            onChange={updateWizardData}
+            reportConfig={reportConfig}
+            onChange={updateConfig}
             tableData={tableData}
           />
         );
       case 3:
         return (
           <StepSorting
-            wizardData={wizardData}
-            onChange={updateWizardData}
+            reportConfig={reportConfig}
+            onChange={updateConfig}
           />
         );
       case 4:
         return (
           <StepPreview
-            wizardData={wizardData}
+            reportConfig={reportConfig}
             tableData={tableData}
             onGenerate={handleGenerate}
             isSubmitting={isSubmitting}
@@ -249,7 +249,7 @@ export default function ReportCreationPage() {
           </p>
 
           {/* Step Indicator */}
-          <WizardStepIndicator currentStep={currentStep} />
+          <StepIndicator currentStep={currentStep} />
 
           {/* Active Step Content */}
           <div style={{ marginBottom: '1.5rem' }}>

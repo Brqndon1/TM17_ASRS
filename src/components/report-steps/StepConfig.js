@@ -1,6 +1,6 @@
 'use client';
 
-export default function StepConfig({ initiatives, wizardData, onChange }) {
+export default function StepConfig({ initiatives, reportConfig, onChange }) {
   return (
     <div>
       <h2 style={{ fontSize: '1.15rem', fontWeight: '600', marginBottom: '0.5rem' }}>
@@ -19,7 +19,7 @@ export default function StepConfig({ initiatives, wizardData, onChange }) {
           <label className="asrs-label">Initiative *</label>
           <select
             className="asrs-input"
-            value={wizardData.selectedInitiative?.id || ''}
+            value={reportConfig.selectedInitiative?.id || ''}
             onChange={(e) => {
               const initiative = initiatives.find(i => i.id === Number(e.target.value));
               onChange({ selectedInitiative: initiative });
@@ -37,7 +37,7 @@ export default function StepConfig({ initiatives, wizardData, onChange }) {
           <input
             className="asrs-input"
             placeholder="e.g. Q2 Safety Trends"
-            value={wizardData.reportName}
+            value={reportConfig.reportName}
             onChange={(e) => onChange({ reportName: e.target.value })}
           />
         </div>
@@ -50,7 +50,7 @@ export default function StepConfig({ initiatives, wizardData, onChange }) {
           className="asrs-input"
           rows={3}
           placeholder="Optional description for the report"
-          value={wizardData.description}
+          value={reportConfig.description}
           onChange={(e) => onChange({ description: e.target.value })}
         />
       </div>

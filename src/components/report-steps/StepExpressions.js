@@ -7,9 +7,9 @@ const MAX_EXPRESSIONS = 3;
 const OPERATORS = ['=', '!=', '>', '<', '>=', '<=', 'contains'];
 const CONNECTORS = ['AND', 'OR'];
 
-export default function StepExpressions({ wizardData, onChange, tableData }) {
-  const attributes = wizardData.selectedInitiative?.attributes || [];
-  const expressions = wizardData.expressions || [];
+export default function StepExpressions({ reportConfig, onChange, tableData }) {
+  const attributes = reportConfig.selectedInitiative?.attributes || [];
+  const expressions = reportConfig.expressions || [];
 
   // Build example values for each attribute (used as placeholder hints)
   const exampleValues = useMemo(() => {

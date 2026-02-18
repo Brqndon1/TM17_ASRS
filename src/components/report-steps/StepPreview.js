@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import DataTable from '@/components/DataTable';
 import { processReportData } from '@/lib/report-engine';
 
-export default function StepPreview({ wizardData, tableData, onGenerate, isSubmitting }) {
-  const attributes = wizardData.selectedInitiative?.attributes || [];
+export default function StepPreview({ reportConfig, tableData, onGenerate, isSubmitting }) {
+  const attributes = reportConfig.selectedInitiative?.attributes || [];
 
   // Run the full pipeline client-side for preview
   const { filteredData, metrics } = useMemo(() => {
@@ -14,17 +14,17 @@ export default function StepPreview({ wizardData, tableData, onGenerate, isSubmi
     }
     return processReportData(
       tableData,
-      wizardData.filters,
-      wizardData.expressions,
-      wizardData.sorts,
+      reportConfig.filters,
+      reportConfig.expressions,
+      reportConfig.sorts,
       attributes
     );
-  }, [tableData, wizardData.filters, wizardData.expressions, wizardData.sorts, attributes]);
+  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, attributes]);
 
   // Build human-readable config summary
-  const activeFilterEntries = Object.entries(wizardData.filters).filter(([, v]) => v && v !== 'All');
-  const hasExpressions = wizardData.expressions.length > 0;
-  const hasSorts = wizardData.sorts.length > 0;
+  const activeFilterEntries = Object.entries(reportConfig.filters).filter(([, v]) => v && v !== 'All');
+  const hasExpressions = reportConfig.expressions.length > 0;
+  const hasSorts = reportConfig.sorts.length > 0;
 
   // Preview limited to 20 rows
   const previewData = filteredData.slice(0, 20);
@@ -47,16 +47,16 @@ export default function StepPreview({ wizardData, tableData, onGenerate, isSubmi
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.88rem' }}>
           <div>
             <span style={{ color: 'var(--color-text-light)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Initiative</span>
-            <p style={{ margin: '0.15rem 0 0 0', fontWeight: '500' }}>{wizardData.selectedInitiative?.name || '—'}</p>
+            <p style={{ margin: '0.15rem 0 0 0', fontWeight: '500' }}>{reportConfig.selectedInitiative?.name || '—'}</p>
           </div>
           <div>
             <span style={{ color: 'var(--color-text-light)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Report Name</span>
-            <p style={{ margin: '0.15rem 0 0 0', fontWeight: '500' }}>{wizardData.reportName || '—'}</p>
+            <p style={{ margin: '0.15rem 0 0 0', fontWeight: '500' }}>{reportConfig.reportName || '—'}</p>
           </div>
-          {wizardData.description && (
+          {reportConfig.description && (
             <div style={{ gridColumn: '1 / -1' }}>
               <span style={{ color: 'var(--color-text-light)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Description</span>
-              <p style={{ margin: '0.15rem 0 0 0' }}>{wizardData.description}</p>
+              <p style={{ margin: '0.15rem 0 0 0' }}>{reportConfig.description}</p>
             </div>
           )}
           {activeFilterEntries.length > 0 && (
@@ -71,7 +71,7 @@ export default function StepPreview({ wizardData, tableData, onGenerate, isSubmi
             <div style={{ gridColumn: '1 / -1' }}>
               <span style={{ color: 'var(--color-text-light)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Expressions</span>
               <p style={{ margin: '0.15rem 0 0 0' }}>
-                {wizardData.expressions.map((e, i) =>
+                {reportConfig.expressions.map((e, i) =>
                   `${i > 0 ? (e.connector || 'AND') + ' ' : ''}${e.attribute} ${e.operator} "${e.value}"`
                 ).join(' ')}
               </p>
@@ -81,7 +81,7 @@ export default function StepPreview({ wizardData, tableData, onGenerate, isSubmi
             <div style={{ gridColumn: '1 / -1' }}>
               <span style={{ color: 'var(--color-text-light)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Sort Order</span>
               <p style={{ margin: '0.15rem 0 0 0' }}>
-                {wizardData.sorts.map((s, i) => `${i + 1}. ${s.attribute} (${s.direction === 'desc' ? 'Z→A' : 'A→Z'})`).join(', ')}
+                {reportConfig.sorts.map((s, i) => `${i + 1}. ${s.attribute} (${s.direction === 'desc' ? 'Z→A' : 'A→Z'})`).join(', ')}
               </p>
             </div>
           )}

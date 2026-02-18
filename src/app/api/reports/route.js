@@ -41,7 +41,7 @@ export async function GET(request) {
   }
 }
 
-// POST - Create a report with full wizard config and snapshot generation
+// POST - Create a report with full config and snapshot generation
 export async function POST(request) {
   try {
     initializeDatabase();
@@ -85,7 +85,7 @@ export async function POST(request) {
 
     const rawReport = { tableData, summary, chartData };
 
-    // Extract wizard config from request body
+    // Extract report config from request body
     const filters = body.filters || {};
     const expressions = body.expressions || [];
     const sorts = body.sorts || [];
