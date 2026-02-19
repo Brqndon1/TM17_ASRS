@@ -46,10 +46,10 @@ export default function SurveyForm() {
     const validQuestions = questions.filter((q) => q.question.trim());
     if (validQuestions.length === 0) return alert("Please add at least one question");
     
-    for (let i = 0; i < questions.length; i++) {
-      if (!questions[i].question.trim()) return alert(`Please enter text for Question ${i + 1}`);
-      if (questions[i].type === 'choice') {
-        const validOptions = questions[i].options.filter(opt => opt.trim());
+    for (let i = 0; i < validQuestions.length; i++) {
+      if (!validQuestions[i].question.trim()) return alert(`Please enter text for Question ${i + 1}`);
+      if (validQuestions[i].type === 'choice') {
+        const validOptions = validQuestions[i].options.filter(opt => opt.trim());
         if (validOptions.length === 0) {
           return alert(`Question ${i + 1} is multiple choice but has no options. Please add at least one option.`);
         }
