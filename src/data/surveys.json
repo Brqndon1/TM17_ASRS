@@ -30,30 +30,6 @@
     "published": true
   },
   {
-<<<<<<< HEAD
-    "id": "1771189037682",
-    "title": "TEST ",
-    "description": "Testing",
-    "questions": [
-      {
-        "id": 1771189037682.3025,
-        "text": {
-          "question": "Does this work?",
-          "type": "text",
-          "required": true
-        }
-      },
-      {
-        "id": 1771189037682.7717,
-        "text": {
-          "question": "This is optional",
-          "type": "text",
-          "required": false
-        }
-      }
-    ],
-    "createdAt": "2026-02-15T20:57:17.682Z",
-=======
     "id": "1771203452791",
     "title": "Testing QR",
     "description": "Testing Survey for testing QR Code implementation",
@@ -91,7 +67,76 @@
       }
     ],
     "createdAt": "2026-02-16T00:59:33.623Z",
->>>>>>> origin
+    "published": true
+  },
+  {
+    "id": "1771534967190",
+    "title": "This is the second Test Survey",
+    "description": "This is a description for the second file",
+    "questions": [
+      {
+        "id": 1771534967190.9373,
+        "text": {
+          "question": "This question is required",
+          "type": "text",
+          "required": true
+        }
+      },
+      {
+        "id": 1771534967190.7444,
+        "text": {
+          "question": "This question is not but is a number",
+          "type": "numeric",
+          "required": false
+        }
+      },
+      {
+        "id": 1771534967190.8425,
+        "text": {
+          "question": "This question is removed",
+          "type": "text",
+          "required": false
+        }
+      },
+      {
+        "id": 1771534967190.1262,
+        "text": {
+          "question": "Did the removing work",
+          "type": "choice",
+          "required": true,
+          "options": [
+            "Yes",
+            "No"
+          ]
+        }
+      }
+    ],
+    "createdAt": "2026-02-19T21:02:47.190Z",
+    "published": true
+  },
+  {
+    "id": "1771535965764",
+    "title": "third test remove",
+    "description": "this should only display 2 question",
+    "questions": [
+      {
+        "id": 1771535965764.402,
+        "text": {
+          "question": "This is required",
+          "type": "text",
+          "required": true
+        }
+      },
+      {
+        "id": 1771535965764.5403,
+        "text": {
+          "question": "this is not required",
+          "type": "text",
+          "required": false
+        }
+      }
+    ],
+    "createdAt": "2026-02-19T21:19:25.764Z",
     "published": true
   }
 ]

@@ -145,6 +145,9 @@ export default function SurveyPage() {
       // Template survey: validate all template questions are answered
       const questions = surveyTemplate.questions || [];
       const unanswered = questions.filter((q) => {
+        const isQuestionRequired = q.text?.required ?? q.required ?? true;
+        // because some surveys did not have required field, if not specified, we will treat it as required by default
+        if (!isQuestionRequired) return false; // skip non-required questions
         const qId = q.id;
         return !templateResponses[qId] || !String(templateResponses[qId]).trim();
       });
@@ -440,11 +443,12 @@ export default function SurveyPage() {
                       const questionType = q.text?.type || q.type || 'text';
                       const questionOptions = q.text?.options || q.options || [];
                       const qId = q.id;
+                      const isRequired = q.text?.required ?? q.required ?? true;
 
                       return (
                         <div key={qId} style={fieldGroupStyle}>
                           <label style={labelStyle}>
-                            {index + 1}. {questionText} <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
+                            {index + 1}. {questionText} {isRequired && <span style={{ color: 'var(--color-asrs-red)' }}>*</span>}
                           </label>
 
                           {questionType === 'text' && (
@@ -461,7 +465,7 @@ export default function SurveyPage() {
                                 resize: 'vertical',
                                 fontFamily: 'inherit',
                               }}
-                              required
+                              required={isRequired}
                             />
                           )}
 
@@ -475,7 +479,7 @@ export default function SurveyPage() {
                               })}
                               placeholder="Enter a number"
                               style={inputStyle}
-                              required
+                              required={isRequired}
                             />
                           )}
 
@@ -510,7 +514,7 @@ export default function SurveyPage() {
                                       [qId]: e.target.value,
                                     })}
                                     style={{ accentColor: 'var(--color-asrs-orange)' }}
-                                    required
+                                    required={isRequired}
                                   />
                                   <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
                                     {option}
