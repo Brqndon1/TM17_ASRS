@@ -8,7 +8,7 @@ const STEPS = [
   { label: 'Preview', icon: '5' },
 ];
 
-export default function WizardStepIndicator({ currentStep }) {
+export default function StepIndicator({ currentStep }) {
   return (
     <div style={{
       display: 'flex',

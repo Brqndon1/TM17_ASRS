@@ -52,13 +52,13 @@ export async function GET() {
 
       // Pull data and map rows and dictionaries to necessary variables. 
       const initiatives = db.prepare('SELECT * FROM initiative').all().map(row => ({
-        ...row,
+        id: row.initiative_id,
+        name: row.initiative_name,
+        description: row.description || '',
         attributes: row.attributes ? JSON.parse(row.attributes) : [],
         questions: row.questions ? JSON.parse(row.questions) : [],
         settings: row.settings ? JSON.parse(row.settings) : {},
-      }
-      )
-      );
+      }));
       return NextResponse.json({initiatives});
     }
     catch(error)
@@ -128,15 +128,15 @@ export async function POST(request) {
       return NextResponse.json({error: "Missing required field: name"}, {status: 400});
     }
     // Prepare to insert data into the database in this specific order. 
-    const stmt = db.prepare('INSERT INTO initiative (initiative_name, description, settings) VALUES (?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO initiative (initiative_name, description, attributes, questions, settings) VALUES (?, ?, ?, ?, ?)');
 
     // Insert the data into the database. 
     const result = stmt.run(
       name.trim(),
       description || '',
       JSON.stringify(attributes || []),
-      JSON.stringify(settings || {}),
       JSON.stringify(questions || []),
+      JSON.stringify(settings || {}),
     );
 
     // Store in the document still

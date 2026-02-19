@@ -200,13 +200,37 @@ function initializeDatabase() {
       created_by_user_id INTEGER REFERENCES user(user_id)
     );
 
+    -- Categories table (global categories for organizing data)
+
+    CREATE TABLE IF NOT EXISTS category (
+      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Junction table for many-to-many relationship between initiatives and categories
+
+    CREATE TABLE IF NOT EXISTS initiative_category (
+      initiative_category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES category(category_id) ON DELETE CASCADE,
+      added_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(initiative_id, category_id)
+    );
+
     -- Indexes
 
     CREATE INDEX IF NOT EXISTS idx_goal_initiative ON initiative_goal(initiative_id);
+    CREATE INDEX IF NOT EXISTS idx_category_name ON category(category_name);
+    CREATE INDEX IF NOT EXISTS idx_initiative_category_initiative ON initiative_category(initiative_id);
+    CREATE INDEX IF NOT EXISTS idx_initiative_category_category ON initiative_category(category_id);
     CREATE INDEX IF NOT EXISTS idx_submission_initiative_date ON submission(initiative_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_form_date ON submission(form_id, submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_submission_value_submission ON submission_value(submission_id);
     CREATE INDEX IF NOT EXISTS idx_submission_value_field ON submission_value(field_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_form_field_unique ON form_field(form_id, field_id);
     CREATE INDEX IF NOT EXISTS idx_surveys_submitted_at ON surveys(submitted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reports_survey_id ON reports(survey_id);
     CREATE INDEX IF NOT EXISTS idx_reports_initiative_id ON reports(initiative_id);
@@ -231,6 +255,8 @@ function initializeDatabase() {
   addColumnIfNotExists('initiative', "attributes TEXT DEFAULT '[]'");
   addColumnIfNotExists('initiative', "questions TEXT DEFAULT '[]'");
   addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
+  addColumnIfNotExists('initiative', 'summary_json TEXT');
+  addColumnIfNotExists('initiative', 'chart_data_json TEXT');
 
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
@@ -239,19 +265,115 @@ function initializeDatabase() {
   insertUserType.run('staff', 50);
   insertUserType.run('admin', 100);
 
-  const insertInitiative = db.prepare(
-    'INSERT OR IGNORE INTO initiative (initiative_name) VALUES (?)'
+  // ── Seed initiative data from JSON files ──────────────
+  function toCamelKey(displayName) {
+    const words = displayName.trim().split(/\s+/);
+    return words
+      .map((w, i) => i === 0 ? w.charAt(0).toLowerCase() + w.slice(1) : w.charAt(0).toUpperCase() + w.slice(1))
+      .join('');
+  }
+
+  const seedDataDir = path.join(process.cwd(), 'src', 'data');
+  let initiativesJson = { initiatives: [] };
+  let reportDataJson = { reports: {} };
+  try {
+    initiativesJson = JSON.parse(fs.readFileSync(path.join(seedDataDir, 'initiatives.json'), 'utf-8'));
+    reportDataJson = JSON.parse(fs.readFileSync(path.join(seedDataDir, 'reportData.json'), 'utf-8'));
+  } catch (e) {
+    console.warn('[db] Could not load seed JSON files:', e.message);
+  }
+
+  // Upsert the 7 core initiatives with real data
+  for (const init of initiativesJson.initiatives.slice(0, 7)) {
+    const report = reportDataJson.reports[String(init.id)];
+    const summaryJson = report ? JSON.stringify(report.summary) : null;
+    const chartDataJson = report ? JSON.stringify(report.chartData) : null;
+    const attrs = JSON.stringify(init.attributes || []);
+    const desc = init.description || '';
+    try {
+      const exists = db.prepare('SELECT 1 FROM initiative WHERE initiative_id = ?').get(init.id);
+      if (exists) {
+        db.prepare(
+          'UPDATE initiative SET initiative_name=?, description=?, attributes=?, summary_json=?, chart_data_json=? WHERE initiative_id=?'
+        ).run(init.name, desc, attrs, summaryJson, chartDataJson, init.id);
+      } else {
+        db.prepare(
+          'INSERT INTO initiative (initiative_id, initiative_name, description, attributes, summary_json, chart_data_json) VALUES (?,?,?,?,?,?)'
+        ).run(init.id, init.name, desc, attrs, summaryJson, chartDataJson);
+      }
+    } catch (e) {
+      console.warn(`[db] Could not upsert initiative ${init.id}:`, e.message);
+    }
+  }
+
+  // ── Seed fields (unique field definitions) ──────────────
+  const insertField = db.prepare(
+    'INSERT OR IGNORE INTO field (field_key, field_label, field_type, scope, is_filterable) VALUES (?,?,?,?,?)'
   );
-  for (const name of [
-    'Sustainability',
-    'Community Engagement',
-    'Academic Excellence',
-    'Research & Innovation',
-    'Student Success',
-    'Infrastructure',
-    'Diversity & Inclusion',
-  ]) {
-    insertInitiative.run(name);
+  insertField.run('grade', 'Grade', 'text', 'common', 1);
+  insertField.run('school', 'School', 'text', 'common', 1);
+
+  for (const [initId, report] of Object.entries(reportDataJson.reports)) {
+    if (!report.tableData || report.tableData.length === 0) continue;
+    const init = initiativesJson.initiatives.find(i => i.id === Number(initId));
+    const sampleRow = report.tableData[0];
+    for (const key of Object.keys(sampleRow)) {
+      if (key === 'id' || key === 'grade' || key === 'school') continue;
+      const label = init?.attributes?.find(a => toCamelKey(a) === key) || key;
+      const fieldType = typeof sampleRow[key] === 'number' ? 'number' : 'text';
+      insertField.run(key, label, fieldType, 'initiative_specific', 1);
+    }
+  }
+
+  // ── Seed forms (1 per initiative) ──────────────────────
+  const insertForm = db.prepare(
+    'INSERT OR IGNORE INTO form (form_id, initiative_id, form_name) VALUES (?,?,?)'
+  );
+  for (const [initId] of Object.entries(reportDataJson.reports)) {
+    const init = initiativesJson.initiatives.find(i => i.id === Number(initId));
+    insertForm.run(Number(initId), Number(initId), `${init?.name || 'Initiative ' + initId} Survey`);
+  }
+
+  // ── Seed form_field (link fields to forms) ──────────────
+  const getFieldId = db.prepare('SELECT field_id FROM field WHERE field_key = ?');
+  const insertFormField = db.prepare(
+    'INSERT OR IGNORE INTO form_field (form_id, field_id, display_order) VALUES (?,?,?)'
+  );
+  for (const [initId, report] of Object.entries(reportDataJson.reports)) {
+    if (!report.tableData || report.tableData.length === 0) continue;
+    const sampleRow = report.tableData[0];
+    let order = 0;
+    for (const key of Object.keys(sampleRow)) {
+      if (key === 'id') continue;
+      const fieldRow = getFieldId.get(key);
+      if (fieldRow) {
+        insertFormField.run(Number(initId), fieldRow.field_id, order++);
+      }
+    }
+  }
+
+  // ── Seed submissions + submission_values ────────────────
+  const insertSubmission = db.prepare(
+    'INSERT OR IGNORE INTO submission (submission_id, initiative_id, form_id) VALUES (?,?,?)'
+  );
+  const insertSubValue = db.prepare(
+    'INSERT OR IGNORE INTO submission_value (submission_id, field_id, value_text, value_number) VALUES (?,?,?,?)'
+  );
+
+  let nextSubId = 1;
+  for (const [initId, report] of Object.entries(reportDataJson.reports)) {
+    if (!report.tableData) continue;
+    for (const row of report.tableData) {
+      insertSubmission.run(nextSubId, Number(initId), Number(initId));
+      for (const [key, value] of Object.entries(row)) {
+        if (key === 'id') continue;
+        const fieldRow = getFieldId.get(key);
+        if (!fieldRow) continue;
+        const numVal = typeof value === 'number' ? value : null;
+        insertSubValue.run(nextSubId, fieldRow.field_id, String(value), numVal);
+      }
+      nextSubId++;
+    }
   }
 
   const insertFeature = db.prepare(

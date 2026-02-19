@@ -1,9 +1,12 @@
 /**
  * ============================================================================
- * REPORTING PAGE — The ASRS Initiatives Reporting System page.
+ * REPORTING PAGE — Displays reports generated from the Report Creation page.
  * ============================================================================
- * This page hosts the full reporting dashboard for ASRS initiatives.
  * Access at: /reporting
+ *
+ * Each initiative can have one assigned report (the most recent one created
+ * for that initiative in Report Creation). Selecting an initiative shows
+ * its assigned report snapshot.
  *
  * LAYOUT STRUCTURE:
  * ┌─────────────────────────────────────────────────────┐
@@ -22,45 +25,44 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
-import { getInitiatives, getReportData, getTrendData } from '@/lib/data-service';
 
 export default function ReportingPage() {
-  // ---- STATE VARIABLES ----
-  // Which initiative the user has clicked on (null means none selected yet)
   const [selectedInitiative, setSelectedInitiative] = useState(null);
-
-  // The list of all available initiatives (loaded from JSON/API on page load)
   const [initiatives, setInitiatives] = useState([]);
-
-  // The report data for the currently selected initiative
   const [reportData, setReportData] = useState(null);
-
-  // The trend data for the currently selected initiative
   const [trendData, setTrendData] = useState([]);
-
-  // The current user role — determines what UI elements are visible
   const [userRole, setUserRole] = useState('public');
-
-  // Loading state to show a spinner while data is being fetched
   const [isLoading, setIsLoading] = useState(true);
+  const [noReport, setNoReport] = useState(false);
 
-  /**
-   * useEffect — Runs ONCE when the page first loads.
-   * Fetches the list of initiatives and selects the first one by default.
-   */
+  // Map of initiative_id → most recent report row (built once on load)
+  const [reportMap, setReportMap] = useState({});
+
   useEffect(() => {
     async function loadInitialData() {
       try {
-        const initiativesList = await getInitiatives();
+        const [initiativesRes, reportsRes] = await Promise.all([
+          fetch('/api/initiatives'),
+          fetch('/api/reports'),
+        ]);
+        const initiativesData = await initiativesRes.json();
+        const reportsData = await reportsRes.json();
+
+        const initiativesList = initiativesData.initiatives || [];
         setInitiatives(initiativesList);
 
-        // Automatically select the first initiative so the page isn't blank
+        // Build map: initiative_id → most recent report (reports come sorted by created_at DESC)
+        const map = {};
+        for (const r of (reportsData.reports || [])) {
+          if (!map[r.initiative_id]) {
+            map[r.initiative_id] = r;
+          }
+        }
+        setReportMap(map);
+
         if (initiativesList.length > 0) {
           setSelectedInitiative(initiativesList[0]);
-          const report = await getReportData(initiativesList[0].id);
-          const trends = await getTrendData(initiativesList[0].id);
-          setReportData(report);
-          setTrendData(trends);
+          loadReportForInitiative(initiativesList[0], map);
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -71,30 +73,116 @@ export default function ReportingPage() {
     loadInitialData();
   }, []);
 
-  /**
-   * handleInitiativeSelect — Called when the user clicks an initiative card.
-   * Loads the report data and trend data for that initiative.
-   */
+  function loadReportForInitiative(initiative, map) {
+    const rMap = map || reportMap;
+    const report = rMap[initiative.id];
+
+    if (!report) {
+      setReportData(null);
+      setTrendData([]);
+      setNoReport(true);
+      return;
+    }
+
+    setNoReport(false);
+
+    let parsed = null;
+    try {
+      parsed = typeof report.report_data === 'string'
+        ? JSON.parse(report.report_data)
+        : report.report_data;
+    } catch {
+      parsed = null;
+    }
+
+    if (parsed && parsed.version) {
+      const results = parsed.results;
+      setReportData({
+        reportId: results.reportId,
+        initiativeId: parsed.config.initiativeId,
+        initiativeName: results.initiativeName,
+        generatedDate: results.generatedDate,
+        summary: results.summary,
+        chartData: results.chartData,
+        tableData: results.filteredTableData,
+      });
+      setTrendData(results.trendData || []);
+    } else {
+      setReportData(null);
+      setTrendData([]);
+      setNoReport(true);
+    }
+  }
+
   async function handleInitiativeSelect(initiative) {
     setIsLoading(true);
     setSelectedInitiative(initiative);
+    loadReportForInitiative(initiative);
+    setIsLoading(false);
+  }
 
-    try {
-      const report = await getReportData(initiative.id);
-      const trends = await getTrendData(initiative.id);
-      setReportData(report);
-      setTrendData(trends);
-    } catch (error) {
-      console.error('Error loading report data:', error);
-    } finally {
-      setIsLoading(false);
+  /**
+   * handleDownload — Exports the current report
+   */
+  function handleDownload(format) {
+    if (!reportData || !selectedInitiative) return;
+
+    const fileName = `${selectedInitiative.name.replace(/\s+/g, '_')}_Report`;
+
+    if (format === 'csv') {
+      const csvContent =
+        "data:text/csv;charset=utf-8," +
+        Object.keys(reportData).join(",") +
+        "\n" +
+        Object.values(reportData).join(",");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `${fileName}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    if (format === 'html') {
+      const htmlContent = `
+        <html>
+          <head><title>${fileName}</title></head>
+          <body>
+            <h1>${selectedInitiative.name} Report</h1>
+            <pre>${JSON.stringify(reportData, null, 2)}</pre>
+          </body>
+        </html>
+      `;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${fileName}.html`;
+      link.click();
+    }
+
+    if (format === 'pdf') {
+      window.print();
+    }
+
+    if (format === 'xlsx') {
+      const worksheet = Object.entries(reportData)
+        .map(([key, value]) => `${key}\t${value}`)
+        .join("\n");
+
+      const blob = new Blob([worksheet], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${fileName}.xlsx`;
+      link.click();
     }
   }
 
   return (
-    <main
-      style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}
-    >
+    <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
       {/* ---- HEADER ---- */}
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
@@ -120,20 +208,83 @@ export default function ReportingPage() {
             padding: '4rem', color: 'var(--color-text-light)'
           }}>
             <div style={{
-              width: '40px', height: '40px', border: '4px solid var(--color-bg-tertiary)',
+              width: '40px', height: '40px',
+              border: '4px solid var(--color-bg-tertiary)',
               borderTop: '4px solid var(--color-asrs-orange)',
-              borderRadius: '50%', animation: 'spin 1s linear infinite'
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
             }} />
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <span style={{ marginLeft: '1rem', fontSize: '1.1rem' }}>Loading report data...</span>
+            <span style={{ marginLeft: '1rem', fontSize: '1.1rem' }}>
+              Loading report data...
+            </span>
+          </div>
+        ) : noReport ? (
+          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <p style={{ color: 'var(--color-text-light)', fontSize: '1.1rem' }}>
+              No report has been assigned to this initiative yet.
+            </p>
+            <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+              Create one in Report Creation to see it here.
+            </p>
           </div>
         ) : reportData ? (
-          <ReportDashboard
-            reportData={reportData}
-            trendData={trendData}
-            selectedInitiative={selectedInitiative}
-            userRole={userRole}
-          />
+          <>
+            {/* ---- DOWNLOAD BAR ---- */}
+            <div
+              className="asrs-card"
+              style={{
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-bg-tertiary)'
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>
+                Download Report
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
+                  <button
+                    key={format}
+                    onClick={() => handleDownload(format)}
+                    style={{
+                      padding: '0.5rem 0.9rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 500,
+                      borderRadius: '6px',
+                      border: '1px solid var(--color-bg-tertiary)',
+                      backgroundColor: 'var(--color-bg-primary)',
+                      color: 'var(--color-text-primary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = 'var(--color-asrs-orange)';
+                      e.target.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'var(--color-bg-primary)';
+                      e.target.style.color = 'var(--color-text-primary)';
+                    }}
+                  >
+                    {format.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <ReportDashboard
+              reportData={reportData}
+              trendData={trendData}
+              selectedInitiative={selectedInitiative}
+              userRole={userRole}
+            />
+          </>
         ) : (
           <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
             <p style={{ color: 'var(--color-text-light)', fontSize: '1.1rem' }}>

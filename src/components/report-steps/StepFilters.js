@@ -2,8 +2,8 @@
 
 import FilterPanel from '@/components/FilterPanel';
 
-export default function StepFilters({ wizardData, onChange, tableData }) {
-  const attributes = wizardData.selectedInitiative?.attributes || [];
+export default function StepFilters({ reportConfig, onChange, tableData }) {
+  const attributes = reportConfig.selectedInitiative?.attributes || [];
 
   return (
     <div>
@@ -17,7 +17,7 @@ export default function StepFilters({ wizardData, onChange, tableData }) {
       {tableData && tableData.length > 0 ? (
         <FilterPanel
           attributes={attributes}
-          activeFilters={wizardData.filters}
+          activeFilters={reportConfig.filters}
           onFiltersChange={(filters) => onChange({ filters })}
           tableData={tableData}
         />
