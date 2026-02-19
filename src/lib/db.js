@@ -1,3 +1,5 @@
+//Database may be causing errors. 
+
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -137,6 +139,35 @@ function initializeDatabase() {
       name TEXT NOT NULL,
       description TEXT
     );
+
+    -- QR code tables (US-011: generate QR codes for surveys/reports)
+
+    CREATE TABLE IF NOT EXISTS qr_codes (
+      qr_code_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      qr_code_key TEXT NOT NULL UNIQUE,
+      qr_type TEXT NOT NULL CHECK (qr_type IN ('survey','report','survey_template')),
+      target_id INTEGER,
+      target_url TEXT NOT NULL,
+      created_by_user_id INTEGER REFERENCES user(user_id),
+      expires_at TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_scans (
+      scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      qr_code_id INTEGER NOT NULL REFERENCES qr_codes(qr_code_id) ON DELETE CASCADE,
+      ip_address TEXT,
+      user_agent TEXT,
+      referrer TEXT,
+      converted_to_submission INTEGER,
+      scanned_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_qr_codes_key ON qr_codes(qr_code_key);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_code_id ON qr_scans(qr_code_id);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_scanned_at ON qr_scans(scanned_at DESC);
 
     CREATE TABLE IF NOT EXISTS feature_access (
       feature_access_id INTEGER PRIMARY KEY AUTOINCREMENT,
