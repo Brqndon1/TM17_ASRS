@@ -1,3 +1,5 @@
+//Database may be causing errors. 
+
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
