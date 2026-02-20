@@ -1,5 +1,6 @@
 import db from '../../../../lib/db.js';
 
+export async function GET() {
   // Query all forms (survey templates)
   const forms = db.prepare(`
     SELECT form_id AS id, form_name AS title, description, created_at, is_published AS published
