@@ -46,6 +46,7 @@ import db from '../../../../lib/db.js';
   return new Response(JSON.stringify(surveys), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+export async function POST(request) {
   try {
     const body = await request.json();
     const { title, description, questions } = body || {};
