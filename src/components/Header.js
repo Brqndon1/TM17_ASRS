@@ -15,12 +15,14 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef(null);
 
   // Check for logged-in user on component mount
   useEffect(() => {
@@ -28,6 +30,17 @@ export default function Header() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+  }, []);
+
+  // Close the mobile menu when the user clicks outside the header
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (headerRef.current && !headerRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleLogout = () => {
@@ -63,14 +76,13 @@ export default function Header() {
   });
 
   return (
-    <header style={{
+    <header ref={headerRef} style={{
       background: 'linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%)',
       color: 'white',
       padding: '0.75rem 1.5rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      flexWrap: 'wrap',
       gap: '1rem',
       boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
       position: 'sticky',
@@ -78,29 +90,40 @@ export default function Header() {
       zIndex: 100
     }}>
       {/* ---- Left Section: Logo + Title ---- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
         <img
           src="/asrs-logo.png"
           alt="ASRS Logo"
-          style={{
-            height: '50px',
-            width: 'auto',
-            borderRadius: '6px'
-          }}
+          style={{ height: '50px', width: 'auto', borderRadius: '6px', flexShrink: 0 }}
         />
-        <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, lineHeight: 1.2 }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             ASRS Initiatives
           </h1>
-          <p style={{ fontSize: '0.8rem', margin: 0, opacity: 0.8 }}>
+          <p style={{ fontSize: '0.8rem', margin: 0, opacity: 0.8, whiteSpace: 'nowrap' }}>
             Reporting System
           </p>
         </div>
       </div>
 
-      {/* ---- Right Section: Navigation ---- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <nav style={{ display: 'flex', gap: '0.5rem' }}>
+      {/* ---- Right Section: Hamburger + Collapsible Nav ---- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+        {/* Hamburger button — visible only on mobile (≤768px) via CSS */}
+        <button
+          className="header-hamburger"
+          onClick={() => setMenuOpen(prev => !prev)}
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+        >
+          <span className="header-hamburger-line" />
+          <span className="header-hamburger-line" />
+          <span className="header-hamburger-line" />
+        </button>
+
+        {/* Nav area — full row on desktop, absolute dropdown on mobile */}
+        <div className={`header-nav-area${menuOpen ? ' open' : ''}`}>
+          <nav className="header-nav-links">
           {/* Show all navigation tabs only when logged in */}
           {isLoggedIn ? (
             <>
@@ -186,28 +209,28 @@ export default function Header() {
               )}
             </>
           ) : null}
-          
-          {/* Show Survey + Login buttons when not logged in, Logout when logged in */}
+
+          {/* Show Survey + Login when not logged in; Logout when logged in */}
           {!isLoggedIn ? (
             <>
-              <Link 
-                href="/" 
+              <Link
+                href="/"
                 style={getNavLinkStyle('/')}
                 onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
                 Home
               </Link>
-              <Link 
-                href="/survey" 
+              <Link
+                href="/survey"
                 style={getNavLinkStyle('/survey')}
                 onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
                 Take Survey
               </Link>
-              <Link 
-                href="/login" 
+              <Link
+                href="/login"
                 style={getNavLinkStyle('/login')}
                 onMouseEnter={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
@@ -216,8 +239,8 @@ export default function Header() {
               </Link>
             </>
           ) : (
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               style={logoutButtonStyle}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'}
@@ -225,21 +248,20 @@ export default function Header() {
               Logout
             </button>
           )}
-        </nav>
+          </nav>{/* end header-nav-links */}
 
-        {/* Show user info when logged in */}
-        {isLoggedIn && (
-          <>
-            <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
-            <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>
-              {user.first_name} {user.last_name}
-              <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                {user.user_type}
+          {/* User info — shown inside dropdown on mobile, inline on desktop */}
+          {isLoggedIn && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
+              <div style={{ fontSize: '0.85rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
+                {user.first_name} {user.last_name}
+                <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>{user.user_type}</div>
               </div>
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>{/* end header-nav-area */}
+      </div>{/* end right section */}
     </header>
   );
 }

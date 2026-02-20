@@ -49,12 +49,8 @@ export default function InitiativeSelector({ initiatives, selectedInitiative, on
         Select Initiative
       </h2>
 
-      {/* Grid of initiative cards — wraps on smaller screens */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-        gap: '0.75rem'
-      }}>
+      {/* Grid of initiative cards — responsive via .initiative-grid CSS class */}
+      <div className="initiative-grid">
         {initiatives.map((initiative, index) => {
           // Check if this card is the currently selected one
           const isSelected = selectedInitiative?.id === initiative.id;
@@ -66,9 +62,9 @@ export default function InitiativeSelector({ initiatives, selectedInitiative, on
               style={{
                 // Card base styles
                 background: isSelected ? 'white' : 'var(--color-bg-secondary)',
-                border: isSelected
-                  ? `2px solid ${accentColors[index]}`
-                  : '2px solid transparent',
+                borderTop: isSelected ? `2px solid ${accentColors[index]}` : '2px solid transparent',
+                borderRight: isSelected ? `2px solid ${accentColors[index]}` : '2px solid transparent',
+                borderBottom: isSelected ? `2px solid ${accentColors[index]}` : '2px solid transparent',
                 borderLeft: `4px solid ${accentColors[index]}`,
                 borderRadius: '10px',
                 padding: '0.875rem',

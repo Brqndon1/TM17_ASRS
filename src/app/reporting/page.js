@@ -187,12 +187,12 @@ export default function ReportingPage() {
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
       {/* ---- BACK BUTTON ---- */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
+      <div className="page-section-top">
         <BackButton />
       </div>
 
       {/* ---- INITIATIVE SELECTOR ---- */}
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem' }}>
+      <section className="page-section">
         <InitiativeSelector
           initiatives={initiatives}
           selectedInitiative={selectedInitiative}
@@ -201,7 +201,7 @@ export default function ReportingPage() {
       </section>
 
       {/* ---- REPORT DASHBOARD ---- */}
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
+      <section className="page-section-bottom">
         {isLoading ? (
           <div style={{
             display: 'flex', justifyContent: 'center', alignItems: 'center',
@@ -236,45 +236,42 @@ export default function ReportingPage() {
               style={{
                 marginBottom: '1.5rem',
                 padding: '1rem 1.5rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
                 backgroundColor: 'var(--color-bg-secondary)',
                 border: '1px solid var(--color-bg-tertiary)'
               }}
             >
-              <div style={{ fontWeight: 600 }}>
-                Download Report
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
-                  <button
-                    key={format}
-                    onClick={() => handleDownload(format)}
-                    style={{
-                      padding: '0.5rem 0.9rem',
-                      fontSize: '0.9rem',
-                      fontWeight: 500,
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-bg-tertiary)',
-                      backgroundColor: 'var(--color-bg-primary)',
-                      color: 'var(--color-text-primary)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = 'var(--color-asrs-orange)';
-                      e.target.style.color = '#fff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'var(--color-bg-primary)';
-                      e.target.style.color = 'var(--color-text-primary)';
-                    }}
-                  >
-                    {format.toUpperCase()}
-                  </button>
-                ))}
+              {/* Inner row — label left, buttons right; stacks on mobile */}
+              <div className="download-bar-inner">
+                <div style={{ fontWeight: 600 }}>Download Report</div>
+                <div className="download-btn-group">
+                  {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
+                    <button
+                      key={format}
+                      onClick={() => handleDownload(format)}
+                      style={{
+                        padding: '0.5rem 0.9rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                        border: '1px solid var(--color-bg-tertiary)',
+                        backgroundColor: 'var(--color-bg-primary)',
+                        color: 'var(--color-text-primary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'var(--color-asrs-orange)';
+                        e.target.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'var(--color-bg-primary)';
+                        e.target.style.color = 'var(--color-text-primary)';
+                      }}
+                    >
+                      {format.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
