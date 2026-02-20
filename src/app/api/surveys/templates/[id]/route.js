@@ -30,23 +30,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { promises as fs } from "fs";
-import path from "path";
-
-const DATA_PATH = path.join(process.cwd(), "src/data", "surveys.json");
-
-/**
- * Read all survey templates from the JSON file
- * @returns {Promise<Array>} Array of survey template objects
- */
-async function readSurveys() {
-  try {
-    const raw = await fs.readFile(DATA_PATH, "utf8");
-    return JSON.parse(raw || "[]");
-  } catch (err) {
-    return [];
-  }
-}
+import db from '../../../../lib/db.js';
 
 /**
  * GET handler - Fetch a specific survey template by ID
@@ -56,11 +40,7 @@ async function readSurveys() {
  * @param {Object} context.params - Route parameters
  * @param {string} context.params.id - The template ID to fetch
  */
-export async function GET(request, context) {
   try {
-    // ─────────────────────────────────────────────────────────────────────
-    // STEP 1: Extract template ID from URL parameters
-    // ─────────────────────────────────────────────────────────────────────
     // Access params using context.params (Next.js 15+ requirement)
     const params = await context.params;
     const templateId = params.id;
@@ -75,16 +55,14 @@ export async function GET(request, context) {
       );
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // STEP 2: Load all templates and find the requested one
-    // ─────────────────────────────────────────────────────────────────────
-    const surveys = await readSurveys();
-    const template = surveys.find(s => s.id === templateId);
+    // Query form by form_id
+    const form = db.prepare(`
+      SELECT form_id AS id, form_name AS title, description, created_at, is_published AS published
+      FROM form
+      WHERE form_id = ?
+    `).get(templateId);
 
-    // ─────────────────────────────────────────────────────────────────────
-    // STEP 3: Return the template or 404 if not found
-    // ─────────────────────────────────────────────────────────────────────
-    if (!template) {
+    if (!form) {
       return new Response(
         JSON.stringify({
           error: "Template not found",
@@ -97,7 +75,42 @@ export async function GET(request, context) {
       );
     }
 
-    // Template found - return it
+    // Get questions
+    const getQuestions = db.prepare(`
+      SELECT ff.form_field_id, f.field_id, f.field_label, f.field_type, ff.required, ff.help_text
+      FROM form_field ff
+      JOIN field f ON ff.field_id = f.field_id
+      WHERE ff.form_id = ?
+      ORDER BY ff.display_order
+    `);
+    const getOptions = db.prepare(`
+      SELECT option_value, display_label FROM field_options WHERE field_id = ? ORDER BY display_order`);
+
+    const questions = getQuestions.all(form.id).map(q => {
+      const options = (q.field_type === 'select' || q.field_type === 'multiselect' || q.field_type === 'choice')
+        ? getOptions.all(q.field_id).map(opt => opt.option_value)
+        : undefined;
+      return {
+        id: q.field_id,
+        text: {
+          question: q.field_label,
+          type: q.field_type,
+          required: !!q.required,
+          ...(options ? { options } : {}),
+          ...(q.help_text ? { help_text: q.help_text } : {})
+        }
+      };
+    });
+
+    const template = {
+      id: form.id,
+      title: form.title,
+      description: form.description,
+      questions,
+      createdAt: form.created_at,
+      published: !!form.published
+    };
+
     return new Response(
       JSON.stringify(template),
       {
