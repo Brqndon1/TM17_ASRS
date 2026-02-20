@@ -76,9 +76,11 @@ function initializeDatabase() {
       form_id INTEGER PRIMARY KEY AUTOINCREMENT,
       initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id),
       form_name TEXT NOT NULL,
+      description TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
-      updated_by_user_id INTEGER REFERENCES user(user_id)
+      updated_by_user_id INTEGER REFERENCES user(user_id),
+      is_published INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS form_field (
