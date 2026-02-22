@@ -270,36 +270,50 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
-
-    -- QR code tables (US-011: generate QR codes for surveys/reports)
-
-    CREATE TABLE IF NOT EXISTS qr_codes (
-      qr_code_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      qr_code_key TEXT NOT NULL UNIQUE,
-      qr_type TEXT NOT NULL CHECK (qr_type IN ('survey','report','survey_template')),
-      target_id INTEGER,
-      target_url TEXT NOT NULL,
-      created_by_user_id INTEGER REFERENCES user(user_id),
-      expires_at TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      description TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS qr_scans (
-      scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      qr_code_id INTEGER NOT NULL REFERENCES qr_codes(qr_code_id) ON DELETE CASCADE,
-      ip_address TEXT,
-      user_agent TEXT,
-      referrer TEXT,
-      converted_to_submission INTEGER,
-      scanned_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_qr_codes_key ON qr_codes(qr_code_key);
-    CREATE INDEX IF NOT EXISTS idx_qr_scans_code_id ON qr_scans(qr_code_id);
-    CREATE INDEX IF NOT EXISTS idx_qr_scans_scanned_at ON qr_scans(scanned_at DESC);
   `);
+
+  // ── Seed survey templates from surveys.json if no forms exist ─────────────
+  function seedSurveysFromJson() {
+    const formsCount = db.prepare('SELECT COUNT(*) as count FROM form').get().count;
+    if (formsCount > 0) return;
+    const surveysPath = path.join(process.cwd(), 'src', 'data', 'surveys.json');
+    if (!fs.existsSync(surveysPath)) return;
+    let surveys;
+    try {
+      surveys = JSON.parse(fs.readFileSync(surveysPath, 'utf-8'));
+    } catch (e) {
+      console.warn('[db] Could not parse surveys.json:', e.message);
+      return;
+    }
+    if (!Array.isArray(surveys)) return;
+    const insertFormSeed = db.prepare('INSERT INTO form (form_name, description, is_published) VALUES (?, ?, 1)');
+    const insertFieldSeed = db.prepare('INSERT INTO field (field_key, field_label, field_type, scope, is_filterable) VALUES (?, ?, ?, ?, 0)');
+    const insertFormFieldSeed = db.prepare('INSERT INTO form_field (form_id, field_id, display_order, required) VALUES (?, ?, ?, 1)');
+    const insertFieldOptionSeed = db.prepare('INSERT INTO field_options (field_id, option_value, display_label, display_order) VALUES (?, ?, ?, ?)');
+    for (const survey of surveys) {
+      const formInfo = insertFormSeed.run(survey.title || 'Untitled Survey', survey.description || '');
+      const formId = formInfo.lastInsertRowid;
+      let order = 0;
+      for (const q of survey.questions || []) {
+        const fieldKey = q.id || q.question || 'q' + order;
+        const fieldLabel = q.question || (q.text && q.text.question) || 'Question ' + (order + 1);
+        const fieldType = q.type || (q.text && q.text.type) || 'text';
+        const fieldInfo = insertFieldSeed.run(String(fieldKey), fieldLabel, fieldType, 'common');
+        const fieldId = fieldInfo.lastInsertRowid;
+        insertFormFieldSeed.run(formId, fieldId, order);
+        const opts = q.options || (q.text && q.text.options) || [];
+        if ((fieldType === 'choice' || fieldType === 'select') && opts.length > 0) {
+          let optOrder = 0;
+          for (const opt of opts) {
+            insertFieldOptionSeed.run(fieldId, opt, opt, optOrder++);
+          }
+        }
+        order++;
+      }
+    }
+    console.log('[db] Seeded survey templates from surveys.json');
+  }
+  seedSurveysFromJson();
 
   // ── Seed data ────────────────────────────────────────
 

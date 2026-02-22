@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 [
   {
     "id": "1771535973540",
@@ -20,4 +21,102 @@
     "createdAt": "2026-02-19T21:19:33.541Z",
     "published": true
   }
+=======
+[
+  {
+    "id": "1770685509385",
+    "title": "test",
+    "description": "test",
+    "questions": [
+      {
+        "id": 1770685509385.8594,
+        "text": {
+          "question": "test 1",
+          "type": "text"
+        }
+      },
+      {
+        "id": 1770685509385.0762,
+        "text": {
+          "question": "test2",
+          "type": "text"
+        }
+      },
+      {
+        "id": 1770685509385.746,
+        "text": {
+          "question": "test3 (should be second since I'm removing second)",
+          "type": "text"
+        }
+      }
+    ],
+    "createdAt": "2026-02-10T01:05:09.385Z",
+    "published": true
+  },
+  {
+<<<<<<< HEAD
+    "id": "1771189037682",
+    "title": "TEST ",
+    "description": "Testing",
+    "questions": [
+      {
+        "id": 1771189037682.3025,
+        "text": {
+          "question": "Does this work?",
+          "type": "text",
+          "required": true
+        }
+      },
+      {
+        "id": 1771189037682.7717,
+        "text": {
+          "question": "This is optional",
+          "type": "text",
+          "required": false
+        }
+      }
+    ],
+    "createdAt": "2026-02-15T20:57:17.682Z",
+=======
+    "id": "1771203452791",
+    "title": "Testing QR",
+    "description": "Testing Survey for testing QR Code implementation",
+    "questions": [
+      {
+        "id": 1771203452791.8662,
+        "text": {
+          "question": "Is it working?",
+          "type": "choice",
+          "options": [
+            "Yes?",
+            "No?"
+          ]
+        }
+      }
+    ],
+    "createdAt": "2026-02-16T00:57:32.791Z",
+    "published": true
+  },
+  {
+    "id": "1771203573623",
+    "title": "Testing QR Code",
+    "description": "Testing the QR code feature",
+    "questions": [
+      {
+        "id": 1771203573623.4138,
+        "text": {
+          "question": "Does it work?",
+          "type": "choice",
+          "options": [
+            "Yes?",
+            "No?"
+          ]
+        }
+      }
+    ],
+    "createdAt": "2026-02-16T00:59:33.623Z",
+>>>>>>> origin
+    "published": true
+  }
+>>>>>>> Stashed changes
 ]
