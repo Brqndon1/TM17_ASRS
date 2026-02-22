@@ -30,7 +30,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import db from '../../../../lib/db.js';
+import db from '@/lib/db.js';
 
 /**
  * GET handler - Fetch a specific survey template by ID
@@ -132,4 +132,4 @@ import db from '../../../../lib/db.js';
       }
     );
   }
-}
+
