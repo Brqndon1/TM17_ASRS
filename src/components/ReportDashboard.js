@@ -124,12 +124,8 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
       </div>
 
       {/* ---- SUMMARY STATISTICS ---- */}
-      {/* Three cards showing key metrics at a glance */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem'
-      }}>
+      {/* Three cards showing key metrics at a glance — responsive via .summary-grid */}
+      <div className="summary-grid">
         <div className="asrs-card" style={{ textAlign: 'center' }}>
           <p style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', margin: 0 }}>
             Total Participants
@@ -165,13 +161,11 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
         </div>
       </div>
 
-      {/* ---- VIEW TOGGLE + FILTER/SORT ROW ---- */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between',
-        alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem'
-      }}>
+      {/* ---- VIEW TOGGLE + EXPORT/SHARE ROW ---- */}
+      {/* Stacks vertically on mobile via .view-toggle-bar */}
+      <div className="view-toggle-bar">
         {/* View toggle: Charts / Table / Both */}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="view-toggle-buttons">
           {['charts', 'table', 'both'].map(view => (
             <button
               key={view}
@@ -185,7 +179,7 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
         </div>
 
         {/* Export and Share panels — only visible to Staff and Admin (per REP033) */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="action-buttons-group">
           {(userRole === 'staff' || userRole === 'admin') && (
             <ExportPanel reportData={reportData} />
           )}
@@ -194,11 +188,8 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
       </div>
 
       {/* ---- FILTER & SORT PANELS ---- */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1rem'
-      }}>
+      {/* Stacks vertically on mobile via .filter-sort-grid */}
+      <div className="filter-sort-grid">
         {/* Filter Panel — up to 7 attribute filters (per REP001/REP020) */}
         <FilterPanel
           attributes={selectedInitiative?.attributes || []}

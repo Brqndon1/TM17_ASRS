@@ -140,3 +140,228 @@ body {
     color: var(--color-text-secondary);
   }
 }
+
+/* ==========================================================================
+ * RESPONSIVE LAYOUT UTILITY CLASSES
+ * These classes replace inline-style grids/flex rows in components so that
+ * CSS media queries can override them at each breakpoint without needing JS.
+ * ========================================================================== */
+
+/* --- Page section wrappers ------------------------------------------------ */
+.page-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+}
+.page-section-top {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
+}
+.page-section-bottom {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2rem;
+}
+
+/* --- Initiative selector card grid --------------------------------------- */
+.initiative-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.75rem;
+}
+
+/* --- Summary statistics (3 stat cards) ----------------------------------- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* --- Chart grid (2×2 charts) --------------------------------------------- */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1rem;
+}
+
+/* --- Filter + Sort panel grid (side-by-side) ----------------------------- */
+.filter-sort-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+/* --- View toggle + Export/Share toolbar row ------------------------------- */
+.view-toggle-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* --- View toggle buttons (Charts / Table / Both) ------------------------- */
+.view-toggle-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* --- Export + Share action button group ---------------------------------- */
+.action-buttons-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* --- Download bar inner layout (reporting page) -------------------------- */
+.download-bar-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* --- Download format buttons row ----------------------------------------- */
+.download-btn-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* --- Header: hamburger button -------------------------------------------- */
+/* Hidden on desktop; shown on mobile via media query below */
+.header-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+}
+.header-hamburger:hover { background-color: rgba(255,255,255,0.15); }
+.header-hamburger-line {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background-color: white;
+  border-radius: 2px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* --- Header: collapsible nav area --------------------------------------- */
+.header-nav-area {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* --- Header: nav link list ----------------------------------------------- */
+.header-nav-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ==========================================================================
+ * RESPONSIVE BREAKPOINTS
+ * ========================================================================== */
+
+/* ---- Large monitors & TVs (≥ 1600px) ------------------------------------ */
+@media (min-width: 1600px) {
+  .page-section,
+  .page-section-top,
+  .page-section-bottom { max-width: 1800px; padding-left: 2.5rem; padding-right: 2.5rem; }
+  .asrs-card { padding: 1.75rem; }
+  body { font-size: 1.05rem; }
+}
+
+/* ---- Very large TVs (≥ 2400px) ----------------------------------------- */
+@media (min-width: 2400px) {
+  .page-section,
+  .page-section-top,
+  .page-section-bottom { max-width: 2200px; padding-left: 3rem; padding-right: 3rem; }
+  .asrs-card { padding: 2rem; }
+  body { font-size: 1.1rem; }
+}
+
+/* ---- Laptops / Tablets landscape (≤ 1024px) ----------------------------- */
+/* Also handles hamburger: nav has too many links to fit comfortably below this width */
+@media (max-width: 1024px) {
+  .chart-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  /* Show hamburger button */
+  .header-hamburger { display: flex; }
+
+  /* Nav becomes absolute dropdown below header */
+  .header-nav-area {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%);
+    padding: 1rem 1.5rem 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    z-index: 99;
+  }
+  .header-nav-area.open { display: flex; }
+
+  /* Nav links become vertical list in the dropdown */
+  .header-nav-links { flex-direction: column; gap: 0.35rem; width: 100%; }
+  .header-nav-links a,
+  .header-nav-links button { width: 100%; text-align: left; }
+}
+
+/* ---- Tablets & large phones (≤ 768px) ----------------------------------- */
+@media (max-width: 768px) {
+  /* Tighter card padding + remove hover lift (touch UX) */
+  .asrs-card { padding: 1rem; border-radius: 8px; }
+  .asrs-card:hover { transform: none; }
+
+  /* Summary keeps 3 cards across */
+  .summary-grid { grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+
+  /* Tighter page padding */
+  .page-section,
+  .page-section-top,
+  .page-section-bottom { padding-left: 1rem; padding-right: 1rem; }
+
+  /* Download bar: label above buttons */
+  .download-bar-inner { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+  /* Initiative cards: smaller minimum */
+  .initiative-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+/* ---- Small phones (≤ 480px) -------------------------------------------- */
+@media (max-width: 480px) {
+  /* Summary: auto-fit keeps cards side-by-side wherever possible */
+  .summary-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; }
+
+  /* Smaller initiative card min width */
+  .initiative-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+
+  /* Minimal page padding */
+  .page-section,
+  .page-section-top,
+  .page-section-bottom { padding-left: 0.75rem; padding-right: 0.75rem; }
+
+  /* View toggle buttons fill row width */
+  .view-toggle-buttons { width: 100%; }
+  .view-toggle-buttons button { flex: 1; min-width: 0; }
+
+  /* Download buttons fill row */
+  .download-btn-group { width: 100%; }
+  .download-btn-group button { flex: 1; min-width: 0; }
+}

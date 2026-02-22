@@ -1,47 +1,18 @@
 [
   {
-    "id": "1770685509385",
-    "title": "test",
-    "description": "test",
+    "id": "1771535973540",
+    "title": "testing",
+    "description": "testing",
     "questions": [
       {
-        "id": 1770685509385.8594,
+        "id": 1771535973540.3293,
         "text": {
-          "question": "test 1",
-          "type": "text"
-        }
-      },
-      {
-        "id": 1770685509385.0762,
-        "text": {
-          "question": "test2",
-          "type": "text"
-        }
-      },
-      {
-        "id": 1770685509385.746,
-        "text": {
-          "question": "test3 (should be second since I'm removing second)",
-          "type": "text"
-        }
-      }
-    ],
-    "createdAt": "2026-02-10T01:05:09.385Z",
-    "published": true
-  },
-  {
-    "id": "1771203452791",
-    "title": "Testing QR",
-    "description": "Testing Survey for testing QR Code implementation",
-    "questions": [
-      {
-        "id": 1771203452791.8662,
-        "text": {
-          "question": "Is it working?",
+          "question": "testing",
           "type": "choice",
+          "required": false,
           "options": [
-            "Yes?",
-            "No?"
+            "yes",
+            "no"
           ]
         }
       }

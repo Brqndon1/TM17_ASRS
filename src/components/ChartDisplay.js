@@ -29,11 +29,8 @@ export default function ChartDisplay({ chartData }) {
   if (!chartData) return null;
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-      gap: '1rem'
-    }}>
+    /* Responsive chart grid — 2 columns on desktop, 1 on mobile via .chart-grid */
+    <div className="chart-grid">
       {/* ---- PIE CHART: Grade Distribution ---- */}
       <div className="asrs-card">
         <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>

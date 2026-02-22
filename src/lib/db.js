@@ -57,7 +57,7 @@ function initializeDatabase() {
       field_id INTEGER PRIMARY KEY AUTOINCREMENT,
       field_key TEXT NOT NULL UNIQUE,
       field_label TEXT NOT NULL,
-      field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json')),
+      field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice')),
       scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
       initiative_id INTEGER REFERENCES initiative(initiative_id),
       is_filterable INTEGER NOT NULL DEFAULT 0,
@@ -76,9 +76,11 @@ function initializeDatabase() {
       form_id INTEGER PRIMARY KEY AUTOINCREMENT,
       initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id),
       form_name TEXT NOT NULL,
+      description TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
-      updated_by_user_id INTEGER REFERENCES user(user_id)
+      updated_by_user_id INTEGER REFERENCES user(user_id),
+      is_published INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS form_field (
@@ -268,6 +270,35 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
+
+    -- QR code tables (US-011: generate QR codes for surveys/reports)
+
+    CREATE TABLE IF NOT EXISTS qr_codes (
+      qr_code_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      qr_code_key TEXT NOT NULL UNIQUE,
+      qr_type TEXT NOT NULL CHECK (qr_type IN ('survey','report','survey_template')),
+      target_id INTEGER,
+      target_url TEXT NOT NULL,
+      created_by_user_id INTEGER REFERENCES user(user_id),
+      expires_at TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_scans (
+      scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      qr_code_id INTEGER NOT NULL REFERENCES qr_codes(qr_code_id) ON DELETE CASCADE,
+      ip_address TEXT,
+      user_agent TEXT,
+      referrer TEXT,
+      converted_to_submission INTEGER,
+      scanned_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_qr_codes_key ON qr_codes(qr_code_key);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_code_id ON qr_scans(qr_code_id);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_scanned_at ON qr_scans(scanned_at DESC);
   `);
 
   // ── Seed data ────────────────────────────────────────
