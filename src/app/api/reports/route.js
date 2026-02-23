@@ -20,14 +20,14 @@ export async function GET(request) {
          FROM reports r
          LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
          WHERE r.initiative_id = ?
-         ORDER BY r.created_at DESC`
+         ORDER BY r.display_order ASC, r.created_at DESC`
       ).all(Number(initiativeId));
     } else {
       rows = db.prepare(
         `SELECT r.*, i.initiative_name
          FROM reports r
          LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
-         ORDER BY r.created_at DESC`
+         ORDER BY r.display_order ASC, r.created_at DESC`
       ).all();
     }
 
@@ -143,6 +143,81 @@ export async function POST(request) {
     console.error('Error creating report:', error);
     return NextResponse.json(
       { error: 'Failed to create report', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update an existing report's metadata
+export async function PUT(request) {
+  try {
+    initializeDatabase();
+    const body = await request.json();
+    const { id, name, description, status } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(id));
+    if (!existing) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (status !== undefined) { updates.push('status = ?'); params.push(status); }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    params.push(Number(id));
+    db.prepare(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+    const updated = db.prepare(
+      `SELECT r.*, i.initiative_name
+       FROM reports r
+       LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
+       WHERE r.id = ?`
+    ).get(Number(id));
+
+    return NextResponse.json({ success: true, report: updated });
+  } catch (error) {
+    console.error('Error updating report:', error);
+    return NextResponse.json(
+      { error: 'Failed to update report', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Remove a report by id
+export async function DELETE(request) {
+  try {
+    initializeDatabase();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'id query param is required' }, { status: 400 });
+    }
+
+    const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(id));
+    if (!existing) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+
+    db.prepare('DELETE FROM reports WHERE id = ?').run(Number(id));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete report', details: error.message },
       { status: 500 }
     );
   }

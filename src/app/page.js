@@ -30,6 +30,12 @@ const routes = [
     description: 'View published reports and dashboards.',
   },
   {
+    href: '/manage-reports',
+    label: 'Manage Reports',
+    description: 'Add, update, delete, and reorder the report library.',
+    staffOnly: true,
+  },
+  {
     href: '/goals',
     label: 'Goals & Scoring',
     description: 'Set initiative goals with target metrics and scoring criteria.',
@@ -46,26 +52,29 @@ const routes = [
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in
     const storedUser = localStorage.getItem('user');
     setIsLoggedIn(!!storedUser);
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
       setIsAdmin(parsed.user_type === 'admin');
+      setIsStaff(parsed.user_type === 'staff' || parsed.user_type === 'admin');
     }
   }, []);
 
-  // Filter routes based on login status and role
   const visibleRoutes = routes.filter(route => {
     if (route.showOnlyWhenLoggedOut) {
-      return !isLoggedIn; // Only show if NOT logged in
+      return !isLoggedIn;
     }
     if (route.adminOnly) {
-      return isLoggedIn && isAdmin; // Only show for admin users
+      return isLoggedIn && isAdmin;
     }
-    return true; // Show all other routes
+    if (route.staffOnly) {
+      return isLoggedIn && isStaff;
+    }
+    return true;
   });
 
   return (

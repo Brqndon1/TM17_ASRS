@@ -177,6 +177,14 @@ export default function Header() {
               >
                 Reporting
               </Link>
+              <Link 
+                href="/manage-reports" 
+                style={getNavLinkStyle('/manage-reports')}
+                onMouseEnter={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Manage Reports
+              </Link>
 
               {/* Admin-only tabs */}
               {isAdmin && (

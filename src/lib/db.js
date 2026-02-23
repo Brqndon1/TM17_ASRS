@@ -197,6 +197,7 @@ function initializeDatabase() {
         CHECK (status IN ('generating','completed','failed')),
       created_by TEXT DEFAULT '',
       report_data TEXT NOT NULL,
+      display_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -338,6 +339,9 @@ function initializeDatabase() {
   // Add deadline column to goals if it doesn't exist
   addColumnIfNotExists('initiative_goal', 'deadline TEXT');
 
+  // Add display_order column to reports if it doesn't exist (US-022)
+  addColumnIfNotExists('reports', 'display_order INTEGER NOT NULL DEFAULT 0');
+
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
   );
@@ -465,6 +469,7 @@ function initializeDatabase() {
   insertFeature.run('REPORT_CREATE_DEFAULT', 'Create Reports', 'Create and run report templates');
   insertFeature.run('ADMIN_USERS', 'Manage Users', 'Manage user accounts and permissions');
   insertFeature.run('GOAL_MANAGE', 'Manage Goals', 'Set and manage initiative goals with scoring criteria');
+  insertFeature.run('REPORT_MANAGE', 'Manage Reports', 'Add, update, delete, and reorder reports');
 
   // Set feature access ranks
   const featureRows = db.prepare('SELECT feature_id, key FROM feature').all();
@@ -475,6 +480,7 @@ function initializeDatabase() {
     REPORT_CREATE_DEFAULT: 50,
     ADMIN_USERS: 100,
     GOAL_MANAGE: 100,
+    REPORT_MANAGE: 50,
   };
   const insertAccess = db.prepare(
     'INSERT OR IGNORE INTO feature_access (feature_id, min_access_rank) VALUES (?, ?)'
