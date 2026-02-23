@@ -32,14 +32,7 @@
 
 import db from '@/lib/db.js';
 
-/**
- * GET handler - Fetch a specific survey template by ID
- *
- * @param {Request} request - The incoming HTTP request
- * @param {Object} context - Next.js context containing route parameters
- * @param {Object} context.params - Route parameters
- * @param {string} context.params.id - The template ID to fetch
- */
+export async function GET(request, context) {
   try {
     // Access params using context.params (Next.js 15+ requirement)
     const params = await context.params;
@@ -132,4 +125,4 @@ import db from '@/lib/db.js';
       }
     );
   }
-
+}

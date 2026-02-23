@@ -78,29 +78,40 @@ export default function SurveyPage() {
       });
   }, [userRole]);
 
-  // Load survey template if ?template= parameter is present
+  // Load survey template if ?template= parameter is present,
+  // or if there is an active distribution and no ?template= in the URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const templateParam = urlParams.get('template');
-    if (!templateParam) return;
 
-    setTemplateLoading(true);
-    fetch(`/api/surveys/templates/${templateParam}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Template not found');
-        return res.json();
-      })
-      .then((templateData) => {
-        setSurveyTemplate(templateData);
-      })
-      .catch((err) => {
-        console.error('Error loading survey template:', err);
-        setError('Survey template not found. The link may be invalid or expired.');
-      })
-      .finally(() => {
-        setTemplateLoading(false);
-      });
-  }, []);
+    // Helper to fetch template by id
+    const fetchTemplate = (id) => {
+      setTemplateLoading(true);
+      fetch(`/api/surveys/templates/${id}`)
+        .then((res) => {
+          if (!res.ok) throw new Error('Template not found');
+          return res.json();
+        })
+        .then((templateData) => {
+          setSurveyTemplate(templateData);
+        })
+        .catch((err) => {
+          console.error('Error loading survey template:', err);
+          setError('Survey template not found. The link may be invalid or expired.');
+        })
+        .finally(() => {
+          setTemplateLoading(false);
+        });
+    };
+
+    if (templateParam) {
+      fetchTemplate(templateParam);
+    } else if (activeDistribution && activeDistribution.survey_template_id) {
+      fetchTemplate(activeDistribution.survey_template_id);
+    }
+    // Only run when activeDistribution changes or on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDistribution]);
 
   // Track QR code scan if ?qr= parameter is present
   useEffect(() => {

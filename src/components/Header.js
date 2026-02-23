@@ -190,6 +190,14 @@ export default function Header() {
                     Goals
                   </Link>
                   <Link 
+                    href="/performance-dashboard" 
+                    style={getNavLinkStyle('/performance-dashboard')}
+                    onMouseEnter={(e) => !isActive('/performance-dashboard') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                    onMouseLeave={(e) => !isActive('/performance-dashboard') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                  >
+                    Performance
+                  </Link>
+                  <Link 
                     href="/initiative-creation" 
                     style={getNavLinkStyle('/initiative-creation')}
                     onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}

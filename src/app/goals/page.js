@@ -27,6 +27,7 @@ export default function GoalsPage() {
     current_value: '0',
     weight: '1',
     scoring_method: 'linear',
+    deadline: '',
   });
 
   // Edit form state
@@ -108,6 +109,7 @@ export default function GoalsPage() {
           current_value: parseFloat(newGoal.current_value) || 0,
           weight: parseFloat(newGoal.weight),
           scoring_method: newGoal.scoring_method,
+          deadline: newGoal.deadline || null,
         }),
       });
 
@@ -124,6 +126,7 @@ export default function GoalsPage() {
         current_value: '0',
         weight: '1',
         scoring_method: 'linear',
+        deadline: '',
       });
       fetchGoals(selectedInitiative);
     } catch (err) {
@@ -147,6 +150,7 @@ export default function GoalsPage() {
           current_value: parseFloat(editGoal.current_value),
           weight: parseFloat(editGoal.weight),
           scoring_method: editGoal.scoring_method,
+          deadline: editGoal.deadline || null,
         }),
       });
 
@@ -190,6 +194,7 @@ export default function GoalsPage() {
       current_value: goal.current_value,
       weight: goal.weight,
       scoring_method: goal.scoring_method,
+      deadline: goal.deadline || '',
     });
   }
 
@@ -396,6 +401,16 @@ export default function GoalsPage() {
                     />
                   </div>
 
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={labelStyle}>Deadline (Optional)</label>
+                    <input
+                      type="date"
+                      value={newGoal.deadline}
+                      onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <div>
                       <label style={labelStyle}>Target Value *</label>
@@ -501,6 +516,15 @@ export default function GoalsPage() {
                           onChange={(e) => setEditGoal({ ...editGoal, description: e.target.value })}
                           rows={2}
                           style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label style={labelStyle}>Deadline (Optional)</label>
+                        <input
+                          type="date"
+                          value={editGoal.deadline}
+                          onChange={(e) => setEditGoal({ ...editGoal, deadline: e.target.value })}
+                          style={inputStyle}
                         />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -625,6 +649,14 @@ export default function GoalsPage() {
                             {goal.scoring_method.charAt(0).toUpperCase() + goal.scoring_method.slice(1)}
                           </div>
                         </div>
+                        {goal.deadline && (
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Deadline</div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                              {new Date(goal.deadline).toLocaleDateString()}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Progress bar */}
