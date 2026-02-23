@@ -38,6 +38,22 @@ function computeOverallScore(goals) {
   return parseFloat((weightedSum / totalWeight).toFixed(2));
 }
 
+// Calculate days until deadline
+function getDaysUntilDeadline(deadline) {
+  if (!deadline) return null;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const deadlineDate = new Date(deadline);
+  deadlineDate.setHours(0, 0, 0, 0);
+  
+  const diffTime = deadlineDate - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays;
+}
+
 // GET - Fetch goals for an initiative with computed scores
 export async function GET(request) {
   try {
@@ -64,6 +80,7 @@ export async function GET(request) {
     const goalsWithScores = goals.map((goal) => ({
       ...goal,
       score: parseFloat(computeGoalScore(goal).toFixed(2)),
+      daysUntilDeadline: getDaysUntilDeadline(goal.deadline),
     }));
 
     const overallScore = computeOverallScore(goals);
@@ -97,6 +114,7 @@ export async function POST(request) {
       current_value,
       weight,
       scoring_method,
+      deadline,
     } = body;
 
     // Validate required fields
@@ -136,8 +154,8 @@ export async function POST(request) {
     }
 
     const result = db.prepare(`
-      INSERT INTO initiative_goal (initiative_id, goal_name, description, target_metric, target_value, current_value, weight, scoring_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO initiative_goal (initiative_id, goal_name, description, target_metric, target_value, current_value, weight, scoring_method, deadline)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       initiative_id,
       goal_name.trim(),
@@ -146,7 +164,8 @@ export async function POST(request) {
       target_value,
       current_value || 0,
       weight,
-      scoring_method
+      scoring_method,
+      deadline || null
     );
 
     const newGoal = db.prepare('SELECT * FROM initiative_goal WHERE goal_id = ?').get(result.lastInsertRowid);
@@ -156,6 +175,7 @@ export async function POST(request) {
       goal: {
         ...newGoal,
         score: parseFloat(computeGoalScore(newGoal).toFixed(2)),
+        daysUntilDeadline: getDaysUntilDeadline(newGoal.deadline),
       },
     }, { status: 201 });
   } catch (error) {
@@ -200,7 +220,7 @@ export async function PUT(request) {
     }
 
     // Build dynamic update
-    const allowedFields = ['goal_name', 'description', 'target_metric', 'target_value', 'current_value', 'weight', 'scoring_method'];
+    const allowedFields = ['goal_name', 'description', 'target_metric', 'target_value', 'current_value', 'weight', 'scoring_method', 'deadline'];
     const setClauses = [];
     const values = [];
 
@@ -235,6 +255,7 @@ export async function PUT(request) {
       goal: {
         ...updatedGoal,
         score: parseFloat(computeGoalScore(updatedGoal).toFixed(2)),
+        daysUntilDeadline: getDaysUntilDeadline(updatedGoal.deadline),
       },
     });
   } catch (error) {

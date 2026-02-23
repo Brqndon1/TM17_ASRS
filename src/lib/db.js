@@ -228,6 +228,7 @@ function initializeDatabase() {
       weight REAL NOT NULL DEFAULT 1.0,
       scoring_method TEXT NOT NULL DEFAULT 'linear'
         CHECK (scoring_method IN ('linear','threshold','binary')),
+      deadline TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       created_by_user_id INTEGER REFERENCES user(user_id)
@@ -333,6 +334,9 @@ function initializeDatabase() {
   addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
   addColumnIfNotExists('initiative', 'summary_json TEXT');
   addColumnIfNotExists('initiative', 'chart_data_json TEXT');
+
+  // Add deadline column to goals if it doesn't exist
+  addColumnIfNotExists('initiative_goal', 'deadline TEXT');
 
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
