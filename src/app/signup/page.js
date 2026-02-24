@@ -49,9 +49,8 @@ export default function SignupPage() {
       setError('Password must contain at least 1 number');
       return;
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(addForm.password)) {
-      setAddError('Password must contain at least 1 special character');
-      setAddLoading(false);
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password)) {
+      setError('Password must contain at least 1 special character');
       return;
     }
 
@@ -206,7 +205,7 @@ export default function SignupPage() {
                 name="phone_number"
                 value={formData.phone_number}
                 onChange={handleChange}
-                placeholder="(optional)"
+                required
                 disabled={loading}
                 style={{
                   width: '100%',

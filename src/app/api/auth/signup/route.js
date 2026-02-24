@@ -55,7 +55,7 @@ export async function POST(request) {
     // Insert new user
     const result = db.prepare(`
       INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id)
-      VALUES (?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(first_name, last_name, phone_number, email, password, publicType.user_type_id);
 
     // Return success with user info (excluding password)
