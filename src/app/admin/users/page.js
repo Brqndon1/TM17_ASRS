@@ -197,9 +197,9 @@ export default function AdminUsersPage() {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.03em',
-    backgroundColor: role === 'admin' ? '#e8eaf6' : '#e8f5e9',
-    color: role === 'admin' ? '#283593' : '#2e7d32',
-    border: `1px solid ${role === 'admin' ? '#c5cae9' : '#c8e6c9'}`,
+    backgroundColor: role === 'admin' ? '#e8eaf6' : role === 'staff' ? '#e8f5e9' : '#fff3e0',
+    color: role === 'admin' ? '#283593' : role === 'staff' ? '#2e7d32' : '#e65100',
+    border: `1px solid ${role === 'admin' ? '#c5cae9' : role === 'staff' ? '#c8e6c9' : '#ffe0b2'}`,
   });
 
   // Don't render until auth check completes
@@ -290,6 +290,7 @@ export default function AdminUsersPage() {
               <option value="all">All Roles</option>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
+              <option value="public">Public</option>
             </select>
           </div>
           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
@@ -351,21 +352,55 @@ export default function AdminUsersPage() {
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            {/* Role toggle button */}
-                            <button
-                              onClick={() => handleRoleChange(u.user_id, u.user_type === 'admin' ? 'staff' : 'admin')}
-                              disabled={isSelf}
-                              title={isSelf ? 'Cannot change your own role' : `Switch to ${u.user_type === 'admin' ? 'staff' : 'admin'}`}
-                              style={{
-                                ...actionBtnStyle,
-                                backgroundColor: isSelf ? '#f5f5f5' : '#e3f2fd',
-                                color: isSelf ? '#bbb' : '#1565c0',
-                                border: `1px solid ${isSelf ? '#eee' : '#bbdefb'}`,
-                                cursor: isSelf ? 'not-allowed' : 'pointer',
-                              }}
-                            >
-                              → {u.user_type === 'admin' ? 'Staff' : 'Admin'}
-                            </button>
+                            {/* Role buttons - show options the user ISN'T currently */}
+                            {u.user_type !== 'admin' && (
+                              <button
+                                onClick={() => handleRoleChange(u.user_id, 'admin')}
+                                disabled={isSelf}
+                                title={isSelf ? 'Cannot change your own role' : 'Promote to Admin'}
+                                style={{
+                                  ...actionBtnStyle,
+                                  backgroundColor: isSelf ? '#f5f5f5' : '#e3f2fd',
+                                  color: isSelf ? '#bbb' : '#1565c0',
+                                  border: `1px solid ${isSelf ? '#eee' : '#bbdefb'}`,
+                                  cursor: isSelf ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                → Admin
+                              </button>
+                            )}
+                            {u.user_type !== 'staff' && (
+                              <button
+                                onClick={() => handleRoleChange(u.user_id, 'staff')}
+                                disabled={isSelf}
+                                title={isSelf ? 'Cannot change your own role' : 'Set as Staff'}
+                                style={{
+                                  ...actionBtnStyle,
+                                  backgroundColor: isSelf ? '#f5f5f5' : '#e8f5e9',
+                                  color: isSelf ? '#bbb' : '#2e7d32',
+                                  border: `1px solid ${isSelf ? '#eee' : '#c8e6c9'}`,
+                                  cursor: isSelf ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                → Staff
+                              </button>
+                            )}
+                            {u.user_type !== 'public' && (
+                              <button
+                                onClick={() => handleRoleChange(u.user_id, 'public')}
+                                disabled={isSelf}
+                                title={isSelf ? 'Cannot change your own role' : 'Demote to Public'}
+                                style={{
+                                  ...actionBtnStyle,
+                                  backgroundColor: isSelf ? '#f5f5f5' : '#fff3e0',
+                                  color: isSelf ? '#bbb' : '#e65100',
+                                  border: `1px solid ${isSelf ? '#eee' : '#ffe0b2'}`,
+                                  cursor: isSelf ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                → Public
+                              </button>
+                            )}
 
                             {/* Delete button */}
                             <button

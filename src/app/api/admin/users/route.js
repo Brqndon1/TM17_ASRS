@@ -180,7 +180,7 @@ export async function PUT(request) {
       );
     }
 
-    if (!['staff', 'admin'].includes(new_role)) {
+    if (!['public', 'staff', 'admin'].includes(new_role)) {
       return NextResponse.json(
         { error: 'new_role must be "staff" or "admin"' },
         { status: 400 }
