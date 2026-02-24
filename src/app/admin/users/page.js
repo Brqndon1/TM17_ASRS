@@ -22,6 +22,7 @@ export default function AdminUsersPage() {
   const [addForm, setAddForm] = useState({
     first_name: '',
     last_name: '',
+    phone_number: '',
     email: '',
     password: '',
     user_type: 'staff',
@@ -129,6 +130,29 @@ export default function AdminUsersPage() {
       return;
     }
 
+    if (!/[a-zA-Z]/.test(addForm.password)) {
+      setAddError('Password must contain at least 1 letter');
+      setAddLoading(false);
+      return;
+    }
+    if (!/[0-9]/.test(addForm.password)) {
+      setAddError('Password must contain at least 1 number');
+      setAddLoading(false);
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(addForm.password)) {
+      setAddError('Password must contain at least 1 special character');
+      setAddLoading(false);
+      return;
+    }
+
+    // Validate phone number is 10 digits
+    if (addForm.phone_number.replace(/\D/g, '').length !== 10) {
+      setAddError('Phone number must be 10 digits');
+      setAddLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/users', {
         method: 'POST',
@@ -142,7 +166,7 @@ export default function AdminUsersPage() {
       if (response.ok) {
         setSuccessMsg(`${addForm.first_name} ${addForm.last_name} added as ${addForm.user_type}`);
         setShowAddForm(false);
-        setAddForm({ first_name: '', last_name: '', email: '', password: '', user_type: 'staff' });
+        setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', password: '', user_type: 'staff' });
         fetchUsers();
       } else {
         setAddError(data.error || 'Failed to add user');
@@ -490,6 +514,19 @@ export default function AdminUsersPage() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
+                <label style={labelStyle}>Phone Number</label>
+                <input
+                  type="tel"
+                  value={addForm.phone_number}
+                  onChange={(e) => setAddForm({ ...addForm, phone_number: e.target.value })}
+                  required
+                  disabled={addLoading}
+                  maxLength={10}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
                 <label style={labelStyle}>Email</label>
                 <input
                   type="email"
@@ -509,7 +546,7 @@ export default function AdminUsersPage() {
                   onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
                   required
                   disabled={addLoading}
-                  placeholder="Min. 6 characters"
+                  placeholder="Min. 6 characters, 1 number, 1 special char"
                   style={inputStyle}
                 />
               </div>

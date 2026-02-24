@@ -5,7 +5,7 @@ export async function POST(request) {
   try {
     initializeDatabase();
 
-    const { first_name, last_name, email, password } = await request.json();
+    const { first_name, last_name, phone_number, email, password } = await request.json();
 
     // Validate required fields
     if (!first_name || !last_name || !email || !password) {
@@ -34,6 +34,14 @@ export async function POST(request) {
       );
     }
 
+    // Validate phone number if provided
+    if (phone_number && !/^\d{10}$/.test(phone_number.replace(/\D/g, ''))) {
+      return NextResponse.json(
+        { error: 'Phone number must be 10 digits' },
+        { status: 400 }
+      );
+    }
+
     // Get the 'public' user type ID (default for new signups)
     const publicType = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get('public');
     
@@ -46,9 +54,9 @@ export async function POST(request) {
 
     // Insert new user
     const result = db.prepare(`
-      INSERT INTO user (first_name, last_name, email, password, user_type_id)
+      INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id)
       VALUES (?, ?, ?, ?, ?)
-    `).run(first_name, last_name, email, password, publicType.user_type_id);
+    `).run(first_name, last_name, phone_number, email, password, publicType.user_type_id);
 
     // Return success with user info (excluding password)
     return NextResponse.json({

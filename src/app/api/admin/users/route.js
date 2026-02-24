@@ -59,7 +59,7 @@ export async function GET(request) {
         ut.access_rank
       FROM user u
       JOIN user_type ut ON u.user_type_id = ut.user_type_id
-      WHERE ut.type IN ('staff', 'admin')
+      WHERE ut.type IN ('public', 'staff', 'admin')
       ORDER BY ut.access_rank DESC, u.last_name ASC, u.first_name ASC
     `).all();
 
@@ -76,7 +76,7 @@ export async function POST(request) {
     initializeDatabase();
 
     const body = await request.json();
-    const { requesterEmail, first_name, last_name, email, password, user_type } = body;
+    const { requesterEmail, first_name, last_name, phone_number, email, password, user_type } = body;
 
     if (!verifyAdmin(requesterEmail)) {
       return NextResponse.json(
@@ -119,6 +119,14 @@ export async function POST(request) {
       );
     }
 
+    // Validate phone number if provided
+    if (phone_number && !/^\d{10}$/.test(phone_number.replace(/\D/g, ''))) {
+      return NextResponse.json(
+        { error: 'Phone number must be 10 digits' },
+        { status: 400 }
+      );
+    }
+
     // Get the user_type_id
     const typeRow = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(user_type);
     if (!typeRow) {
@@ -129,9 +137,9 @@ export async function POST(request) {
     }
 
     const result = db.prepare(`
-      INSERT INTO user (first_name, last_name, email, password, user_type_id)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(first_name, last_name, email, password, typeRow.user_type_id);
+      INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(first_name, last_name, phone_number, email, password, typeRow.user_type_id);
 
     return NextResponse.json({
       success: true,

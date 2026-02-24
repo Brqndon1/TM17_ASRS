@@ -11,6 +11,7 @@ export default function SignupPage() {
     first_name: '',
     last_name: '',
     email: '',
+    phone_number: '',
     password: '',
     confirmPassword: ''
   });
@@ -40,6 +41,25 @@ export default function SignupPage() {
       return;
     }
 
+    if (!/[a-zA-Z]/.test(formData.password)) {
+      setError('Password must contain at least 1 letter');
+      return;
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      setError('Password must contain at least 1 number');
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(addForm.password)) {
+      setAddError('Password must contain at least 1 special character');
+      setAddLoading(false);
+      return;
+    }
+
+    if (formData.phone_number && formData.phone_number.replace(/\D/g, '').length !== 10) {
+      setError('Phone number must be 10 digits');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -51,6 +71,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           first_name: formData.first_name,
           last_name: formData.last_name,
+          phone_number: formData.phone_number,
           email: formData.email,
           password: formData.password
         }),
@@ -157,6 +178,35 @@ export default function SignupPage() {
                 value={formData.last_name}
                 onChange={handleChange}
                 required
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '0.625rem 0.75rem',
+                  border: '1px solid var(--color-bg-tertiary)',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{
+                display: 'block',
+                color: 'var(--color-text-primary)',
+                marginBottom: '0.4rem',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}>Phone Number </label>
+              <input
+                type="tel"
+                name="phone_number"
+                value={formData.phone_number}
+                onChange={handleChange}
+                placeholder="(optional)"
                 disabled={loading}
                 style={{
                   width: '100%',
