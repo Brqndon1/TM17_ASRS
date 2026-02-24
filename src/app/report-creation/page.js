@@ -11,9 +11,19 @@ import StepConfig from '@/components/report-steps/StepConfig';
 import StepFilters from '@/components/report-steps/StepFilters';
 import StepExpressions from '@/components/report-steps/StepExpressions';
 import StepSorting from '@/components/report-steps/StepSorting';
+import StepTrends from '@/components/report-steps/StepTrends';
 import StepPreview from '@/components/report-steps/StepPreview';
+import { validateTrendConfig } from '@/lib/report-engine';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
+
+function getDefaultTrendConfig() {
+  return {
+    variables: [],
+    enabledCalc: true,
+    enabledDisplay: true,
+  };
+}
 
 export default function ReportCreationPage() {
   const [userRole, setUserRole] = useState('staff');
@@ -31,6 +41,7 @@ export default function ReportCreationPage() {
     filters: {},
     expressions: [],
     sorts: [],
+    trendConfig: getDefaultTrendConfig(),
   });
 
   // ---- UI STATE ----
@@ -68,6 +79,22 @@ export default function ReportCreationPage() {
     loadTableData();
   }, [reportConfig.selectedInitiative]);
 
+  useEffect(() => {
+    const available = reportConfig.selectedInitiative?.attributes || [];
+    setReportConfig((prev) => {
+      const currentTrend = prev.trendConfig || getDefaultTrendConfig();
+      const nextVariables = (currentTrend.variables || []).filter((v) => available.includes(v));
+      if (nextVariables.length === (currentTrend.variables || []).length) return prev;
+      return {
+        ...prev,
+        trendConfig: {
+          ...currentTrend,
+          variables: nextVariables,
+        },
+      };
+    });
+  }, [reportConfig.selectedInitiative]);
+
   async function fetchReports() {
     setLoadingReports(true);
     try {
@@ -90,7 +117,14 @@ export default function ReportCreationPage() {
     if (currentStep === 0) {
       return reportConfig.selectedInitiative && reportConfig.reportName.trim().length > 0;
     }
-    return true; // Steps 1-3 are optional, step 4 is the last
+    if (currentStep === 4) {
+      const validation = validateTrendConfig(
+        reportConfig.trendConfig,
+        reportConfig.selectedInitiative?.attributes || []
+      );
+      return validation.valid;
+    }
+    return true;
   }
 
   function handleNext() {
@@ -108,8 +142,17 @@ export default function ReportCreationPage() {
   }
 
   function handleSkip() {
-    // Steps 1-3 can be skipped
-    if (currentStep >= 1 && currentStep <= 3) {
+    // Steps 2-5 can be skipped
+    if (currentStep >= 1 && currentStep <= 4) {
+      if (currentStep === 4) {
+        setReportConfig((prev) => ({
+          ...prev,
+          trendConfig: {
+            ...(prev.trendConfig || getDefaultTrendConfig()),
+            enabledCalc: false,
+          },
+        }));
+      }
       handleNext();
     }
   }
@@ -132,6 +175,7 @@ export default function ReportCreationPage() {
           filters: reportConfig.filters,
           expressions: reportConfig.expressions,
           sorts: reportConfig.sorts,
+          trendConfig: reportConfig.trendConfig,
         }),
       });
 
@@ -146,6 +190,7 @@ export default function ReportCreationPage() {
         filters: {},
         expressions: [],
         sorts: [],
+        trendConfig: getDefaultTrendConfig(),
       });
       setSuccessMessage('Report generated and published to Reporting.');
       fetchReports();
@@ -220,6 +265,13 @@ export default function ReportCreationPage() {
         );
       case 4:
         return (
+          <StepTrends
+            reportConfig={reportConfig}
+            onChange={updateConfig}
+          />
+        );
+      case 5:
+        return (
           <StepPreview
             reportConfig={reportConfig}
             tableData={tableData}
@@ -232,7 +284,7 @@ export default function ReportCreationPage() {
     }
   }
 
-  const isOptionalStep = currentStep >= 1 && currentStep <= 3;
+  const isOptionalStep = currentStep >= 1 && currentStep <= 4;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>

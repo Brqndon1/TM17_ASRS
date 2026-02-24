@@ -206,3 +206,236 @@ export function processReportData(tableData, filters, expressions, sortConfig, a
 
   return { filteredData: data, metrics };
 }
+
+function getRowKeyByAttribute(row, attribute) {
+  const key = toCamelKey(attribute);
+  return Object.keys(row).find((k) => k.toLowerCase() === key.toLowerCase()) || null;
+}
+
+function toNumberIfPossible(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[%,$\s]/g, '');
+    const num = Number(normalized);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function splitHalves(values) {
+  const midpoint = Math.floor(values.length / 2);
+  const first = values.slice(0, midpoint);
+  const second = values.slice(midpoint);
+  return { first, second };
+}
+
+function average(nums) {
+  if (nums.length === 0) return null;
+  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
+
+function computeNumericTrend(values) {
+  const nums = values.map(toNumberIfPossible).filter((n) => n !== null);
+  if (nums.length < 4) return null;
+
+  const { first, second } = splitHalves(nums);
+  if (first.length === 0 || second.length === 0) return null;
+
+  const firstMean = average(first);
+  const secondMean = average(second);
+  if (firstMean === null || secondMean === null) return null;
+
+  const denom = Math.max(Math.abs(firstMean), 1);
+  const signedChangePct = ((secondMean - firstMean) / denom) * 100;
+
+  return {
+    signedChangePct,
+    magnitudePct: Math.abs(signedChangePct),
+    method: 'numeric',
+  };
+}
+
+function computeDominantShare(values, dominantCategory) {
+  if (values.length === 0) return 0;
+  const matches = values.filter((v) => String(v) === dominantCategory).length;
+  return matches / values.length;
+}
+
+function computeCategoricalTrend(values) {
+  const cleaned = values
+    .map((v) => (v === null || v === undefined ? null : String(v).trim()))
+    .filter((v) => v);
+  if (cleaned.length < 4) return null;
+
+  const counts = {};
+  cleaned.forEach((v) => {
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  const dominantCategory = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!dominantCategory) return null;
+
+  const { first, second } = splitHalves(cleaned);
+  if (first.length === 0 || second.length === 0) return null;
+
+  const firstShare = computeDominantShare(first, dominantCategory);
+  const secondShare = computeDominantShare(second, dominantCategory);
+  const signedChangePct = (secondShare - firstShare) * 100;
+
+  return {
+    signedChangePct,
+    magnitudePct: Math.abs(signedChangePct),
+    method: 'categorical',
+    dominantCategory,
+  };
+}
+
+function createTrendId() {
+  return `TRD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function getDirectionFromScore(score) {
+  if (score > 2) return 'up';
+  if (score < -2) return 'down';
+  return 'stable';
+}
+
+function buildTrendDescription(attributes, direction, magnitude, rowsEvaluated, skippedAttributes) {
+  if (rowsEvaluated < 4) {
+    return `Insufficient data for trend calculation. At least 4 rows are required; received ${rowsEvaluated}.`;
+  }
+
+  const joinedAttrs = attributes.join(', ');
+  const directionText = direction === 'up'
+    ? 'shows an upward pattern'
+    : direction === 'down'
+      ? 'shows a downward pattern'
+      : 'is stable';
+
+  if (skippedAttributes > 0) {
+    return `Trend across ${joinedAttrs} ${directionText} (${magnitude}%). ${skippedAttributes} selected variable(s) were skipped due to insufficient usable values.`;
+  }
+
+  return `Trend across ${joinedAttrs} ${directionText} (${magnitude}%).`;
+}
+
+export function validateTrendConfig(trendConfig, availableAttributes = []) {
+  const source = trendConfig || {};
+  const enabledCalc = source.enabledCalc !== false;
+  const enabledDisplay = source.enabledDisplay !== false;
+  const rawVariables = Array.isArray(source.variables) ? source.variables : [];
+  const cleanedVariables = [];
+  rawVariables.forEach((v) => {
+    if (typeof v !== 'string') return;
+    const trimmed = v.trim();
+    if (!trimmed) return;
+    if (!cleanedVariables.includes(trimmed)) cleanedVariables.push(trimmed);
+  });
+
+  if (cleanedVariables.length > 5) {
+    return { valid: false, error: 'Trend configuration supports up to 5 variables.' };
+  }
+
+  const canonicalMap = {};
+  availableAttributes.forEach((attr) => {
+    canonicalMap[String(attr).toLowerCase()] = attr;
+  });
+
+  const normalizedVariables = cleanedVariables.map((v) => {
+    const canonical = canonicalMap[v.toLowerCase()];
+    return canonical || v;
+  });
+
+  if (availableAttributes.length > 0) {
+    const availableLower = new Set(availableAttributes.map((a) => String(a).toLowerCase()));
+    const invalid = normalizedVariables.find((v) => !availableLower.has(String(v).toLowerCase()));
+    if (invalid) {
+      return { valid: false, error: `Invalid trend variable: ${invalid}` };
+    }
+  }
+
+  if (enabledCalc && normalizedVariables.length < 1) {
+    return { valid: false, error: 'At least one trend variable is required when calculation is enabled.' };
+  }
+
+  return {
+    valid: true,
+    normalized: {
+      variables: normalizedVariables,
+      enabledCalc,
+      enabledDisplay,
+    },
+  };
+}
+
+export function computeTrendData(filteredData, trendConfig) {
+  if (!trendConfig || trendConfig.enabledCalc === false) return [];
+
+  const rows = Array.isArray(filteredData) ? filteredData : [];
+  const attributes = trendConfig.variables || [];
+  if (attributes.length === 0) return [];
+
+  if (rows.length < 4) {
+    return [{
+      trendId: createTrendId(),
+      attributes,
+      direction: 'stable',
+      magnitude: 0,
+      timePeriod: 'Current dataset',
+      enabledDisplay: trendConfig.enabledDisplay !== false,
+      enabledCalc: true,
+      description: buildTrendDescription(attributes, 'stable', 0, rows.length, 0),
+    }];
+  }
+
+  const variableScores = [];
+  let skipped = 0;
+
+  attributes.forEach((attribute) => {
+    const values = rows.map((row) => {
+      const key = getRowKeyByAttribute(row, attribute);
+      return key ? row[key] : null;
+    });
+    const numeric = computeNumericTrend(values);
+    if (numeric) {
+      variableScores.push(numeric);
+      return;
+    }
+    const categorical = computeCategoricalTrend(values);
+    if (categorical) {
+      variableScores.push(categorical);
+      return;
+    }
+    skipped += 1;
+  });
+
+  if (variableScores.length === 0) {
+    return [{
+      trendId: createTrendId(),
+      attributes,
+      direction: 'stable',
+      magnitude: 0,
+      timePeriod: 'Current dataset',
+      enabledDisplay: trendConfig.enabledDisplay !== false,
+      enabledCalc: true,
+      description: buildTrendDescription(attributes, 'stable', 0, rows.length, skipped),
+    }];
+  }
+
+  const avgSigned = average(variableScores.map((v) => v.signedChangePct)) || 0;
+  const avgMagnitude = average(variableScores.map((v) => v.magnitudePct)) || 0;
+  const direction = getDirectionFromScore(avgSigned);
+  const magnitude = Math.min(100, Math.round(avgMagnitude * 10) / 10);
+
+  return [{
+    trendId: createTrendId(),
+    attributes,
+    direction,
+    magnitude,
+    timePeriod: 'Current dataset',
+    enabledDisplay: trendConfig.enabledDisplay !== false,
+    enabledCalc: true,
+    description: buildTrendDescription(attributes, direction, magnitude, rows.length, skipped),
+  }];
+}

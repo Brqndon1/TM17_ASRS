@@ -5,7 +5,8 @@ const STEPS = [
   { label: 'Filters', icon: '2' },
   { label: 'Expressions', icon: '3' },
   { label: 'Sorting', icon: '4' },
-  { label: 'Preview', icon: '5' },
+  { label: 'Trends', icon: '5' },
+  { label: 'Preview', icon: '6' },
 ];
 
 export default function StepIndicator({ currentStep }) {

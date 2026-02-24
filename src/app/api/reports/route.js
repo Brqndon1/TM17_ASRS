@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
-import { processReportData } from '@/lib/report-engine';
+import { computeTrendData, processReportData, validateTrendConfig } from '@/lib/report-engine';
 import { queryTableData } from '@/lib/query-helpers';
-import fs from 'fs';
-import path from 'path';
 
 // GET - List reports (optionally filtered by initiativeId)
 export async function GET(request) {
@@ -75,20 +73,18 @@ export async function POST(request) {
     const chartData = initiative.chart_data_json ? JSON.parse(initiative.chart_data_json) : {};
     const attributes = initiative.attributes ? JSON.parse(initiative.attributes) : [];
 
-    // Trends are computed analytics — read from JSON file
-    const trendFilePath = path.join(process.cwd(), 'src', 'data', 'trendData.json');
-    let trendData = [];
-    try {
-      const trendDataFile = JSON.parse(fs.readFileSync(trendFilePath, 'utf-8'));
-      trendData = (trendDataFile.trends[String(initiativeId)] || []).filter(t => t.enabledDisplay);
-    } catch { /* no trend data available */ }
-
-    const rawReport = { tableData, summary, chartData };
-
     // Extract report config from request body
     const filters = body.filters || {};
     const expressions = body.expressions || [];
     const sorts = body.sorts || [];
+    const incomingTrendConfig = body.trendConfig === undefined
+      ? { variables: [], enabledCalc: false, enabledDisplay: true }
+      : body.trendConfig;
+    const trendConfigValidation = validateTrendConfig(incomingTrendConfig, attributes);
+    if (!trendConfigValidation.valid) {
+      return NextResponse.json({ error: trendConfigValidation.error }, { status: 400 });
+    }
+    const trendConfig = trendConfigValidation.normalized;
 
     // Run the full pipeline
     const { filteredData, metrics } = processReportData(
@@ -98,6 +94,7 @@ export async function POST(request) {
       sorts,
       attributes
     );
+    const trendData = computeTrendData(filteredData, trendConfig);
 
     // Build the versioned snapshot
     const snapshot = {
@@ -108,6 +105,7 @@ export async function POST(request) {
         filters,
         expressions,
         sorts,
+        trendConfig,
       },
       results: {
         metrics,

@@ -85,8 +85,10 @@ export default function ReportViewPage() {
     const filterEntries = Object.entries(snapshotConfig.filters || {}).filter(([, v]) => v && v !== 'All');
     const expressions = snapshotConfig.expressions || [];
     const sorts = snapshotConfig.sorts || [];
+    const trendConfig = snapshotConfig.trendConfig || null;
+    const hasTrendVariables = (trendConfig?.variables || []).length > 0;
 
-    if (filterEntries.length === 0 && expressions.length === 0 && sorts.length === 0) {
+    if (filterEntries.length === 0 && expressions.length === 0 && sorts.length === 0 && !hasTrendVariables) {
       return null;
     }
 
@@ -117,6 +119,12 @@ export default function ReportViewPage() {
             <div>
               <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Sort: </span>
               {sorts.map((s, i) => `${i + 1}. ${s.attribute} (${s.direction === 'desc' ? 'Z\u2192A' : 'A\u2192Z'})`).join(', ')}
+            </div>
+          )}
+          {hasTrendVariables && (
+            <div>
+              <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Trends: </span>
+              Variables ({trendConfig.variables.join(', ')}), display {trendConfig.enabledDisplay === false ? 'off' : 'on'}
             </div>
           )}
         </div>

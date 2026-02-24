@@ -2,24 +2,37 @@
 
 import { useMemo } from 'react';
 import DataTable from '@/components/DataTable';
-import { processReportData } from '@/lib/report-engine';
+import { computeTrendData, processReportData, validateTrendConfig } from '@/lib/report-engine';
 
 export default function StepPreview({ reportConfig, tableData, onGenerate, isSubmitting }) {
-  const attributes = reportConfig.selectedInitiative?.attributes || [];
+  const selectedAttributes = reportConfig.selectedInitiative?.attributes;
+  const rawTrendConfig = reportConfig.trendConfig;
 
   // Run the full pipeline client-side for preview
-  const { filteredData, metrics } = useMemo(() => {
+  const { filteredData, metrics, trendData } = useMemo(() => {
+    const attributes = selectedAttributes || [];
+    const trendConfig = rawTrendConfig || { variables: [], enabledCalc: true, enabledDisplay: true };
+
     if (!tableData || tableData.length === 0) {
-      return { filteredData: [], metrics: { totalRows: 0, totalRowsUnfiltered: 0, filterMatchRate: 0, numericAverages: {}, categoryCounts: {} } };
+      return {
+        filteredData: [],
+        metrics: { totalRows: 0, totalRowsUnfiltered: 0, filterMatchRate: 0, numericAverages: {}, categoryCounts: {} },
+        trendData: [],
+      };
     }
-    return processReportData(
+    const processed = processReportData(
       tableData,
       reportConfig.filters,
       reportConfig.expressions,
       reportConfig.sorts,
       attributes
     );
-  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, attributes]);
+    const trendValidation = validateTrendConfig(trendConfig, attributes);
+    return {
+      ...processed,
+      trendData: trendValidation.valid ? computeTrendData(processed.filteredData, trendValidation.normalized) : [],
+    };
+  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, selectedAttributes, rawTrendConfig]);
 
   // Build human-readable config summary
   const activeFilterEntries = Object.entries(reportConfig.filters).filter(([, v]) => v && v !== 'All');
@@ -33,7 +46,7 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
   return (
     <div>
       <h2 style={{ fontSize: '1.15rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-        Step 5: Preview & Generate
+        Step 6: Preview & Generate
       </h2>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
         Review your configuration and preview the results before generating the report.
@@ -157,6 +170,27 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
         )}
         <DataTable data={previewData} columns={previewColumns} />
       </div>
+
+      {trendData.length > 0 && (
+        <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: '600', margin: '0 0 0.75rem 0' }}>
+            Trend Preview
+          </h3>
+          {trendData.map((trend) => (
+            <div key={trend.trendId} style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 0.4rem 0' }}>
+                <strong>Variables:</strong> {trend.attributes.join(', ')}
+              </p>
+              <p style={{ margin: '0 0 0.4rem 0' }}>
+                <strong>Direction:</strong> {trend.direction} ({trend.magnitude}%)
+              </p>
+              <p style={{ margin: 0 }}>
+                {trend.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Generate Button */}
       <div style={{ textAlign: 'center' }}>
