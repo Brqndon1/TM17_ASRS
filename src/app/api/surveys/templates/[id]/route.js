@@ -30,7 +30,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import db from '../../../../../lib/db.js';
+import db from '@/lib/db.js';
 
 export async function GET(request, context) {
   try {
@@ -126,4 +126,3 @@ export async function GET(request, context) {
     );
   }
 }
-

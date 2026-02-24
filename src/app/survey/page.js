@@ -30,6 +30,9 @@ export default function SurveyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
 
+  // Invalid fields tracking
+  const [invalidFields, setInvalidFields] = useState({});
+
   // Distribution / auto-close state (public users only)
   const [surveyOpen, setSurveyOpen] = useState(null); // null = loading, true = open, false = closed
   const [activeDistribution, setActiveDistribution] = useState(null);
@@ -144,33 +147,48 @@ export default function SurveyPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setError(null);
 
+    const newInvalidFields = {};
+
     // Validate personal info
-    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-      setError('Please fill out all required personal information fields.');
+    if (!firstName.trim()) newInvalidFields.firstName = true;
+    if (!lastName.trim()) newInvalidFields.lastName = true;
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) newInvalidFields.email = true;
+
+    if (surveyTemplate) {
+      // Template survey: validate all required template questions
+      const questions = surveyTemplate.questions || [];
+      questions.forEach((q) => {
+        const isQuestionRequired = q.text?.required ?? q.required ?? true;
+        if (!isQuestionRequired) return;
+        const qId = q.id;
+        if (!templateResponses[qId] || !String(templateResponses[qId]).trim()) {
+          newInvalidFields[`question_${qId}`] = true;
+        }
+      });
+    } else {
+      // Default survey: validate initiative rating
+      if (!initiativeRating) newInvalidFields.initiativeRating = true;
+    }
+
+    if (Object.keys(newInvalidFields).length > 0) {
+      setInvalidFields(newInvalidFields);
+      setError('Please fill out all required fields.');
+      // Scroll to first invalid field
+      const firstKey = Object.keys(newInvalidFields)[0];
+      const fieldId = firstKey.startsWith('question_')
+        ? `field-${firstKey}`
+        : `field-${firstKey}`;
+      setTimeout(() => {
+        const el = document.getElementById(`field-${firstKey}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
       return;
     }
 
-    if (surveyTemplate) {
-      // Template survey: validate all template questions are answered
-      const questions = surveyTemplate.questions || [];
-      const unanswered = questions.filter((q) => {
-        const qId = q.id;
-        return !templateResponses[qId] || !String(templateResponses[qId]).trim();
-      });
-      if (unanswered.length > 0) {
-        setError('Please answer all questions before submitting.');
-        return;
-      }
-    } else {
-      // Default survey: validate initiative rating
-      if (!initiativeRating) {
-        setError('Please fill out all required fields.');
-        return;
-      }
-    }
-
+    setInvalidFields({});
     setIsSubmitting(true);
 
     try {
@@ -239,6 +257,7 @@ export default function SurveyPage() {
     setTemplateResponses({});
     setSubmitted(false);
     setError(null);
+    setInvalidFields({});
   };
 
   // Shared input style
@@ -253,6 +272,12 @@ export default function SurveyPage() {
     outline: 'none',
     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
     boxSizing: 'border-box',
+  };
+
+  const invalidInputStyle = {
+    ...inputStyle,
+    border: '1.5px solid #ef4444',
+    backgroundColor: '#fef2f2',
   };
 
   const labelStyle = {
@@ -359,7 +384,7 @@ export default function SurveyPage() {
               </div>
             ) : (
               /* ---- Survey Form ---- */
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 {/* Error banner */}
                 {error && (
                   <div style={{
@@ -387,8 +412,8 @@ export default function SurveyPage() {
                   </h2>
 
                   {/* First Name & Last Name – side by side */}
-                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
+                                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div id="field-firstName" style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
                       <label style={labelStyle}>
                         First Name <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
                       </label>
@@ -396,12 +421,15 @@ export default function SurveyPage() {
                         type="text"
                         placeholder="John"
                         value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        style={inputStyle}
-                        required
+                        onChange={(e) => {
+                          setFirstName(e.target.value);
+                          if (invalidFields.firstName) setInvalidFields((p) => ({ ...p, firstName: false }));
+                        }}
+                        style={invalidFields.firstName ? invalidInputStyle : inputStyle}
                       />
+                      {invalidFields.firstName && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>First name is required.</span>}
                     </div>
-                    <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
+                    <div id="field-lastName" style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
                       <label style={labelStyle}>
                         Last Name <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
                       </label>
@@ -409,15 +437,18 @@ export default function SurveyPage() {
                         type="text"
                         placeholder="Doe"
                         value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        style={inputStyle}
-                        required
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          if (invalidFields.lastName) setInvalidFields((p) => ({ ...p, lastName: false }));
+                        }}
+                        style={invalidFields.lastName ? invalidInputStyle : inputStyle}
                       />
+                      {invalidFields.lastName && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Last name is required.</span>}
                     </div>
                   </div>
 
                   {/* Email */}
-                  <div style={fieldGroupStyle}>
+                  <div id="field-email" style={fieldGroupStyle}>
                     <label style={labelStyle}>
                       Email Address <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
                     </label>
@@ -425,10 +456,13 @@ export default function SurveyPage() {
                       type="email"
                       placeholder="john.doe@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      style={inputStyle}
-                      required
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (invalidFields.email) setInvalidFields((p) => ({ ...p, email: false }));
+                      }}
+                      style={invalidFields.email ? invalidInputStyle : inputStyle}
                     />
+                    {invalidFields.email && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>{!email.trim() ? 'Email address is required.' : 'Please enter a valid email address.'}</span>}
                   </div>
                 </div>
 
@@ -451,47 +485,59 @@ export default function SurveyPage() {
                       const questionType = q.text?.type || q.type || 'text';
                       const questionOptions = q.text?.options || q.options || [];
                       const qId = q.id;
+                      const isRequired = q.text?.required ?? q.required ?? true;
+                      const isInvalid = !!invalidFields[`question_${qId}`];
 
                       return (
-                        <div key={qId} style={fieldGroupStyle}>
+                        <div key={qId} id={`field-question_${qId}`} style={fieldGroupStyle}>
                           <label style={labelStyle}>
-                            {index + 1}. {questionText} <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
+                            {index + 1}. {questionText} {isRequired && <span style={{ color: 'var(--color-asrs-red)' }}>*</span>}
                           </label>
 
                           {questionType === 'text' && (
+                            <>
                             <textarea
                               value={templateResponses[qId] || ''}
-                              onChange={(e) => setTemplateResponses({
-                                ...templateResponses,
-                                [qId]: e.target.value,
-                              })}
+                              onChange={(e) => {
+                                setTemplateResponses({ ...templateResponses, [qId]: e.target.value });
+                                if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                              }}
                               rows={3}
                               placeholder="Enter your response..."
                               style={{
-                                ...inputStyle,
+                                ...(isInvalid ? invalidInputStyle : inputStyle),
                                 resize: 'vertical',
                                 fontFamily: 'inherit',
                               }}
-                              required
                             />
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>This field is required.</span>}
+                            </>
                           )}
 
                           {questionType === 'numeric' && (
+                            <>
                             <input
                               type="number"
                               value={templateResponses[qId] || ''}
-                              onChange={(e) => setTemplateResponses({
-                                ...templateResponses,
-                                [qId]: e.target.value,
-                              })}
+                              onChange={(e) => {
+                                setTemplateResponses({ ...templateResponses, [qId]: e.target.value });
+                                if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                              }}
                               placeholder="Enter a number"
-                              style={inputStyle}
-                              required
+                              style={isInvalid ? invalidInputStyle : inputStyle}
                             />
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>This field is required.</span>}
+                            </>
                           )}
 
                           {questionType === 'choice' && questionOptions.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                              ...(isInvalid ? { border: '1.5px solid #ef4444', borderRadius: '8px', padding: '0.5rem', backgroundColor: '#fef2f2' } : {}),
+                            }}>
                               {questionOptions.map((option) => (
                                 <label
                                   key={option}
@@ -516,12 +562,11 @@ export default function SurveyPage() {
                                     name={`question_${qId}`}
                                     value={option}
                                     checked={templateResponses[qId] === option}
-                                    onChange={(e) => setTemplateResponses({
-                                      ...templateResponses,
-                                      [qId]: e.target.value,
-                                    })}
+                                    onChange={(e) => {
+                                      setTemplateResponses({ ...templateResponses, [qId]: e.target.value });
+                                      if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                    }}
                                     style={{ accentColor: 'var(--color-asrs-orange)' }}
-                                    required
                                   />
                                   <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>
                                     {option}
@@ -529,6 +574,8 @@ export default function SurveyPage() {
                                 </label>
                               ))}
                             </div>
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please select an option.</span>}
+                            </>
                           )}
                         </div>
                       );
@@ -553,7 +600,12 @@ export default function SurveyPage() {
                       <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.65rem' }}>
                         Select the option that best describes your experience.
                       </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div id="field-initiativeRating" style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                        ...(invalidFields.initiativeRating ? { border: '1.5px solid #ef4444', borderRadius: '8px', padding: '0.5rem', backgroundColor: '#fef2f2' } : {}),
+                      }}>
                         {ratingOptions.map((option) => (
                           <label
                             key={option.value}
@@ -578,7 +630,10 @@ export default function SurveyPage() {
                               name="initiativeRating"
                               value={option.value}
                               checked={initiativeRating === option.value}
-                              onChange={(e) => setInitiativeRating(e.target.value)}
+                              onChange={(e) => {
+                                setInitiativeRating(e.target.value);
+                                if (invalidFields.initiativeRating) setInvalidFields((p) => ({ ...p, initiativeRating: false }));
+                              }}
                               style={{ accentColor: 'var(--color-asrs-orange)' }}
                             />
                             <span style={{ fontSize: '1.15rem' }}>{option.emoji}</span>
@@ -588,6 +643,7 @@ export default function SurveyPage() {
                           </label>
                         ))}
                       </div>
+                      {invalidFields.initiativeRating && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please select a rating.</span>}
                     </div>
 
                     {/* Additional comments */}
