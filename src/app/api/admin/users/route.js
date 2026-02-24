@@ -59,7 +59,7 @@ export async function GET(request) {
         ut.access_rank
       FROM user u
       JOIN user_type ut ON u.user_type_id = ut.user_type_id
-      WHERE ut.type IN ('public', 'staff', 'admin')
+      WHERE ut.type IN ('staff', 'admin')
       ORDER BY ut.access_rank DESC, u.last_name ASC, u.first_name ASC
     `).all();
 
