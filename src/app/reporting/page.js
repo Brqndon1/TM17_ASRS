@@ -2,21 +2,6 @@
  * ============================================================================
  * REPORTING PAGE — Displays reports generated from the Report Creation page.
  * ============================================================================
- * Access at: /reporting
- *
- * Each initiative can have one assigned report (the most recent one created
- * for that initiative in Report Creation). Selecting an initiative shows
- * its assigned report snapshot.
- *
- * LAYOUT STRUCTURE:
- * ┌─────────────────────────────────────────────────────┐
- * │ Header (Logo + Title + Role Selector)               │
- * ├─────────────────────────────────────────────────────┤
- * │ Initiative Selector (7 clickable cards)             │
- * ├─────────────────────────────────────────────────────┤
- * │ Report Dashboard (Charts + Filters + Table + Trends)│
- * └─────────────────────────────────────────────────────┘
- * ============================================================================
  */
 'use client';
 
@@ -35,7 +20,6 @@ export default function ReportingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [noReport, setNoReport] = useState(false);
 
-  // Map of initiative_id → most recent report row (built once on load)
   const [reportMap, setReportMap] = useState({});
 
   useEffect(() => {
@@ -51,7 +35,6 @@ export default function ReportingPage() {
         const initiativesList = initiativesData.initiatives || [];
         setInitiatives(initiativesList);
 
-        // Build map: initiative_id → most recent report (reports come sorted by created_at DESC)
         const map = {};
         for (const r of (reportsData.reports || [])) {
           if (!map[r.initiative_id]) {
@@ -122,6 +105,27 @@ export default function ReportingPage() {
   }
 
   /**
+   * Create shareable link
+   */
+  function handleCreateShareableLink() {
+    if (!reportData || !selectedInitiative) return;
+
+    const shareableUrl = `${window.location.origin}/reporting?reportId=${reportData.reportId}&initiativeId=${selectedInitiative.id}`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareableUrl)
+        .then(() => {
+          alert("Shareable link copied to clipboard!");
+        })
+        .catch(() => {
+          window.prompt("Copy this shareable report link:", shareableUrl);
+        });
+    } else {
+      window.prompt("Copy this shareable report link:", shareableUrl);
+    }
+  }
+
+  /**
    * handleDownload — Exports the current report
    */
   function handleDownload(format) {
@@ -183,15 +187,12 @@ export default function ReportingPage() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      {/* ---- HEADER ---- */}
       <Header userRole={userRole} onRoleChange={setUserRole} />
 
-      {/* ---- BACK BUTTON ---- */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
         <BackButton />
       </div>
 
-      {/* ---- INITIATIVE SELECTOR ---- */}
       <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem' }}>
         <InitiativeSelector
           initiatives={initiatives}
@@ -200,37 +201,9 @@ export default function ReportingPage() {
         />
       </section>
 
-      {/* ---- REPORT DASHBOARD ---- */}
       <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
-        {isLoading ? (
-          <div style={{
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            padding: '4rem', color: 'var(--color-text-light)'
-          }}>
-            <div style={{
-              width: '40px', height: '40px',
-              border: '4px solid var(--color-bg-tertiary)',
-              borderTop: '4px solid var(--color-asrs-orange)',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <span style={{ marginLeft: '1rem', fontSize: '1.1rem' }}>
-              Loading report data...
-            </span>
-          </div>
-        ) : noReport ? (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--color-text-light)', fontSize: '1.1rem' }}>
-              No report has been assigned to this initiative yet.
-            </p>
-            <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-              Create one in Report Creation to see it here.
-            </p>
-          </div>
-        ) : reportData ? (
+        {reportData && (
           <>
-            {/* ---- DOWNLOAD BAR ---- */}
             <div
               className="asrs-card"
               style={{
@@ -259,22 +232,27 @@ export default function ReportingPage() {
                       borderRadius: '6px',
                       border: '1px solid var(--color-bg-tertiary)',
                       backgroundColor: 'var(--color-bg-primary)',
-                      color: 'var(--color-text-primary)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = 'var(--color-asrs-orange)';
-                      e.target.style.color = '#fff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'var(--color-bg-primary)';
-                      e.target.style.color = 'var(--color-text-primary)';
+                      cursor: 'pointer'
                     }}
                   >
                     {format.toUpperCase()}
                   </button>
                 ))}
+
+                <button
+                  onClick={handleCreateShareableLink}
+                  style={{
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: '1px solid var(--color-bg-tertiary)',
+                    backgroundColor: 'var(--color-bg-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Create Shareable Link
+                </button>
               </div>
             </div>
 
@@ -285,12 +263,6 @@ export default function ReportingPage() {
               userRole={userRole}
             />
           </>
-        ) : (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--color-text-light)', fontSize: '1.1rem' }}>
-              Select an initiative above to view its report.
-            </p>
-          </div>
         )}
       </section>
     </main>
