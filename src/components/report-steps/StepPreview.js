@@ -6,10 +6,12 @@ import { computeTrendData, processReportData, validateTrendConfig } from '@/lib/
 
 export default function StepPreview({ reportConfig, tableData, onGenerate, isSubmitting }) {
   const selectedAttributes = reportConfig.selectedInitiative?.attributes;
+  const selectedInitiativeId = reportConfig.selectedInitiative?.id;
   const rawTrendConfig = reportConfig.trendConfig;
+  const reportName = reportConfig.reportName;
 
   // Run the full pipeline client-side for preview
-  const { filteredData, metrics, trendData } = useMemo(() => {
+  const { filteredData, metrics, trendData, explainability } = useMemo(() => {
     const attributes = selectedAttributes || [];
     const trendConfig = rawTrendConfig || { variables: [], enabledCalc: true, enabledDisplay: true };
 
@@ -18,6 +20,13 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
         filteredData: [],
         metrics: { totalRows: 0, totalRowsUnfiltered: 0, filterMatchRate: 0, numericAverages: {}, categoryCounts: {} },
         trendData: [],
+        explainability: {
+          inputRowCount: 0,
+          afterFilterCount: 0,
+          afterExpressionCount: 0,
+          outputRowCount: 0,
+          droppedByStep: { filters: 0, expressions: 0, sorting: 0 },
+        },
       };
     }
     const processed = processReportData(
@@ -30,9 +39,14 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
     const trendValidation = validateTrendConfig(trendConfig, attributes);
     return {
       ...processed,
-      trendData: trendValidation.valid ? computeTrendData(processed.filteredData, trendValidation.normalized) : [],
+      trendData: trendValidation.valid
+        ? computeTrendData(processed.filteredData, trendValidation.normalized, {
+          initiativeId: selectedInitiativeId,
+          reportName,
+        })
+        : [],
     };
-  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, selectedAttributes, rawTrendConfig]);
+  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, selectedAttributes, rawTrendConfig, selectedInitiativeId, reportName]);
 
   // Build human-readable config summary
   const activeFilterEntries = Object.entries(reportConfig.filters).filter(([, v]) => v && v !== 'All');
@@ -184,6 +198,9 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
               <p style={{ margin: '0 0 0.4rem 0' }}>
                 <strong>Direction:</strong> {trend.direction} ({trend.magnitude}%)
               </p>
+              <p style={{ margin: '0 0 0.4rem 0' }}>
+                <strong>Confidence:</strong> {trend.confidenceScore}%
+              </p>
               <p style={{ margin: 0 }}>
                 {trend.description}
               </p>
@@ -191,6 +208,20 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
           ))}
         </div>
       )}
+
+      <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: '600', margin: '0 0 0.75rem 0' }}>
+          Explainability
+        </h3>
+        <div style={{ fontSize: '0.88rem', lineHeight: 1.6 }}>
+          <div>Input rows: {explainability.inputRowCount}</div>
+          <div>After filters: {explainability.afterFilterCount}</div>
+          <div>After expressions: {explainability.afterExpressionCount}</div>
+          <div>Output rows: {explainability.outputRowCount}</div>
+          <div>Dropped by filters: {explainability.droppedByStep.filters}</div>
+          <div>Dropped by expressions: {explainability.droppedByStep.expressions}</div>
+        </div>
+      </div>
 
       {/* Generate Button */}
       <div style={{ textAlign: 'center' }}>

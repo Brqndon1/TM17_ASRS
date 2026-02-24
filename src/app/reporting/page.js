@@ -10,6 +10,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
+import { normalizeSnapshot } from '@/lib/report-snapshot';
 
 export default function ReportingPage() {
   const [selectedInitiative, setSelectedInitiative] = useState(null);
@@ -78,16 +79,18 @@ export default function ReportingPage() {
       parsed = null;
     }
 
-    if (parsed && parsed.version) {
-      const results = parsed.results;
+    const normalized = normalizeSnapshot(parsed);
+    if (normalized) {
+      const results = normalized.results;
       setReportData({
         reportId: results.reportId,
-        initiativeId: parsed.config.initiativeId,
+        initiativeId: normalized.config.initiativeId,
         initiativeName: results.initiativeName,
         generatedDate: results.generatedDate,
         summary: results.summary,
         chartData: results.chartData,
         tableData: results.filteredTableData,
+        explainability: results.explainability,
       });
       setTrendData(results.trendData || []);
     } else {

@@ -201,6 +201,22 @@ function initializeDatabase() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS report_generation_log (
+      log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER REFERENCES initiative(initiative_id),
+      report_id INTEGER REFERENCES reports(id),
+      status TEXT NOT NULL CHECK (status IN ('started','completed','failed')),
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      input_rows INTEGER NOT NULL DEFAULT 0,
+      output_rows INTEGER NOT NULL DEFAULT 0,
+      filters_count INTEGER NOT NULL DEFAULT 0,
+      expressions_count INTEGER NOT NULL DEFAULT 0,
+      sorts_count INTEGER NOT NULL DEFAULT 0,
+      trend_variables_count INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     -- Survey distribution table (US-010: distribute surveys with deadlines)
 
     CREATE TABLE IF NOT EXISTS survey_distribution (
@@ -270,6 +286,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_reports_survey_id ON reports(survey_id);
     CREATE INDEX IF NOT EXISTS idx_reports_initiative_id ON reports(initiative_id);
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_report_generation_log_created_at ON report_generation_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_report_generation_log_status ON report_generation_log(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
   `);

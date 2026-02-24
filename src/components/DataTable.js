@@ -12,16 +12,21 @@
  */
 'use client';
 
+import { useMemo, useState } from 'react';
+
 export default function DataTable({ data, columns }) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="asrs-card" style={{ textAlign: 'center', padding: '2rem' }}>
-        <p style={{ color: 'var(--color-text-light)' }}>
-          No data matches your current filters.
-        </p>
-      </div>
-    );
-  }
+  const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
+  const safeColumns = useMemo(() => (Array.isArray(columns) ? columns : []), [columns]);
+  const displayColumns = safeColumns.filter(col => col !== 'id');
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(safeData.length / pageSize));
+  const displayPage = Math.min(page, totalPages);
+
+  const pagedData = useMemo(() => {
+    const start = (displayPage - 1) * pageSize;
+    return safeData.slice(start, start + pageSize);
+  }, [safeData, displayPage, pageSize]);
 
   /**
    * formatColumnName — Converts camelCase keys to human-readable labels.
@@ -34,8 +39,15 @@ export default function DataTable({ data, columns }) {
       .trim();
   }
 
-  // Filter out the "id" column from display — it's internal only
-  const displayColumns = columns.filter(col => col !== 'id');
+  if (safeData.length === 0) {
+    return (
+      <div className="asrs-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <p style={{ color: 'var(--color-text-light)' }}>
+          No data matches your current filters.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="asrs-card" style={{ overflow: 'hidden', padding: '0' }}>
@@ -48,8 +60,46 @@ export default function DataTable({ data, columns }) {
           Data Table
         </h3>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-          {data.length} record{data.length !== 1 ? 's' : ''}
+          {safeData.length} record{safeData.length !== 1 ? 's' : ''}
         </span>
+      </div>
+      <div style={{ padding: '0.6rem 1.5rem', borderBottom: '1px solid var(--color-bg-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem' }}>
+          Rows per page
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setPageSize(next);
+              setPage(1);
+            }}
+            className="asrs-input"
+            style={{ width: '80px', padding: '0.25rem 0.4rem' }}
+          >
+            {[20, 50, 100].map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+          <button
+            className="asrs-btn-secondary"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            style={{ padding: '0.3rem 0.55rem' }}
+          >
+            Prev
+          </button>
+          <span>Page {displayPage} of {totalPages}</span>
+          <button
+            className="asrs-btn-secondary"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            style={{ padding: '0.3rem 0.55rem' }}
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* Scrollable container for wide tables */}
@@ -72,7 +122,7 @@ export default function DataTable({ data, columns }) {
             </tr>
           </thead>
           <tbody>
-            {data.map((row, rowIndex) => (
+            {pagedData.map((row, rowIndex) => (
               <tr key={row.id || rowIndex} style={{
                 borderBottom: '1px solid var(--color-bg-secondary)',
                 transition: 'background-color 0.15s ease'

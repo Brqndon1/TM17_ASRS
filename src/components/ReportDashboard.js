@@ -224,6 +224,22 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
       {trendData && trendData.length > 0 && (
         <TrendDisplay trends={trendData} />
       )}
+
+      {reportData.explainability && (
+        <div className="asrs-card">
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+            Calculation Explainability
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.88rem' }}>
+            <div>Input rows: {reportData.explainability.inputRowCount}</div>
+            <div>After filters: {reportData.explainability.afterFilterCount}</div>
+            <div>After expressions: {reportData.explainability.afterExpressionCount}</div>
+            <div>Output rows: {reportData.explainability.outputRowCount}</div>
+            <div>Dropped by filters: {reportData.explainability.droppedByStep?.filters ?? 0}</div>
+            <div>Dropped by expressions: {reportData.explainability.droppedByStep?.expressions ?? 0}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

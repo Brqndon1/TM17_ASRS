@@ -22,8 +22,12 @@ function getDefaultTrendConfig() {
     variables: [],
     enabledCalc: true,
     enabledDisplay: true,
+    method: 'delta_halves',
+    thresholdPct: 2,
   };
 }
+
+const DRAFT_KEY_PREFIX = 'reportDraft';
 
 export default function ReportCreationPage() {
   const [userRole, setUserRole] = useState('staff');
@@ -52,6 +56,7 @@ export default function ReportCreationPage() {
   // ---- REPORT HISTORY ----
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Load initiatives on mount
   useEffect(() => {
@@ -59,8 +64,59 @@ export default function ReportCreationPage() {
       const data = await getInitiatives();
       setInitiatives(data);
       if (data.length > 0) {
-        setReportConfig(prev => ({ ...prev, selectedInitiative: data[0] }));
+        const defaultInitiative = data[0];
+        const draftKey = `${DRAFT_KEY_PREFIX}:${defaultInitiative.id}`;
+        const rawDraft = localStorage.getItem(draftKey);
+        if (!rawDraft) {
+          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
+          setDraftLoaded(true);
+          return;
+        }
+
+        let parsedDraft = null;
+        try {
+          parsedDraft = JSON.parse(rawDraft);
+        } catch {
+          parsedDraft = null;
+        }
+
+        if (!parsedDraft || typeof parsedDraft !== 'object') {
+          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
+          setDraftLoaded(true);
+          return;
+        }
+
+        const shouldRestore = window.confirm('A saved report draft was found. Restore it?');
+        if (!shouldRestore) {
+          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
+          localStorage.removeItem(draftKey);
+          setDraftLoaded(true);
+          return;
+        }
+
+        const restoredInitiative = data.find((i) => i.id === parsedDraft.selectedInitiativeId) || defaultInitiative;
+        const availableAttrs = restoredInitiative.attributes || [];
+        const restoredTrend = {
+          ...getDefaultTrendConfig(),
+          ...(parsedDraft.trendConfig || {}),
+          variables: Array.isArray(parsedDraft?.trendConfig?.variables)
+            ? parsedDraft.trendConfig.variables.filter((v) => availableAttrs.includes(v)).slice(0, 5)
+            : [],
+        };
+
+        setReportConfig((prev) => ({
+          ...prev,
+          selectedInitiative: restoredInitiative,
+          reportName: parsedDraft.reportName || '',
+          description: parsedDraft.description || '',
+          filters: parsedDraft.filters || {},
+          expressions: Array.isArray(parsedDraft.expressions) ? parsedDraft.expressions : [],
+          sorts: Array.isArray(parsedDraft.sorts) ? parsedDraft.sorts : [],
+          trendConfig: restoredTrend,
+        }));
+        setCurrentStep(Number.isFinite(parsedDraft.currentStep) ? Math.max(0, Math.min(TOTAL_STEPS - 1, parsedDraft.currentStep)) : 0);
       }
+      setDraftLoaded(true);
     }
     loadInitiatives();
     fetchReports();
@@ -94,6 +150,26 @@ export default function ReportCreationPage() {
       };
     });
   }, [reportConfig.selectedInitiative]);
+
+  useEffect(() => {
+    if (!draftLoaded || !reportConfig.selectedInitiative) return;
+    const handle = setTimeout(() => {
+      const key = `${DRAFT_KEY_PREFIX}:${reportConfig.selectedInitiative.id}`;
+      const payload = {
+        selectedInitiativeId: reportConfig.selectedInitiative.id,
+        reportName: reportConfig.reportName,
+        description: reportConfig.description,
+        filters: reportConfig.filters,
+        expressions: reportConfig.expressions,
+        sorts: reportConfig.sorts,
+        trendConfig: reportConfig.trendConfig,
+        currentStep,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [draftLoaded, reportConfig, currentStep]);
 
   async function fetchReports() {
     setLoadingReports(true);
@@ -179,9 +255,15 @@ export default function ReportCreationPage() {
         }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const failure = await res.json().catch(() => ({}));
+        throw new Error(failure.error || 'Failed to generate report');
+      }
 
       // Reset form
+      if (reportConfig.selectedInitiative) {
+        localStorage.removeItem(`${DRAFT_KEY_PREFIX}:${reportConfig.selectedInitiative.id}`);
+      }
       setCurrentStep(0);
       setReportConfig({
         selectedInitiative: initiatives.length > 0 ? initiatives[0] : null,
@@ -194,8 +276,8 @@ export default function ReportCreationPage() {
       });
       setSuccessMessage('Report generated and published to Reporting.');
       fetchReports();
-    } catch {
-      setErrorMessage('Failed to generate report. Please try again.');
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to generate report. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

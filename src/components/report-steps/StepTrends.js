@@ -6,6 +6,8 @@ export default function StepTrends({ reportConfig, onChange }) {
     variables: [],
     enabledCalc: true,
     enabledDisplay: true,
+    method: 'delta_halves',
+    thresholdPct: 2,
   };
   const selected = trendConfig.variables || [];
 
@@ -70,6 +72,45 @@ export default function StepTrends({ reportConfig, onChange }) {
               }
             />
             Show in report
+          </label>
+          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.9rem' }}>
+            Method:
+            <select
+              className="asrs-input"
+              style={{ width: '170px', padding: '0.35rem 0.5rem' }}
+              value={trendConfig.method || 'delta_halves'}
+              onChange={(e) =>
+                onChange({
+                  trendConfig: {
+                    ...trendConfig,
+                    method: e.target.value,
+                  },
+                })
+              }
+            >
+              <option value="delta_halves">Half-to-Half Delta</option>
+              <option value="linear_slope">Linear Slope</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.9rem' }}>
+            Threshold %:
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={trendConfig.thresholdPct ?? 2}
+              onChange={(e) =>
+                onChange({
+                  trendConfig: {
+                    ...trendConfig,
+                    thresholdPct: Number(e.target.value),
+                  },
+                })
+              }
+              className="asrs-input"
+              style={{ width: '90px', padding: '0.35rem 0.5rem' }}
+            />
           </label>
         </div>
       </div>

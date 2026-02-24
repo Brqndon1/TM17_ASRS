@@ -194,9 +194,11 @@ export function processReportData(tableData, filters, expressions, sortConfig, a
 
   // Step 1: Apply equality filters
   let data = applyFilters(tableData, filters);
+  const afterFilterCount = data.length;
 
   // Step 2: Apply boolean expressions
   data = applyExpressionFilter(data, expressions);
+  const afterExpressionCount = data.length;
 
   // Step 3: Apply sorting
   data = applySorting(data, sortConfig);
@@ -204,7 +206,21 @@ export function processReportData(tableData, filters, expressions, sortConfig, a
   // Step 4: Compute metrics
   const metrics = computeMetrics(data, unfilteredData, attributes);
 
-  return { filteredData: data, metrics };
+  return {
+    filteredData: data,
+    metrics,
+    explainability: {
+      inputRowCount: unfilteredData.length,
+      afterFilterCount,
+      afterExpressionCount,
+      outputRowCount: data.length,
+      droppedByStep: {
+        filters: Math.max(0, unfilteredData.length - afterFilterCount),
+        expressions: Math.max(0, afterFilterCount - afterExpressionCount),
+        sorting: 0,
+      },
+    },
+  };
 }
 
 function getRowKeyByAttribute(row, attribute) {
@@ -291,14 +307,24 @@ function computeCategoricalTrend(values) {
   };
 }
 
-function createTrendId() {
-  return `TRD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+function stableHash(input) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return (hash >>> 0).toString(36).toUpperCase();
 }
 
-function getDirectionFromScore(score) {
-  if (score > 2) return 'up';
-  if (score < -2) return 'down';
-  return 'stable';
+function createDeterministicTrendId(context, attributes, method, rows) {
+  const seed = JSON.stringify({
+    initiativeId: context?.initiativeId || null,
+    reportName: context?.reportName || '',
+    attributes,
+    method,
+    rows,
+  });
+  return `TRD-${stableHash(seed)}`;
 }
 
 function buildTrendDescription(attributes, direction, magnitude, rowsEvaluated, skippedAttributes) {
@@ -324,6 +350,10 @@ export function validateTrendConfig(trendConfig, availableAttributes = []) {
   const source = trendConfig || {};
   const enabledCalc = source.enabledCalc !== false;
   const enabledDisplay = source.enabledDisplay !== false;
+  const method = ['delta_halves', 'linear_slope'].includes(source.method) ? source.method : 'delta_halves';
+  const thresholdPct = Number.isFinite(Number(source.thresholdPct))
+    ? Math.max(0, Math.min(100, Number(source.thresholdPct)))
+    : 2;
   const rawVariables = Array.isArray(source.variables) ? source.variables : [];
   const cleanedVariables = [];
   rawVariables.forEach((v) => {
@@ -365,11 +395,47 @@ export function validateTrendConfig(trendConfig, availableAttributes = []) {
       variables: normalizedVariables,
       enabledCalc,
       enabledDisplay,
+      method,
+      thresholdPct,
     },
   };
 }
 
-export function computeTrendData(filteredData, trendConfig) {
+function computeLinearSlopeTrend(values) {
+  const nums = values.map(toNumberIfPossible).filter((n) => n !== null);
+  if (nums.length < 4) return null;
+
+  const n = nums.length;
+  const xMean = (n - 1) / 2;
+  const yMean = average(nums);
+  if (yMean === null) return null;
+
+  let numerator = 0;
+  let denominator = 0;
+  for (let i = 0; i < n; i++) {
+    const xDiff = i - xMean;
+    numerator += xDiff * (nums[i] - yMean);
+    denominator += xDiff * xDiff;
+  }
+  if (denominator === 0) return null;
+
+  const slope = numerator / denominator;
+  const denom = Math.max(Math.abs(yMean), 1);
+  const signedChangePct = (slope / denom) * 100 * n;
+  return {
+    signedChangePct,
+    magnitudePct: Math.abs(signedChangePct),
+    method: 'linear_slope',
+  };
+}
+
+function computeConfidenceScore(rowCount, skipped, totalVars) {
+  const coverage = totalVars > 0 ? (totalVars - skipped) / totalVars : 0;
+  const sampleFactor = Math.min(1, rowCount / 40);
+  return Math.round((coverage * 70 + sampleFactor * 30) * 100) / 100;
+}
+
+export function computeTrendData(filteredData, trendConfig, context = {}) {
   if (!trendConfig || trendConfig.enabledCalc === false) return [];
 
   const rows = Array.isArray(filteredData) ? filteredData : [];
@@ -378,10 +444,11 @@ export function computeTrendData(filteredData, trendConfig) {
 
   if (rows.length < 4) {
     return [{
-      trendId: createTrendId(),
+      trendId: createDeterministicTrendId(context, attributes, trendConfig.method, rows),
       attributes,
       direction: 'stable',
       magnitude: 0,
+      confidenceScore: 0,
       timePeriod: 'Current dataset',
       enabledDisplay: trendConfig.enabledDisplay !== false,
       enabledCalc: true,
@@ -397,7 +464,9 @@ export function computeTrendData(filteredData, trendConfig) {
       const key = getRowKeyByAttribute(row, attribute);
       return key ? row[key] : null;
     });
-    const numeric = computeNumericTrend(values);
+    const numeric = trendConfig.method === 'linear_slope'
+      ? computeLinearSlopeTrend(values)
+      : computeNumericTrend(values);
     if (numeric) {
       variableScores.push(numeric);
       return;
@@ -412,10 +481,11 @@ export function computeTrendData(filteredData, trendConfig) {
 
   if (variableScores.length === 0) {
     return [{
-      trendId: createTrendId(),
+      trendId: createDeterministicTrendId(context, attributes, trendConfig.method, rows),
       attributes,
       direction: 'stable',
       magnitude: 0,
+      confidenceScore: 0,
       timePeriod: 'Current dataset',
       enabledDisplay: trendConfig.enabledDisplay !== false,
       enabledCalc: true,
@@ -425,14 +495,17 @@ export function computeTrendData(filteredData, trendConfig) {
 
   const avgSigned = average(variableScores.map((v) => v.signedChangePct)) || 0;
   const avgMagnitude = average(variableScores.map((v) => v.magnitudePct)) || 0;
-  const direction = getDirectionFromScore(avgSigned);
+  const threshold = Number.isFinite(trendConfig.thresholdPct) ? trendConfig.thresholdPct : 2;
+  const direction = avgSigned > threshold ? 'up' : avgSigned < -threshold ? 'down' : 'stable';
   const magnitude = Math.min(100, Math.round(avgMagnitude * 10) / 10);
+  const confidenceScore = computeConfidenceScore(rows.length, skipped, attributes.length);
 
   return [{
-    trendId: createTrendId(),
+    trendId: createDeterministicTrendId(context, attributes, trendConfig.method, rows),
     attributes,
     direction,
     magnitude,
+    confidenceScore,
     timePeriod: 'Current dataset',
     enabledDisplay: trendConfig.enabledDisplay !== false,
     enabledCalc: true,

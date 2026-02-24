@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import ReportDashboard from '@/components/ReportDashboard';
 import { getInitiatives, getReportData, getTrendData } from '@/lib/data-service';
+import { normalizeSnapshot } from '@/lib/report-snapshot';
 
 export default function ReportViewPage() {
   const { id } = useParams();
@@ -46,22 +47,24 @@ export default function ReportViewPage() {
         const initiative = initiatives.find(i => i.id === row.initiative_id) || null;
         setSelectedInitiative(initiative);
 
-        if (parsed && parsed.version) {
+        const normalized = normalizeSnapshot(parsed);
+        if (normalized) {
           // ── New snapshot format ──
           // Shape the snapshot results into the format ReportDashboard expects
-          const results = parsed.results;
+          const results = normalized.results;
           const shaped = {
             reportId: results.reportId,
-            initiativeId: parsed.config.initiativeId,
+            initiativeId: normalized.config.initiativeId,
             initiativeName: results.initiativeName,
             generatedDate: results.generatedDate,
             summary: results.summary,
             chartData: results.chartData,
             tableData: results.filteredTableData,
+            explainability: results.explainability,
           };
           setReportData(shaped);
           setTrendData(results.trendData || []);
-          setSnapshotConfig(parsed.config);
+          setSnapshotConfig(normalized.config);
         } else {
           // ── Legacy format — load from static JSON ──
           const data = await getReportData(row.initiative_id);
@@ -124,7 +127,8 @@ export default function ReportViewPage() {
           {hasTrendVariables && (
             <div>
               <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Trends: </span>
-              Variables ({trendConfig.variables.join(', ')}), display {trendConfig.enabledDisplay === false ? 'off' : 'on'}
+              Variables ({trendConfig.variables.join(', ')}), method {trendConfig.method || 'delta_halves'}, threshold {trendConfig.thresholdPct ?? 2}%,
+              display {trendConfig.enabledDisplay === false ? 'off' : 'on'}
             </div>
           )}
         </div>
