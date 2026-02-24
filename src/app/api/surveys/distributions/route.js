@@ -1,6 +1,13 @@
 import db, { initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
+function toLocalYyyyMmDd(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // POST - Create a new survey distribution
 export async function POST(request) {
   try {
@@ -52,7 +59,7 @@ export async function POST(request) {
     }
 
     // --- Compute initial status based on dates ---
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = toLocalYyyyMmDd(today);
     let status = 'pending';
     if (start_date <= todayStr && end_date >= todayStr) {
       status = 'active';
@@ -97,7 +104,7 @@ export async function GET() {
       SELECT * FROM survey_distribution ORDER BY created_at DESC
     `).all();
 
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = toLocalYyyyMmDd(new Date()); // YYYY-MM-DD
 
     const distributions = rows.map((row) => {
       // Auto-compute status based on current date
