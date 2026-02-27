@@ -55,16 +55,12 @@ export async function POST(request) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
-    // Insert new form (survey template)
+    // Prepare all statements
     const now = new Date().toISOString();
     const insertForm = db.prepare(`
       INSERT INTO form (initiative_id, form_name, description, created_at, updated_at, updated_by_user_id, is_published)
       VALUES (?, ?, ?, ?, ?, NULL, 1)
     `);
-    const result = insertForm.run(1, title, description || '', now, now);
-    const formId = result.lastInsertRowid;
-
-    // Insert questions
     const insertField = db.prepare(`
       INSERT INTO field (field_key, field_label, field_type, scope, is_filterable, is_required_default)
       VALUES (?, ?, ?, 'common', 0, 0)
@@ -78,49 +74,66 @@ export async function POST(request) {
       VALUES (?, ?, ?, ?)
     `);
 
-    let displayOrder = 0;
-    const questionObjs = [];
-    for (const q of questions) {
-      const textObj = typeof q === 'object' && q.text ? q.text : q;
-      const fieldKey = `${title}_${displayOrder}_${Date.now()}`;
-      const fieldLabel = textObj.question || '';
-      const fieldType = textObj.type || 'text';
-      const required = textObj.required ? 1 : 0;
-      const helpText = textObj.help_text || null;
-      // Insert field
-      const fieldResult = insertField.run(fieldKey, fieldLabel, fieldType);
-      const fieldId = fieldResult.lastInsertRowid;
-      // Insert form_field
-      insertFormField.run(formId, fieldId, displayOrder, required, helpText);
-      // Insert options if present
-      if (textObj.options && Array.isArray(textObj.options)) {
-        textObj.options.forEach((opt, idx) => {
-          insertOption.run(fieldId, opt, opt, idx);
-        });
-      }
-      questionObjs.push({
-        id: fieldId,
-        text: {
-          question: fieldLabel,
-          type: fieldType,
-          required: !!required,
-          ...(textObj.options ? { options: textObj.options } : {}),
-          ...(helpText ? { help_text: helpText } : {})
-        }
-      });
-      displayOrder++;
-    }
+    // Use transaction to ensure atomicity
+    const createSurvey = db.transaction(() => {
+      // Insert new form (survey template)
+      const result = insertForm.run(1, title, description || '', now, now);
+      const formId = result.lastInsertRowid;
 
-    const newSurvey = {
-      id: formId,
-      title,
-      description: description || '',
-      questions: questionObjs,
-      createdAt: now,
-      published: true
-    };
+      let displayOrder = 0;
+      const questionObjs = [];
+
+      // Insert questions
+      for (const q of questions) {
+        const textObj = typeof q === 'object' && q.text ? q.text : q;
+        const fieldKey = `${title}_${displayOrder}_${Date.now()}`;
+        const fieldLabel = textObj.question || '';
+        const fieldType = textObj.type || 'text';
+        const required = textObj.required ? 1 : 0;
+        const helpText = textObj.help_text || null;
+
+        // Insert field
+        const fieldResult = insertField.run(fieldKey, fieldLabel, fieldType);
+        const fieldId = fieldResult.lastInsertRowid;
+
+        // Insert form_field
+        insertFormField.run(formId, fieldId, displayOrder, required, helpText);
+
+        // Insert options if present
+        if (textObj.options && Array.isArray(textObj.options)) {
+          textObj.options.forEach((opt, idx) => {
+            insertOption.run(fieldId, opt, opt, idx);
+          });
+        }
+
+        questionObjs.push({
+          id: fieldId,
+          text: {
+            question: fieldLabel,
+            type: fieldType,
+            required: !!required,
+            ...(textObj.options ? { options: textObj.options } : {}),
+            ...(helpText ? { help_text: helpText } : {})
+          }
+        });
+        displayOrder++;
+      }
+
+      return {
+        id: formId,
+        title,
+        description: description || '',
+        questions: questionObjs,
+        createdAt: now,
+        published: true
+      };
+    });
+
+    // Execute the transaction
+    const newSurvey = createSurvey();
     return new Response(JSON.stringify(newSurvey), { status: 201, headers: { "Content-Type": "application/json" } });
   } catch (err) {
+    console.error('[surveys/templates POST] Error:', err);
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }

@@ -22,6 +22,112 @@ db.pragma('foreign_keys = ON');
 let _initialized = false;
 
 /**
+ * Migration: Add missing columns to form table
+ */
+function migrationAddFormColumns() {
+  try {
+    db.exec(`ALTER TABLE form ADD COLUMN description TEXT;`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+
+  try {
+    db.exec(`ALTER TABLE form ADD COLUMN is_published INTEGER NOT NULL DEFAULT 0;`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+}
+
+/**
+ * Migration: Fix field table to allow 'choice' field type
+ *
+ * The existing schema has a CHECK constraint on field_type that doesn't include 'choice'.
+ * This migration recreates the field table with the correct constraint.
+ */
+function migrationFixFieldTableConstraint() {
+  try {
+    // Check if field table exists
+    const fieldTableExists = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='field'"
+    ).get();
+
+    if (!fieldTableExists) return; // Table doesn't exist yet, will be created normally
+
+    // Query the CREATE TABLE statement to see what the current constraint is
+    const fieldTableDef = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='field'"
+    ).get();
+
+    if (!fieldTableDef || !fieldTableDef.sql) return;
+
+    // Check if 'choice' is already in the constraint
+    if (fieldTableDef.sql.includes("'choice'")) {
+      console.log('[db] Field table already has correct constraint');
+      return;
+    }
+
+    // 'choice' is not in the constraint, need to recreate the table
+    console.log('[db] Fixing field table CHECK constraint to include choice...');
+
+    // First, clean up any leftover backup tables
+    try {
+      db.exec('DROP TABLE IF EXISTS field_backup;');
+    } catch (e) {
+      // Ignore
+    }
+
+    db.pragma('foreign_keys = OFF');
+    try {
+      db.exec(`
+        BEGIN TRANSACTION;
+
+        ALTER TABLE field RENAME TO field_backup;
+
+        CREATE TABLE field (
+          field_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          field_key TEXT NOT NULL UNIQUE,
+          field_label TEXT NOT NULL,
+          field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice')),
+          scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
+          initiative_id INTEGER REFERENCES initiative(initiative_id),
+          is_filterable INTEGER NOT NULL DEFAULT 0,
+          is_required_default INTEGER NOT NULL DEFAULT 0
+        );
+
+        INSERT INTO field (field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default)
+        SELECT field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default
+        FROM field_backup;
+
+        DROP TABLE field_backup;
+
+        COMMIT;
+      `);
+      console.log('[db] ✓ Field table fixed with choice constraint');
+    } catch (migrationError) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (e) {
+        // Ignore
+      }
+      throw migrationError;
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
+  } catch (e) {
+    try {
+      db.pragma('foreign_keys = ON');
+    } catch (e2) {
+      // Ignore
+    }
+    console.error('[db] Migration error:', e.message);
+    // Don't re-throw - allow app to continue
+  }
+}
+
+// Initialize database schema on module load
+initializeDatabase();
+
+/**
  * Create all tables, indexes, and seed data if they don't already exist.
  * Covers the full ASRS schema (design doc) plus the legacy survey tables.
  * Safe to call multiple times — the first successful call sets the flag.
@@ -29,7 +135,12 @@ let _initialized = false;
 function initializeDatabase() {
   if (_initialized) return;
 
-  // ── Design-doc tables ──────────────────────────────────
+  try {
+    // ── Migrations for existing databases ──────────────────────────────
+    migrationAddFormColumns();
+    migrationFixFieldTableConstraint();
+
+    // ── Design-doc tables ──────────────────────────────────
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_type (
@@ -526,8 +637,15 @@ function initializeDatabase() {
     insertUser.run('Test', 'Staff', 'staff@test.com', 'staff123', staffType.user_type_id);
   }
 
-  _initialized = true;
-  console.log('[db] SQLite database initialized at', DB_PATH);
+    _initialized = true;
+    console.log('[db] SQLite database initialized at', DB_PATH);
+  } catch (err) {
+    console.error('[db] ===== CRITICAL ERROR DURING DATABASE INITIALIZATION =====');
+    console.error('[db] Error:', err.message);
+    console.error('[db] Stack:', err.stack);
+    // Mark as initialized anyway to prevent infinite retry loops on startup
+    _initialized = true;
+  }
 }
 
 export { db, initializeDatabase };

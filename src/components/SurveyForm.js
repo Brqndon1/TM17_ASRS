@@ -123,7 +123,7 @@ export default function SurveyForm() {
                   <input value={q.question} onChange={(e) => updateQuestion(i, 'question', e.target.value)} required placeholder={`Enter question ${i + 1}`} style={{ flex: '1 1 60%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem' }} />
                   <select value={q.type} onChange={(e) => updateQuestion(i, 'type', e.target.value)} style={{ flex: '1 1 35%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem', cursor: 'pointer' }}>
                     <option value="text">Text Response</option>
-                    <option value="numeric">Numeric</option>
+                    <option value="number">Numeric</option>
                     <option value="choice">Multiple Choice</option>
                   </select>
                 </div>
@@ -175,7 +175,7 @@ export default function SurveyForm() {
                 <div key={i} style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
                   <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{q.question}{q.required ? ' *' : ''}</div>
                   {q.type === 'text' && <input disabled placeholder="Text response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
-                  {q.type === 'numeric' && <input disabled type="number" placeholder="Numeric response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'number' && <input disabled type="number" placeholder="Numeric response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
                   {q.type === 'choice' && q.options && (
                     <div>
                       {q.options.filter(o => o && o.trim()).map((opt, oIdx) => (
