@@ -8,37 +8,44 @@ const routes = [
     href: '/initiative-creation',
     label: 'Initiative Creation',
     description: 'Create and configure new ASRS initiatives.',
+    requiresAuth: true,
   },
   {
     href: '/form-creation',
     label: 'Form Creation',
     description: 'Build and configure survey forms for initiatives.',
+    requiresAuth: true,
   },
   {
     href: '/survey',
     label: 'Survey',
     description: 'Fill out and submit surveys.',
+    // No requiresAuth — publicly accessible
   },
   {
     href: '/report-creation',
     label: 'Report Creation',
     description: 'Generate reports from collected survey data.',
+    requiresAuth: true,
   },
   {
     href: '/reporting',
     label: 'Reporting',
     description: 'View published reports and dashboards.',
+    requiresAuth: true,
   },
   {
     href: '/manage-reports',
     label: 'Manage Reports',
     description: 'Add, update, delete, and reorder the report library.',
+    requiresAuth: true,
     staffOnly: true,
   },
   {
     href: '/goals',
     label: 'Goals & Scoring',
     description: 'Set initiative goals with target metrics and scoring criteria.',
+    requiresAuth: true,
     adminOnly: true,
   },
   {
@@ -73,6 +80,9 @@ export default function Home() {
     }
     if (route.staffOnly) {
       return isLoggedIn && isStaff;
+    }
+    if (route.requiresAuth) {
+      return isLoggedIn;
     }
     return true;
   });
