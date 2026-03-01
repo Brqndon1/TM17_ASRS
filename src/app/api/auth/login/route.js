@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * LOGIN API — src/app/api/auth/login/route.js
+ * ============================================================================
+ * Updated to block users who haven't verified their email yet.
+ * ============================================================================
+ */
+
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
 
@@ -14,18 +22,26 @@ export async function POST(request) {
       );
     }
 
-    // Check if user exists with this email and password
+    // Fetch user by email first (so we can give a specific unverified error)
     const user = db.prepare(`
       SELECT u.*, ut.type as user_type
       FROM user u
       LEFT JOIN user_type ut ON u.user_type_id = ut.user_type_id
-      WHERE u.email = ? AND u.password = ?
-    `).get(email, password);
+      WHERE u.email = ?
+    `).get(email);
 
-    if (!user) {
+    if (!user || user.password !== password) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
+      );
+    }
+
+    // Block login for unverified users
+    if (!user.verified) {
+      return NextResponse.json(
+        { error: 'Please verify your email before logging in. Check your inbox for the verification link.' },
+        { status: 403 }
       );
     }
 
@@ -35,8 +51,8 @@ export async function POST(request) {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        user_type: user.user_type
-      }
+        user_type: user.user_type,
+      },
     });
 
   } catch (error) {
