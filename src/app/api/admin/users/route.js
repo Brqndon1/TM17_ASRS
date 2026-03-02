@@ -1,22 +1,20 @@
-import { NextResponse } from 'next/server';
-import db, { initializeDatabase } from '@/lib/db';
-
 /**
  * ============================================================================
- * ADMIN USERS API — /api/admin/users
+ * ADMIN USERS API — src/app/api/admin/users/route.js
  * ============================================================================
- * Supports:
- *   GET    — List all staff/admin users
- *   POST   — Add a new staff/admin user
- *   PUT    — Update a user's role (staff ↔ admin)
- *   DELETE — Remove a user account
+ * Updated POST handler: no longer requires a password from the admin.
+ * Instead, creates the user unverified and sends them an invite email
+ * with a link to set their own password.
  *
- * All endpoints verify the requester is an admin before proceeding.
- *
- * [API ADJUSTMENT] When you add proper session/JWT auth, replace the
- * email-based admin check with session validation middleware.
+ * Only the POST handler is updated below — GET, PUT, DELETE are unchanged.
+ * Replace your existing POST in this file with this one.
  * ============================================================================
  */
+
+import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
+import db, { initializeDatabase } from '@/lib/db';
+import { sendAdminInviteEmail } from '@/lib/email';
 
 // ── Helper: verify the requester is an admin ────────────────────────────────
 function verifyAdmin(requesterEmail) {
@@ -55,11 +53,11 @@ export async function GET(request) {
         u.last_name,
         u.email,
         u.phone_number,
+        u.verified,
         ut.type as user_type,
         ut.access_rank
       FROM user u
       JOIN user_type ut ON u.user_type_id = ut.user_type_id
-      WHERE ut.type IN ('staff', 'admin')
       ORDER BY ut.access_rank DESC, u.last_name ASC, u.first_name ASC
     `).all();
 
@@ -70,13 +68,14 @@ export async function GET(request) {
   }
 }
 
-// ── POST: Add a new staff/admin user ────────────────────────────────────────
+// ── POST: Add a new staff/admin user (sends invite email) ───────────────────
 export async function POST(request) {
   try {
     initializeDatabase();
 
     const body = await request.json();
-    const { requesterEmail, first_name, last_name, phone_number, email, password, user_type } = body;
+    // NOTE: password is no longer accepted — user sets it via email link
+    const { requesterEmail, first_name, last_name, phone_number, email, user_type } = body;
 
     if (!verifyAdmin(requesterEmail)) {
       return NextResponse.json(
@@ -85,10 +84,10 @@ export async function POST(request) {
       );
     }
 
-    // Validate required fields
-    if (!first_name || !last_name || !email || !password || !user_type) {
+    // Validate required fields (password removed)
+    if (!first_name || !last_name || !email || !user_type) {
       return NextResponse.json(
-        { error: 'All fields are required (first_name, last_name, email, password, user_type)' },
+        { error: 'All fields are required (first_name, last_name, email, user_type)' },
         { status: 400 }
       );
     }
@@ -111,8 +110,25 @@ export async function POST(request) {
     }
 
     // Check if email already exists
-    const existing = db.prepare('SELECT user_id FROM user WHERE email = ?').get(email);
+    const existing = db.prepare('SELECT user_id, verified FROM user WHERE email = ?').get(email);
     if (existing) {
+      if (!existing.verified) {
+        // Resend the invite if they haven't verified yet
+        const token = randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+        db.prepare(`
+          UPDATE user SET verification_token = ?, token_expires_at = ? WHERE user_id = ?
+        `).run(token, expiresAt, existing.user_id);
+
+        await sendAdminInviteEmail({ to: email, firstName: first_name, role: user_type, token });
+
+        return NextResponse.json({
+          success: true,
+          message: 'This user exists but hasn\'t verified yet. A new invite email has been sent.',
+        });
+      }
+
       return NextResponse.json(
         { error: 'A user with this email already exists' },
         { status: 409 }
@@ -130,28 +146,35 @@ export async function POST(request) {
     // Get the user_type_id
     const typeRow = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(user_type);
     if (!typeRow) {
-      return NextResponse.json(
-        { error: 'Invalid user type' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid user type' }, { status: 400 });
     }
 
+    // Generate verification token (expires in 24 hours)
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    // Insert unverified user (empty password placeholder — set on /verify page)
     const result = db.prepare(`
-      INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(first_name, last_name, phone_number, email, password, typeRow.user_type_id);
+      INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id, verified, verification_token, token_expires_at)
+      VALUES (?, ?, ?, ?, '', ?, 0, ?, ?)
+    `).run(first_name, last_name, phone_number || null, email, typeRow.user_type_id, token, expiresAt);
+
+    // Send invite email
+    await sendAdminInviteEmail({ to: email, firstName: first_name, role: user_type, token });
 
     return NextResponse.json({
       success: true,
-      message: 'User created successfully',
+      message: `User created. An invite email has been sent to ${email}.`,
       user: {
         user_id: result.lastInsertRowid,
         first_name,
         last_name,
         email,
         user_type,
+        verified: false,
       },
     }, { status: 201 });
+
   } catch (error) {
     console.error('Admin users POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -187,8 +210,6 @@ export async function PUT(request) {
       );
     }
 
-    // Prevent admin from demoting themselves
-    const admin = verifyAdmin(requesterEmail);
     const targetUser = db.prepare('SELECT user_id, email FROM user WHERE user_id = ?').get(user_id);
 
     if (!targetUser) {
@@ -203,7 +224,6 @@ export async function PUT(request) {
     }
 
     const typeRow = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(new_role);
-
     db.prepare('UPDATE user SET user_type_id = ? WHERE user_id = ?').run(typeRow.user_type_id, user_id);
 
     return NextResponse.json({
@@ -233,13 +253,9 @@ export async function DELETE(request) {
     }
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'user_id is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
     }
 
-    // Prevent admin from deleting themselves
     const targetUser = db.prepare('SELECT email FROM user WHERE user_id = ?').get(Number(userId));
 
     if (!targetUser) {

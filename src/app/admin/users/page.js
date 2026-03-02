@@ -17,14 +17,13 @@ export default function AdminUsersPage() {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // Add user form state
+  // Add user form state (password removed — user sets it via email link)
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({
     first_name: '',
     last_name: '',
     phone_number: '',
     email: '',
-    password: '',
     user_type: 'staff',
   });
   const [addLoading, setAddLoading] = useState(false);
@@ -124,30 +123,8 @@ export default function AdminUsersPage() {
     setAddError('');
     setAddLoading(true);
 
-    if (addForm.password.length < 6) {
-      setAddError('Password must be at least 6 characters');
-      setAddLoading(false);
-      return;
-    }
-
-    if (!/[a-zA-Z]/.test(addForm.password)) {
-      setAddError('Password must contain at least 1 letter');
-      setAddLoading(false);
-      return;
-    }
-    if (!/[0-9]/.test(addForm.password)) {
-      setAddError('Password must contain at least 1 number');
-      setAddLoading(false);
-      return;
-    }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(addForm.password)) {
-      setAddError('Password must contain at least 1 special character');
-      setAddLoading(false);
-      return;
-    }
-
     // Validate phone number is 10 digits
-    if (addForm.phone_number.replace(/\D/g, '').length !== 10) {
+    if (addForm.phone_number && addForm.phone_number.replace(/\D/g, '').length !== 10) {
       setAddError('Phone number must be 10 digits');
       setAddLoading(false);
       return;
@@ -164,9 +141,9 @@ export default function AdminUsersPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        setSuccessMsg(`${addForm.first_name} ${addForm.last_name} added as ${addForm.user_type}`);
+        setSuccessMsg(`Invite sent to ${addForm.email} — they'll set their own password via email.`);
         setShowAddForm(false);
-        setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', password: '', user_type: 'staff' });
+        setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', user_type: 'staff' });
         fetchUsers();
       } else {
         setAddError(data.error || 'Failed to add user');
@@ -319,6 +296,7 @@ export default function AdminUsersPage() {
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Phone</th>
                     <th style={thStyle}>Role</th>
+                    <th style={thStyle}>Status</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -350,9 +328,15 @@ export default function AdminUsersPage() {
                         <td style={tdStyle}>
                           <span style={getRoleBadgeStyle(u.user_type)}>{u.user_type}</span>
                         </td>
+                        <td style={tdStyle}>
+                          {u.verified ? (
+                            <span style={{ color: '#2e7d32', fontSize: '0.8rem', fontWeight: '600' }}>✓ Verified</span>
+                          ) : (
+                            <span style={{ color: '#e65100', fontSize: '0.8rem', fontWeight: '600' }}>⏳ Pending</span>
+                          )}
+                        </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            {/* Role buttons - show options the user ISN'T currently */}
                             {u.user_type !== 'admin' && (
                               <button
                                 onClick={() => handleRoleChange(u.user_id, 'admin')}
@@ -401,8 +385,6 @@ export default function AdminUsersPage() {
                                 → Public
                               </button>
                             )}
-
-                            {/* Delete button */}
                             <button
                               onClick={() => setDeleteTarget(u)}
                               disabled={isSelf}
@@ -431,14 +413,8 @@ export default function AdminUsersPage() {
 
       {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}
       {deleteTarget && (
-        <div
-          style={overlayStyle}
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div
-            style={modalStyle}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.5rem 0' }}>
               Confirm Deletion
             </h2>
@@ -446,11 +422,8 @@ export default function AdminUsersPage() {
               Are you sure you want to delete this user? This action cannot be undone.
             </p>
             <div style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '8px',
-              marginBottom: '1.5rem',
-              fontSize: '0.9rem',
+              padding: '0.75rem 1rem', backgroundColor: '#f8f9fa',
+              borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem',
             }}>
               <strong>{deleteTarget.first_name} {deleteTarget.last_name}</strong>
               <br />
@@ -463,14 +436,9 @@ export default function AdminUsersPage() {
               <button
                 onClick={() => setDeleteTarget(null)}
                 style={{
-                  padding: '0.5rem 1.25rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'white',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
+                  padding: '0.5rem 1.25rem', borderRadius: '8px',
+                  border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
+                  color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -478,14 +446,9 @@ export default function AdminUsersPage() {
               <button
                 onClick={handleDelete}
                 style={{
-                  padding: '0.5rem 1.25rem',
-                  borderRadius: '8px',
-                  border: '1px solid #ef5350',
-                  backgroundColor: '#ef5350',
-                  color: 'white',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
+                  padding: '0.5rem 1.25rem', borderRadius: '8px',
+                  border: '1px solid #ef5350', backgroundColor: '#ef5350',
+                  color: 'white', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
                 }}
               >
                 Delete User
@@ -497,19 +460,13 @@ export default function AdminUsersPage() {
 
       {/* ── Add User Modal ────────────────────────────────────────────────── */}
       {showAddForm && (
-        <div
-          style={overlayStyle}
-          onClick={() => setShowAddForm(false)}
-        >
-          <div
-            style={{ ...modalStyle, maxWidth: '480px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={overlayStyle} onClick={() => setShowAddForm(false)}>
+          <div style={{ ...modalStyle, maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.25rem 0' }}>
               Add New User
             </h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-              Create a new staff or admin account.
+              An invite email will be sent so they can set their own password.
             </p>
 
             {addError && (
@@ -549,14 +506,15 @@ export default function AdminUsersPage() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Phone Number</label>
+                <label style={labelStyle}>Phone Number <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}></span></label>
                 <input
                   type="tel"
                   value={addForm.phone_number}
                   onChange={(e) => setAddForm({ ...addForm, phone_number: e.target.value })}
-                  required
                   disabled={addLoading}
+                  required
                   maxLength={10}
+                  placeholder="10 digits"
                   style={inputStyle}
                 />
               </div>
@@ -569,19 +527,6 @@ export default function AdminUsersPage() {
                   onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                   required
                   disabled={addLoading}
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Password</label>
-                <input
-                  type="password"
-                  value={addForm.password}
-                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                  required
-                  disabled={addLoading}
-                  placeholder="Min. 6 characters, 1 number, 1 special char"
                   style={inputStyle}
                 />
               </div>
@@ -605,9 +550,8 @@ export default function AdminUsersPage() {
                   onClick={() => setShowAddForm(false)}
                   style={{
                     padding: '0.5rem 1.25rem', borderRadius: '8px',
-                    border: '1px solid var(--color-bg-tertiary)',
-                    backgroundColor: 'white', color: 'var(--color-text-primary)',
-                    fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
+                    border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
+                    color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
                   }}
                 >
                   Cancel
@@ -622,7 +566,7 @@ export default function AdminUsersPage() {
                     cursor: addLoading ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {addLoading ? 'Creating...' : 'Add User'}
+                  {addLoading ? 'Sending invite...' : 'Send Invite'}
                 </button>
               </div>
             </form>
