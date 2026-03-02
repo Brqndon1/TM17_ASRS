@@ -347,10 +347,10 @@ export default function SurveyDistributionPage() {
               </div>
             </div>
 
-            {/* Recipient Emails */}
+            {/* Distribution Emails */}
             <div style={fieldGroupStyle}>
               <label style={labelStyle}>
-                Recipient Emails
+                Distribution Emails
               </label>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
                 Type an email and press <strong>Enter</strong> or <strong>comma</strong> to add it.
@@ -358,7 +358,7 @@ export default function SurveyDistributionPage() {
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input
                   type="email"
-                  placeholder="recipient@example.com"
+                  placeholder="email@example.com"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   onKeyDown={handleEmailKeyDown}
