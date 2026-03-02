@@ -19,6 +19,15 @@ export default function ReportingPage() {
   const [trendData, setTrendData] = useState([]);
   const [userRole, setUserRole] = useState('public');
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setUserRole(parsed.user_type || 'public');
+    }
+  }, []);
+
   const [noReport, setNoReport] = useState(false);
 
   const [reportMap, setReportMap] = useState({});
@@ -207,27 +216,44 @@ export default function ReportingPage() {
       <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
         {reportData && (
           <>
-            <div
-              className="asrs-card"
-              style={{
-                marginBottom: '1.5rem',
-                padding: '1rem 1.5rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-bg-tertiary)'
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>
-                Download Report
-              </div>
+            {(userRole === 'staff' || userRole === 'admin') && (
+              <div
+                className="asrs-card"
+                style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem 1.5rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-bg-tertiary)'
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>
+                  Download Report
+                </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
+                    <button
+                      key={format}
+                      onClick={() => handleDownload(format)}
+                      style={{
+                        padding: '0.5rem 0.9rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                        border: '1px solid var(--color-bg-tertiary)',
+                        backgroundColor: 'var(--color-bg-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {format.toUpperCase()}
+                    </button>
+                  ))}
+
                   <button
-                    key={format}
-                    onClick={() => handleDownload(format)}
+                    onClick={handleCreateShareableLink}
                     style={{
                       padding: '0.5rem 0.9rem',
                       fontSize: '0.9rem',
@@ -238,26 +264,11 @@ export default function ReportingPage() {
                       cursor: 'pointer'
                     }}
                   >
-                    {format.toUpperCase()}
+                    Create Shareable Link
                   </button>
-                ))}
-
-                <button
-                  onClick={handleCreateShareableLink}
-                  style={{
-                    padding: '0.5rem 0.9rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    borderRadius: '6px',
-                    border: '1px solid var(--color-bg-tertiary)',
-                    backgroundColor: 'var(--color-bg-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Create Shareable Link
-                </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <ReportDashboard
               reportData={reportData}
