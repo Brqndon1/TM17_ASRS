@@ -46,6 +46,8 @@ export default function ReportCreationPage() {
     expressions: [],
     sorts: [],
     trendConfig: getDefaultTrendConfig(),
+    startDate: '',
+    endDate: '',
   });
 
   // ---- UI STATE ----
@@ -113,6 +115,8 @@ export default function ReportCreationPage() {
           expressions: Array.isArray(parsedDraft.expressions) ? parsedDraft.expressions : [],
           sorts: Array.isArray(parsedDraft.sorts) ? parsedDraft.sorts : [],
           trendConfig: restoredTrend,
+          startDate: parsedDraft.startDate || '',
+          endDate: parsedDraft.endDate || '',
         }));
         setCurrentStep(Number.isFinite(parsedDraft.currentStep) ? Math.max(0, Math.min(TOTAL_STEPS - 1, parsedDraft.currentStep)) : 0);
       }
@@ -163,6 +167,8 @@ export default function ReportCreationPage() {
         expressions: reportConfig.expressions,
         sorts: reportConfig.sorts,
         trendConfig: reportConfig.trendConfig,
+        startDate: reportConfig.startDate,
+        endDate: reportConfig.endDate,
         currentStep,
         savedAt: new Date().toISOString(),
       };
@@ -273,6 +279,8 @@ export default function ReportCreationPage() {
         expressions: [],
         sorts: [],
         trendConfig: getDefaultTrendConfig(),
+        startDate: '',
+        endDate: '',
       });
       setSuccessMessage('Report generated and published to Reporting.');
       fetchReports();
