@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 
 const routes = [
@@ -8,44 +9,51 @@ const routes = [
     href: '/initiative-creation',
     label: 'Initiative Creation',
     description: 'Create and configure new ASRS initiatives.',
+    requiresAuth: true,
   },
   {
     href: '/form-creation',
     label: 'Form Creation',
     description: 'Build and configure survey forms for initiatives.',
+    requiresAuth: true,
   },
   {
     href: '/survey',
     label: 'Survey',
     description: 'Fill out and submit surveys.',
+    // No requiresAuth — publicly accessible
   },
   {
     href: '/report-creation',
     label: 'Report Creation',
     description: 'Generate reports from collected survey data.',
+    requiresAuth: true,
   },
   {
     href: '/reporting',
     label: 'Reporting',
     description: 'View published reports and dashboards.',
+    requiresAuth: true,
   },
   {
     href: '/manage-reports',
     label: 'Manage Reports',
     description: 'Add, update, delete, and reorder the report library.',
+    requiresAuth: true,
     staffOnly: true,
   },
   {
     href: '/goals',
     label: 'Goals & Scoring',
     description: 'Set initiative goals with target metrics and scoring criteria.',
+    requiresAuth: true,
     adminOnly: true,
   },
   {
     href: '/login',
     label: 'Login',
     description: 'Sign in to access staff and admin features.',
-    showOnlyWhenLoggedOut: true, // Only show this when not logged in
+    showOnlyWhenLoggedOut: true,
   },
 ];
 
@@ -53,6 +61,9 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
+  const [initiatives, setInitiatives] = useState([]);
+  const [selectedInitiative, setSelectedInitiative] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -62,6 +73,11 @@ export default function Home() {
       setIsAdmin(parsed.user_type === 'admin');
       setIsStaff(parsed.user_type === 'staff' || parsed.user_type === 'admin');
     }
+
+    fetch('/api/initiatives')
+      .then(res => res.json())
+      .then(data => setInitiatives(Array.isArray(data.initiatives) ? data.initiatives : []))
+      .catch(() => setInitiatives([]));
   }, []);
 
   const visibleRoutes = routes.filter(route => {
@@ -73,6 +89,9 @@ export default function Home() {
     }
     if (route.staffOnly) {
       return isLoggedIn && isStaff;
+    }
+    if (route.requiresAuth) {
+      return isLoggedIn;
     }
     return true;
   });
@@ -94,26 +113,27 @@ export default function Home() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: '1rem',
         }}>
-          {visibleRoutes.map(({ href, label, description }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{ textDecoration: 'none' }}
-            >
+          {visibleRoutes.map(({ href, label, description }) => {
+            const isSurvey = href === '/survey';
+            const cardContent = (
               <div
                 className="asrs-card"
                 style={{
-                  cursor: 'pointer',
+                  cursor: isSurvey ? 'default' : 'pointer',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   height: '100%',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                  if (!isSurvey) {
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '';
+                  if (!isSurvey) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '';
+                  }
                 }}
               >
                 <h2 style={{
@@ -131,9 +151,60 @@ export default function Home() {
                 }}>
                   {description}
                 </p>
+
+                {isSurvey && (
+                  <div style={{ marginTop: '1rem' }} onClick={e => e.preventDefault()}>
+                    <select
+                      value={selectedInitiative}
+                      onChange={e => setSelectedInitiative(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--color-border, #ccc)',
+                        backgroundColor: 'var(--color-bg-primary)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '0.85rem',
+                        marginBottom: '0.6rem',
+                      }}
+                    >
+                      <option value=''>— Select an initiative —</option>
+                      {initiatives.map(ini => (
+                        <option key={ini.id} value={ini.id}>{ini.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      disabled={!selectedInitiative}
+                      onClick={e => {
+                        e.preventDefault();
+                        if (selectedInitiative) router.push(`/survey?initiativeId=${selectedInitiative}`);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: selectedInitiative
+                          ? 'var(--color-primary, #2563eb)'
+                          : 'var(--color-border, #ccc)',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        cursor: selectedInitiative ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      Start Survey
+                    </button>
+                  </div>
+                )}
               </div>
-            </Link>
-          ))}
+            );
+
+            return (
+              <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+                {cardContent}
+              </Link>
+            );
+          })}
         </div>
       </main>
     </div>
