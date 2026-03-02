@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 
 const routes = [
@@ -62,6 +63,7 @@ export default function Home() {
   const [isStaff, setIsStaff] = useState(false);
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -108,7 +110,7 @@ export default function Home() {
         </div>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 220px))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: '1rem',
         }}>
           {visibleRoutes.map(({ href, label, description }) => {
@@ -171,29 +173,27 @@ export default function Home() {
                         <option key={ini.id} value={ini.id}>{ini.name}</option>
                       ))}
                     </select>
-                    <Link
-                      href={selectedInitiative ? `/survey?initiativeId=${selectedInitiative}` : '#'}
-                      style={{ textDecoration: 'none', display: 'block' }}
-                      onClick={e => { if (!selectedInitiative) e.preventDefault(); }}
+                    <button
+                      disabled={!selectedInitiative}
+                      onClick={e => {
+                        e.preventDefault();
+                        if (selectedInitiative) router.push(`/survey?initiativeId=${selectedInitiative}`);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: selectedInitiative
+                          ? 'var(--color-primary, #2563eb)'
+                          : 'var(--color-border, #ccc)',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        cursor: selectedInitiative ? 'pointer' : 'not-allowed',
+                      }}
                     >
-                      <button
-                        disabled={!selectedInitiative}
-                        style={{
-                          width: '100%',
-                          padding: '0.4rem 0.75rem',
-                          borderRadius: '6px',
-                          border: 'none',
-                          backgroundColor: selectedInitiative
-                            ? 'var(--color-primary, #2563eb)'
-                            : 'var(--color-border, #ccc)',
-                          color: '#fff',
-                          fontSize: '0.85rem',
-                          cursor: selectedInitiative ? 'pointer' : 'not-allowed',
-                        }}
-                      >
-                        Start Survey
-                      </button>
-                    </Link>
+                      Start Survey
+                    </button>
                   </div>
                 )}
               </div>
