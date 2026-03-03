@@ -156,7 +156,10 @@ function initializeDatabase() {
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
       phone_number TEXT,
-      user_type_id INTEGER REFERENCES user_type(user_type_id)
+      user_type_id INTEGER REFERENCES user_type(user_type_id),
+      verified INTEGER NOT NULL DEFAULT 0,
+      verification_token TEXT,
+      token_expires_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS initiative (
@@ -464,6 +467,9 @@ function initializeDatabase() {
   addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
   addColumnIfNotExists('initiative', 'summary_json TEXT');
   addColumnIfNotExists('initiative', 'chart_data_json TEXT');
+  addColumnIfNotExists('user', 'verified INTEGER NOT NULL DEFAULT 0');
+  addColumnIfNotExists('user', 'verification_token TEXT');
+  addColumnIfNotExists('user', 'token_expires_at TEXT');
 
   // Add deadline column to goals if it doesn't exist
   addColumnIfNotExists('initiative_goal', 'deadline TEXT');
@@ -628,7 +634,7 @@ function initializeDatabase() {
   const staffType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'staff'").get();
 
   const insertUser = db.prepare(
-    'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id, verified) VALUES (?, ?, ?, ?, ?, 1)'
   );
   if (adminType) {
     insertUser.run('Test', 'Admin', 'admin@test.com', 'admin123', adminType.user_type_id);
@@ -636,6 +642,15 @@ function initializeDatabase() {
   if (staffType) {
     insertUser.run('Test', 'Staff', 'staff@test.com', 'staff123', staffType.user_type_id);
   }
+
+  // Ensure seeded dev test accounts can log in without email verification.
+  db.prepare(`
+    UPDATE user
+    SET verified = 1,
+        verification_token = NULL,
+        token_expires_at = NULL
+    WHERE email IN ('admin@test.com', 'staff@test.com')
+  `).run();
 
     _initialized = true;
     console.log('[db] SQLite database initialized at', DB_PATH);
