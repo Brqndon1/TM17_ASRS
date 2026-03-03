@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const SURVEY_FORM_DRAFT_KEY = "surveyTemplateDraft:v1";
 
 export default function SurveyForm() {
   const [title, setTitle] = useState("");
@@ -7,6 +9,48 @@ export default function SurveyForm() {
   const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""], required: false }]);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const hasLoadedDraft = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const rawDraft = window.localStorage.getItem(SURVEY_FORM_DRAFT_KEY);
+      if (!rawDraft) {
+        hasLoadedDraft.current = true;
+        return;
+      }
+
+      const parsedDraft = JSON.parse(rawDraft);
+      if (parsedDraft && typeof parsedDraft === "object") {
+        setTitle(typeof parsedDraft.title === "string" ? parsedDraft.title : "");
+        setDescription(typeof parsedDraft.description === "string" ? parsedDraft.description : "");
+        if (Array.isArray(parsedDraft.questions) && parsedDraft.questions.length > 0) {
+          setQuestions(parsedDraft.questions);
+        }
+      }
+    } catch {
+      // Ignore invalid draft payloads and continue with empty form.
+    } finally {
+      hasLoadedDraft.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasLoadedDraft.current) return;
+
+    const timeout = setTimeout(() => {
+      const payload = {
+        title,
+        description,
+        questions,
+        savedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem(SURVEY_FORM_DRAFT_KEY, JSON.stringify(payload));
+    }, 600);
+
+    return () => clearTimeout(timeout);
+  }, [title, description, questions]);
 
   const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""], required: false }]);
   
@@ -83,6 +127,9 @@ export default function SurveyForm() {
       setTitle("");
       setDescription("");
       setQuestions([{ question: "", type: "text", options: [""], required: false }]);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(SURVEY_FORM_DRAFT_KEY);
+      }
     } catch (err) {
       alert("Error creating survey template: " + (err.message || err));
     } finally {
