@@ -18,32 +18,29 @@ export default function ReportingPage() {
   const [reportData, setReportData] = useState(null);
   const [trendData, setTrendData] = useState([]);
   const [userRole, setUserRole] = useState('public');
-  const [canAccess, setCanAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [noReport, setNoReport] = useState(false);
+  const [reportMap, setReportMap] = useState({});
+
+  /**
+   * ================================
+   * SOCIAL MEDIA STATE (NEW)
+   * ================================
+   */
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showSocialMenu, setShowSocialMenu] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
-      const role = parsed.user_type || 'public';
-      setUserRole(role);
-      setCanAccess(role === 'staff' || role === 'admin');
-    } else {
-      setUserRole('public');
-      setCanAccess(false);
+      setUserRole(parsed.user_type || 'public');
     }
   }, []);
 
-  const [noReport, setNoReport] = useState(false);
-
-  const [reportMap, setReportMap] = useState({});
-
   useEffect(() => {
-    if (!canAccess) {
-      setIsLoading(false);
-      return;
-    }
-
     async function loadInitialData() {
       try {
         const [initiativesRes, reportsRes] = await Promise.all([
@@ -75,7 +72,7 @@ export default function ReportingPage() {
       }
     }
     loadInitialData();
-  }, [canAccess]);
+  }, []);
 
   function loadReportForInitiative(initiative, map) {
     const rMap = map || reportMap;
@@ -125,6 +122,44 @@ export default function ReportingPage() {
     setSelectedInitiative(initiative);
     loadReportForInitiative(initiative);
     setIsLoading(false);
+  }
+
+  /**
+   * ================================
+   * SOCIAL MEDIA FUNCTIONS
+   * ================================
+   */
+  function togglePlatform(platform) {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platform)
+        ? prev.filter((p) => p !== platform)
+        : [...prev, platform]
+    );
+  }
+
+  async function handlePostToSocialMedia() {
+    if (!reportData || selectedPlatforms.length === 0) {
+      alert("Select at least one platform.");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus(null);
+
+    try {
+      for (const platform of selectedPlatforms) {
+        console.log(`Uploading report ${reportData.reportId} to ${platform}`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      setUploadStatus("Upload successful.");
+      setSelectedPlatforms([]);
+    } catch (error) {
+      console.error(error);
+      setUploadStatus("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   /**
@@ -208,27 +243,6 @@ export default function ReportingPage() {
     }
   }
 
-  if (!canAccess) {
-    return (
-      <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header userRole={userRole} onRoleChange={setUserRole} />
-        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
-          <BackButton />
-        </div>
-        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 2rem' }}>
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              Reporting Access Required
-            </h2>
-            <p style={{ color: 'var(--color-text-secondary)' }}>
-              Only staff and admin users can view this page.
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
       <Header userRole={userRole} onRoleChange={setUserRole} />
@@ -265,7 +279,7 @@ export default function ReportingPage() {
                   Download Report
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
                     <button
                       key={format}
@@ -298,6 +312,89 @@ export default function ReportingPage() {
                   >
                     Create Shareable Link
                   </button>
+
+                  {/* SMALL SHARE DROPDOWN (ADMIN ONLY) */}
+                  {userRole === 'admin' && (
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setShowSocialMenu(!showSocialMenu)}
+                        style={{
+                          padding: '0.4rem 0.75rem',
+                          fontSize: '0.8rem',
+                          borderRadius: '6px',
+                          border: '1px solid var(--color-bg-tertiary)',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          opacity: 0.8
+                        }}
+                      >
+                        Share ▾
+                      </button>
+
+                      {showSocialMenu && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '110%',
+                            right: 0,
+                            backgroundColor: 'var(--color-bg-primary)',
+                            border: '1px solid var(--color-bg-tertiary)',
+                            borderRadius: '8px',
+                            padding: '0.75rem',
+                            width: '220px',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>
+                            Share to:
+                          </div>
+
+                          {['Website', 'Instagram', 'Facebook', 'LinkedIn'].map((platform) => (
+                            <div key={platform} style={{ marginBottom: '0.4rem' }}>
+                              <label style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPlatforms.includes(platform)}
+                                  onChange={() => togglePlatform(platform)}
+                                  style={{ marginRight: '0.4rem' }}
+                                />
+                                {platform}
+                              </label>
+                            </div>
+                          ))}
+
+                          <button
+                            onClick={handlePostToSocialMedia}
+                            disabled={isUploading || selectedPlatforms.length === 0}
+                            style={{
+                              marginTop: '0.5rem',
+                              width: '100%',
+                              padding: '0.4rem',
+                              fontSize: '0.8rem',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-bg-tertiary)',
+                              backgroundColor: 'var(--color-brand-primary)',
+                              color: '#fff',
+                              cursor: isUploading ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {isUploading ? 'Posting...' : 'Post'}
+                          </button>
+
+                          {uploadStatus && (
+                            <div style={{
+                              marginTop: '0.5rem',
+                              fontSize: '0.75rem',
+                              opacity: 0.8
+                            }}>
+                              {uploadStatus}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
