@@ -56,37 +56,19 @@ export default function InitiativeCreationPage() {
     }
   }, []);
 
-  // Fetch categories on mount
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('/api/categories');
-        const data = await response.json();
-        if (response.ok) {
-          setCategories(data.categories || []);
-        }
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
-    fetchCategories();
-  }, []);
-
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedAttributes, setSelectedAttributes] = useState([]);
+  const [customAttributes, setCustomAttributes] = useState([]);
+  const [newAttribute, setNewAttribute] = useState('');
   const [addQuestions, setAddQuestions] = useState(false);
   const [questions, setQuestions] = useState(['']);
   const [status, setStatus] = useState('Active');
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const allAttributes = [...ATTRIBUTE_CATALOG, ...customAttributes];
 
   const handleAttributeToggle = (attribute) => {
     setSelectedAttributes((prev) =>
@@ -96,12 +78,22 @@ export default function InitiativeCreationPage() {
     );
   };
 
-  const handleCategoryToggle = (categoryId) => {
-    setSelectedCategories((prev) =>
-      prev.includes(categoryId)
-        ? prev.filter((c) => c !== categoryId)
-        : [...prev, categoryId]
+  const handleAddCustomAttribute = () => {
+    const trimmed = newAttribute.trim();
+    if (!trimmed) return;
+
+    const alreadyExists = allAttributes.some(
+      (attribute) => attribute.toLowerCase() === trimmed.toLowerCase()
     );
+    if (alreadyExists) {
+      setMessage('This attribute already exists.');
+      return;
+    }
+
+    setCustomAttributes((prev) => [...prev, trimmed]);
+    setSelectedAttributes((prev) => [...prev, trimmed]);
+    setNewAttribute('');
+    setMessage('');
   };
 
   const handleQuestionChange = (index, value) => {
@@ -155,32 +147,16 @@ export default function InitiativeCreationPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Link the initiative to selected categories
-        const initiativeId = data.initiative.initiative_id;
-        for (const categoryId of selectedCategories) {
-          try {
-            await fetch('/api/initiative-categories', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                initiative_id: initiativeId,
-                category_id: categoryId,
-              }),
-            });
-          } catch (error) {
-            console.error(`Error linking category ${categoryId}:`, error);
-          }
-        }
-
         setMessage('Initiative created successfully!');
         setName('');
         setDescription('');
         setSelectedAttributes([]);
+        setCustomAttributes([]);
+        setNewAttribute('');
         setAddQuestions(false);
         setQuestions(['']);
         setStatus('Active');
         setIsPublic(false);
-        setSelectedCategories([]);
         setTimeout(() => router.push('/'), 2000);
       } else {
         setMessage(`${data.error || 'Failed to create initiative'}`);
@@ -200,7 +176,7 @@ export default function InitiativeCreationPage() {
       <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
         <BackButton />
         
-        {userRole === 'admin' ? (
+        {(userRole === 'admin' || userRole === 'staff') ? (
           <>
             {/* Page Header */}
             <div style={{ marginBottom: '2rem' }}>
@@ -278,6 +254,29 @@ export default function InitiativeCreationPage() {
                   </span>
                 </h2>
 
+                {userRole === 'admin' && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={labelStyle}>Add Custom Attribute (Admin only)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={newAttribute}
+                        onChange={(e) => setNewAttribute(e.target.value)}
+                        placeholder="e.g., Mentor Participation"
+                        style={{ ...inputStyle, marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomAttribute}
+                        className="asrs-btn-secondary"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Add Attribute
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{
                   maxHeight: '240px',
                   overflowY: 'auto',
@@ -291,7 +290,7 @@ export default function InitiativeCreationPage() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                     gap: '0.25rem',
                   }}>
-                    {ATTRIBUTE_CATALOG.map((attribute) => {
+                    {allAttributes.map((attribute) => {
                       const isSelected = selectedAttributes.includes(attribute);
                       return (
                         <label
@@ -320,74 +319,6 @@ export default function InitiativeCreationPage() {
                     })}
                   </div>
                 </div>
-              </div>
-
-              {/* ── Categories ────────────────────────────── */}
-              <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
-                <h2 style={sectionHeadingStyle}>
-                  Categories
-                  <span style={{
-                    fontSize: '0.8rem',
-                    fontWeight: '400',
-                    color: 'var(--color-text-light)',
-                    marginLeft: '0.5rem',
-                  }}>
-                    {selectedCategories.length} selected
-                  </span>
-                </h2>
-
-                {loadingCategories ? (
-                  <div style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                    Loading categories...
-                  </div>
-                ) : categories.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                    No categories available. Create categories first.
-                  </div>
-                ) : (
-                  <div style={{
-                    maxHeight: '240px',
-                    overflowY: 'auto',
-                    border: '1px solid var(--color-bg-tertiary)',
-                    borderRadius: '8px',
-                    padding: '0.5rem',
-                    backgroundColor: 'var(--color-bg-primary)',
-                  }}>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '0.25rem',
-                    }}>
-                      {categories.map((category) => {
-                        const isSelected = selectedCategories.includes(category.category_id);
-                        return (
-                          <label
-                            key={category.category_id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              cursor: 'pointer',
-                              padding: '0.4rem 0.6rem',
-                              borderRadius: '6px',
-                              backgroundColor: isSelected ? 'var(--color-bg-secondary)' : 'transparent',
-                              border: isSelected ? '1px solid var(--color-bg-tertiary)' : '1px solid transparent',
-                              transition: 'all 0.15s ease',
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleCategoryToggle(category.category_id)}
-                              style={{ marginRight: '0.5rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
-                            />
-                            <span style={{ color: 'var(--color-text-primary)' }}>{category.category_name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* ── Settings ───────────────────────────────── */}
@@ -515,21 +446,6 @@ export default function InitiativeCreationPage() {
                 {isSubmitting ? 'Creating...' : 'Create Initiative'}
               </button>
 
-              {/* ── Manage Categories ──────────────────────── */}
-                <button
-                  type="button"
-                  onClick={() => router.push('/categories')}
-                  className="asrs-btn-primary"
-                  style={{
-                    marginTop: '1rem',
-                    width: '100%',
-                    padding: '0.75rem',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                  }}
-                >
-                  Manage initiative categories
-                </button>
             </form>
               
           </>

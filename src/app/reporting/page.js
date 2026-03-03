@@ -18,13 +18,19 @@ export default function ReportingPage() {
   const [reportData, setReportData] = useState(null);
   const [trendData, setTrendData] = useState([]);
   const [userRole, setUserRole] = useState('public');
+  const [canAccess, setCanAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
-      setUserRole(parsed.user_type || 'public');
+      const role = parsed.user_type || 'public';
+      setUserRole(role);
+      setCanAccess(role === 'staff' || role === 'admin');
+    } else {
+      setUserRole('public');
+      setCanAccess(false);
     }
   }, []);
 
@@ -33,6 +39,11 @@ export default function ReportingPage() {
   const [reportMap, setReportMap] = useState({});
 
   useEffect(() => {
+    if (!canAccess) {
+      setIsLoading(false);
+      return;
+    }
+
     async function loadInitialData() {
       try {
         const [initiativesRes, reportsRes] = await Promise.all([
@@ -64,7 +75,7 @@ export default function ReportingPage() {
       }
     }
     loadInitialData();
-  }, []);
+  }, [canAccess]);
 
   function loadReportForInitiative(initiative, map) {
     const rMap = map || reportMap;
@@ -195,6 +206,27 @@ export default function ReportingPage() {
       link.download = `${fileName}.xlsx`;
       link.click();
     }
+  }
+
+  if (!canAccess) {
+    return (
+      <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+        <Header userRole={userRole} onRoleChange={setUserRole} />
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
+          <BackButton />
+        </div>
+        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 2rem' }}>
+          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              Reporting Access Required
+            </h2>
+            <p style={{ color: 'var(--color-text-secondary)' }}>
+              Only staff and admin users can view this page.
+            </p>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
