@@ -20,15 +20,24 @@ import { useState } from 'react';
 export default function SharePanel({ reportId }) {
   const [showShareMenu, setShowShareMenu] = useState(false);
 
-  /**
-   * The base URL where reports will be publicly accessible.
-   * [API ADJUSTMENT] Replace this with your actual deployed domain:
-   *   const reportUrl = `https://www.asrssuccess.org/reports/${reportId}`;
-   */
-  const reportUrl = `https://www.asrssuccess.org/reports/${reportId}`;
+  function getReportUrl() {
+    const envBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '');
+    const originBaseUrl = typeof window !== 'undefined'
+      ? window.location.origin.replace(/\/+$/, '')
+      : '';
+    const baseUrl = envBaseUrl || originBaseUrl;
+
+    if (!baseUrl) {
+      return `/reporting?reportId=${reportId}`;
+    }
+
+    return `${baseUrl}/reporting?reportId=${reportId}`;
+  }
 
   /** handleShare — Opens a share action based on the selected platform. */
   function handleShare(platform) {
+    const reportUrl = getReportUrl();
+
     switch (platform) {
       case 'facebook':
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(reportUrl)}`, '_blank');
@@ -43,11 +52,15 @@ export default function SharePanel({ reportId }) {
       case 'embed':
         // Copy embed code to clipboard
         const embedCode = `<iframe src="${reportUrl}" width="100%" height="600" frameborder="0"></iframe>`;
-        navigator.clipboard.writeText(embedCode).then(() => {
-          alert('Embed code copied to clipboard!');
-        }).catch(() => {
-          alert(`Embed code:\n${embedCode}`);
-        });
+        if (navigator?.clipboard?.writeText) {
+          navigator.clipboard.writeText(embedCode).then(() => {
+            alert('Embed code copied to clipboard!');
+          }).catch(() => {
+            window.prompt('Copy this embed code:', embedCode);
+          });
+        } else {
+          window.prompt('Copy this embed code:', embedCode);
+        }
         break;
     }
     setShowShareMenu(false);
