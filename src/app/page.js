@@ -43,11 +43,16 @@ export default function Home() {
   const { user } = useAuthStore();
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
+  const [isHydrated, setIsHydrated] = useState(false);
   const router = useRouter();
 
   const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
   const isStaff = isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     fetch('/api/initiatives')
@@ -89,7 +94,7 @@ export default function Home() {
             gap: '1rem',
           }}
         >
-          {visibleRoutes.map(({ href, label, description }) => {
+          {isHydrated && visibleRoutes.map(({ href, label, description }) => {
             const isSurvey = href === '/survey';
             const cardContent = (
               <div
@@ -132,7 +137,7 @@ export default function Home() {
                   {description}
                 </p>
 
-                {isSurvey && !isLoggedIn && (
+                {isSurvey && (
                   <div style={{ marginTop: '1rem' }} onClick={(event) => event.preventDefault()}>
                     <select
                       value={selectedInitiative}
