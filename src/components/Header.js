@@ -124,14 +124,6 @@ export default function Header() {
                 Home
               </Link>
               <Link 
-                href="/form-creation" 
-                style={getNavLinkStyle('/form-creation')}
-                onMouseEnter={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Form Creation
-              </Link>
-              <Link 
                 href="/survey" 
                 style={getNavLinkStyle('/survey')}
                 onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
@@ -150,28 +142,12 @@ export default function Header() {
                 </Link>
               )}
               <Link 
-                href="/report-creation" 
-                style={getNavLinkStyle('/report-creation')}
-                onMouseEnter={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Report Creation
-              </Link>
-              <Link 
                 href="/reporting" 
                 style={getNavLinkStyle('/reporting')}
                 onMouseEnter={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
                 Reporting
-              </Link>
-              <Link 
-                href="/manage-reports" 
-                style={getNavLinkStyle('/manage-reports')}
-                onMouseEnter={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Manage Reports
               </Link>
               <Link 
                 href="/initiative-creation" 
