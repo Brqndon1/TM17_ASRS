@@ -132,7 +132,7 @@ export default function Home() {
                   {description}
                 </p>
 
-                {isSurvey && (
+                {isSurvey && !isLoggedIn && (
                   <div style={{ marginTop: '1rem' }} onClick={(event) => event.preventDefault()}>
                     <select
                       value={selectedInitiative}
