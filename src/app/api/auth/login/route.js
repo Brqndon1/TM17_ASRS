@@ -1,28 +1,15 @@
-/**
- * ============================================================================
- * LOGIN API — src/app/api/auth/login/route.js
- * ============================================================================
- * Updated to block users who haven't verified their email yet.
- * ============================================================================
- */
-
 import { NextResponse } from 'next/server';
-import db, { initializeDatabase } from '@/lib/db';
+import { getServiceContainer } from '@/lib/container/service-container';
 
 export async function POST(request) {
   try {
-    initializeDatabase();
-
+    const { db } = getServiceContainer();
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 
-    // Fetch user by email first (so we can give a specific unverified error)
     const user = db.prepare(`
       SELECT u.*, ut.type as user_type
       FROM user u
@@ -31,13 +18,9 @@ export async function POST(request) {
     `).get(email);
 
     if (!user || user.password !== password) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    // Block login for unverified users
     if (!user.verified) {
       return NextResponse.json(
         { error: 'Please verify your email before logging in. Check your inbox for the verification link.' },
@@ -54,12 +37,8 @@ export async function POST(request) {
         user_type: user.user_type,
       },
     });
-
   } catch (error) {
     console.error('Login error:', error);
-    return NextResponse.json(
-      { error: 'Server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

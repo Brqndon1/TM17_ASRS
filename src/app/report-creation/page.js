@@ -14,6 +14,8 @@ import StepSorting from '@/components/report-steps/StepSorting';
 import StepTrends from '@/components/report-steps/StepTrends';
 import StepPreview from '@/components/report-steps/StepPreview';
 import { validateTrendConfig } from '@/lib/report-engine';
+import { getUiEventBus } from '@/lib/events/ui-event-bus';
+import EVENTS from '@/lib/events/event-types';
 
 const TOTAL_STEPS = 6;
 
@@ -266,6 +268,8 @@ export default function ReportCreationPage() {
         throw new Error(failure.error || 'Failed to generate report');
       }
 
+      const successPayload = await res.json().catch(() => ({}));
+
       // Reset form
       if (reportConfig.selectedInitiative) {
         localStorage.removeItem(`${DRAFT_KEY_PREFIX}:${reportConfig.selectedInitiative.id}`);
@@ -283,6 +287,11 @@ export default function ReportCreationPage() {
         endDate: '',
       });
       setSuccessMessage('Report generated and published to Reporting.');
+      getUiEventBus().publish(EVENTS.REPORT_UPDATED, {
+        reportId: successPayload.reportId,
+        initiativeId: reportConfig.selectedInitiative?.id,
+        updatedAt: new Date().toISOString(),
+      });
       fetchReports();
     } catch (err) {
       setErrorMessage(err.message || 'Failed to generate report. Please try again.');

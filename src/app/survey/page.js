@@ -5,18 +5,12 @@ import BackButton from '@/components/BackButton';
 import SurveyForm from '@/components/SurveyForm';
 import QRCodeManager from '@/components/QRCodeManager';
 import { useState, useEffect } from 'react';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
+import { toSurveyTemplateViewModel } from '@/lib/adapters/survey-template-adapter';
 
 export default function SurveyPage() {
-  const [userRole, setUserRole] = useState('public');
-
-  // Check for logged-in user and set their role
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setUserRole(user.user_type || 'public');
-    }
-  }, []);
+  const { user } = useAuthStore();
+  const userRole = user?.user_type || 'public';
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -96,7 +90,7 @@ export default function SurveyPage() {
           return res.json();
         })
         .then((templateData) => {
-          setSurveyTemplate(templateData);
+          setSurveyTemplate(toSurveyTemplateViewModel(templateData));
         })
         .catch((err) => {
           console.error('Error loading survey template:', err);
@@ -161,7 +155,7 @@ export default function SurveyPage() {
       // Template survey: validate all required template questions
       const questions = surveyTemplate.questions || [];
       questions.forEach((q) => {
-        const isQuestionRequired = q.text?.required ?? q.required ?? true;
+        const isQuestionRequired = q.required ?? q.text?.required ?? true;
         if (!isQuestionRequired) return;
         const qId = q.id;
         if (!templateResponses[qId] || !String(templateResponses[qId]).trim()) {
@@ -481,11 +475,11 @@ export default function SurveyPage() {
                       // Handle both formats:
                       // Old: { id, text: { question, type, options } }
                       // New: { id, question, type, options }
-                      const questionText = q.text?.question || q.question || '';
-                      const questionType = q.text?.type || q.type || 'text';
-                      const questionOptions = q.text?.options || q.options || [];
+                      const questionText = q.label || q.text?.question || q.question || '';
+                      const questionType = q.type || q.text?.type || 'text';
+                      const questionOptions = q.options || q.text?.options || [];
                       const qId = q.id;
-                      const isRequired = q.text?.required ?? q.required ?? true;
+                      const isRequired = q.required ?? q.text?.required ?? true;
                       const isInvalid = !!invalidFields[`question_${qId}`];
 
                       return (

@@ -6,13 +6,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { NextResponse } from 'next/server';
-import { db, initializeDatabase } from '@/lib/db';
-
-// ──────────────────────────────────────────────────────────────────────────
-// INITIALIZE DATABASE
-// ──────────────────────────────────────────────────────────────────────────
-// Ensure all database tables exist before processing any requests
-initializeDatabase();
+import { getServiceContainer } from '@/lib/container/service-container';
+import EVENTS from '@/lib/events/event-types';
 
 // ══════════════════════════════════════════════════════════════════════════
 // POST /api/qr-codes/scan
@@ -50,6 +45,8 @@ initializeDatabase();
 // ══════════════════════════════════════════════════════════════════════════
 export async function POST(request) {
   try {
+    const { db, eventBus, clock } = getServiceContainer();
+
     // ─────────────────────────────────────────────────────────────────────
     // STEP 1: Parse Request Body and Headers
     // ─────────────────────────────────────────────────────────────────────
@@ -145,6 +142,14 @@ export async function POST(request) {
 
     const scanId = scanResult.lastInsertRowid;
 
+    eventBus.publish(EVENTS.QR_SCANNED, {
+      scanId: Number(scanId),
+      qrCodeId: Number(qrCode.qr_code_id),
+      qrCodeKey: qrCode.qr_code_key,
+      convertedToSubmission: Boolean(convertedToSubmission),
+      scannedAt: clock.nowIso(),
+    });
+
     // ─────────────────────────────────────────────────────────────────────
     // STEP 5: Return Success Response with QR Code Info
     // ─────────────────────────────────────────────────────────────────────
@@ -157,7 +162,7 @@ export async function POST(request) {
       scan: {
         scanId: Number(scanId),
         qrCodeId: qrCode.qr_code_id,
-        scannedAt: new Date().toISOString()
+        scannedAt: clock.nowIso()
       },
       qrCode: {
         qrCodeKey: qrCode.qr_code_key,
@@ -236,6 +241,8 @@ export async function POST(request) {
 // ══════════════════════════════════════════════════════════════════════════
 export async function GET(request) {
   try {
+    const { db } = getServiceContainer();
+
     // ─────────────────────────────────────────────────────────────────────
     // STEP 1: Parse Query Parameters
     // ─────────────────────────────────────────────────────────────────────

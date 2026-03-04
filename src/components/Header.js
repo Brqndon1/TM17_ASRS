@@ -1,95 +1,87 @@
-/**
- * ============================================================================
- * HEADER COMPONENT — The top navigation bar of the reporting system.
- * ============================================================================
- * Displays:
- * - The ASRS logo (loaded from /public/asrs-logo.png)
- * - The system title
- * - Navigation tabs (shown only when logged in) with active highlighting
- * - "User Management" tab (shown only for admin users)
- * - Login/Logout button
- * - User info when logged in
- * ============================================================================
- */
 'use client';
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState(null);
+  const { user, clearUser } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const headerRef = useRef(null);
 
-  // Check for logged-in user on component mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  // Close the mobile menu when the user clicks outside the header
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (headerRef.current && !headerRef.current.contains(e.target)) {
+    function handleClickOutside(event) {
+      if (headerRef.current && !headerRef.current.contains(event.target)) {
         setMenuOpen(false);
       }
     }
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    router.push('/login');
-  };
-
-  const isLoggedIn = !!user;
+  const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
 
-  // Helper function to check if a route is active
-  const isActive = (href) => {
-    if (href === '/') {
-      return pathname === '/';
-    }
-    return pathname.startsWith(href);
-  };
+  function handleLogout() {
+    clearUser();
+    router.push('/login');
+  }
 
-  // Navigation link style with active state
-  const getNavLinkStyle = (href) => ({
-    padding: '0.4rem 1rem',
-    borderRadius: '6px',
-    border: '1px solid rgba(255,255,255,0.3)',
-    backgroundColor: isActive(href) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-    color: 'white',
-    fontSize: '0.85rem',
-    fontWeight: isActive(href) ? '700' : '600',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease',
-    boxShadow: isActive(href) ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+  function isActive(href) {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
+  }
+
+  function getNavLinkStyle(href) {
+    return {
+      padding: '0.4rem 1rem',
+      borderRadius: '6px',
+      border: '1px solid rgba(255,255,255,0.3)',
+      backgroundColor: isActive(href) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+      color: 'white',
+      fontSize: '0.85rem',
+      fontWeight: isActive(href) ? '700' : '600',
+      textDecoration: 'none',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s ease',
+      boxShadow: isActive(href) ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+    };
+  }
+
+  const navHoverHandlers = (href) => ({
+    onMouseEnter: (event) => {
+      if (!isActive(href)) {
+        event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+      }
+    },
+    onMouseLeave: (event) => {
+      if (!isActive(href)) {
+        event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)';
+      }
+    },
   });
 
   return (
-    <header ref={headerRef} style={{
-      background: 'linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%)',
-      color: 'white',
-      padding: '0.75rem 1.5rem',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '1rem',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100
-    }}>
-      {/* ---- Left Section: Logo + Title ---- */}
+    <header
+      ref={headerRef}
+      style={{
+        background: 'linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%)',
+        color: 'white',
+        padding: '0.75rem 1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
         <img
           src="/asrs-logo.png"
@@ -106,13 +98,10 @@ export default function Header() {
         </div>
       </div>
 
-      {/* ---- Right Section: Hamburger + Collapsible Nav ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-
-        {/* Hamburger button — visible only on mobile (≤768px) via CSS */}
         <button
           className="header-hamburger"
-          onClick={() => setMenuOpen(prev => !prev)}
+          onClick={() => setMenuOpen((prev) => !prev)}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={menuOpen}
         >
@@ -121,152 +110,81 @@ export default function Header() {
           <span className="header-hamburger-line" />
         </button>
 
-        {/* Nav area — full row on desktop, absolute dropdown on mobile */}
         <div className={`header-nav-area${menuOpen ? ' open' : ''}`}>
           <nav className="header-nav-links">
-          {/* Show all navigation tabs only when logged in */}
-          {isLoggedIn ? (
-            <>
-              <Link 
-                href="/" 
-                style={getNavLinkStyle('/')}
-                onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Home
-              </Link>
-              <Link 
-                href="/form-creation" 
-                style={getNavLinkStyle('/form-creation')}
-                onMouseEnter={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Form Creation
-              </Link>
-              <Link 
-                href="/survey" 
-                style={getNavLinkStyle('/survey')}
-                onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Survey
-              </Link>
-              {isAdmin && (
-                <Link 
-                  href="/survey-distribution" 
-                  style={getNavLinkStyle('/survey-distribution')}
-                  onMouseEnter={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                  onMouseLeave={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                >
-                  Distribute
+            {isLoggedIn ? (
+              <>
+                <Link href="/" style={getNavLinkStyle('/')} {...navHoverHandlers('/')}>
+                  Home
                 </Link>
-              )}
-              <Link 
-                href="/report-creation" 
-                style={getNavLinkStyle('/report-creation')}
-                onMouseEnter={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Report Creation
-              </Link>
-              <Link 
-                href="/reporting" 
-                style={getNavLinkStyle('/reporting')}
-                onMouseEnter={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Reporting
-              </Link>
-              <Link 
-                href="/manage-reports" 
-                style={getNavLinkStyle('/manage-reports')}
-                onMouseEnter={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Manage Reports
-              </Link>
-              <Link 
-                href="/initiative-creation" 
-                style={getNavLinkStyle('/initiative-creation')}
-                onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Initiatives
-              </Link>
-
-              {/* Admin-only tabs */}
-              {isAdmin && (
-                <>
-                  <Link 
-                    href="/goals" 
-                    style={getNavLinkStyle('/goals')}
-                    onMouseEnter={(e) => !isActive('/goals') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                    onMouseLeave={(e) => !isActive('/goals') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                  >
-                    Goals
+                <Link href="/form-creation" style={getNavLinkStyle('/form-creation')} {...navHoverHandlers('/form-creation')}>
+                  Form Creation
+                </Link>
+                <Link href="/survey" style={getNavLinkStyle('/survey')} {...navHoverHandlers('/survey')}>
+                  Survey
+                </Link>
+                {isAdmin && (
+                  <Link href="/survey-distribution" style={getNavLinkStyle('/survey-distribution')} {...navHoverHandlers('/survey-distribution')}>
+                    Distribute
                   </Link>
-                  <Link 
-                    href="/performance-dashboard" 
-                    style={getNavLinkStyle('/performance-dashboard')}
-                    onMouseEnter={(e) => !isActive('/performance-dashboard') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                    onMouseLeave={(e) => !isActive('/performance-dashboard') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                  >
-                    Performance
-                  </Link>
-                  <Link 
-                    href="/admin/users" 
-                    style={getNavLinkStyle('/admin/users')}
-                    onMouseEnter={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                    onMouseLeave={(e) => !isActive('/admin/users') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                  >
-                    User Management
-                  </Link>
-                </>
-              )}
-            </>
-          ) : null}
+                )}
+                <Link href="/report-creation" style={getNavLinkStyle('/report-creation')} {...navHoverHandlers('/report-creation')}>
+                  Report Creation
+                </Link>
+                <Link href="/reporting" style={getNavLinkStyle('/reporting')} {...navHoverHandlers('/reporting')}>
+                  Reporting
+                </Link>
+                <Link href="/manage-reports" style={getNavLinkStyle('/manage-reports')} {...navHoverHandlers('/manage-reports')}>
+                  Manage Reports
+                </Link>
+                <Link href="/initiative-creation" style={getNavLinkStyle('/initiative-creation')} {...navHoverHandlers('/initiative-creation')}>
+                  Initiatives
+                </Link>
 
-          {/* Show Survey + Login when not logged in; Logout when logged in */}
-          {!isLoggedIn ? (
-            <>
-              <Link
-                href="/"
-                style={getNavLinkStyle('/')}
-                onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Home
-              </Link>
-              <Link
-                href="/survey"
-                style={getNavLinkStyle('/survey')}
-                onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Take Survey
-              </Link>
-              <Link
-                href="/login"
-                style={getNavLinkStyle('/login')}
-                onMouseEnter={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-                onMouseLeave={(e) => !isActive('/login') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-              >
-                Login
-              </Link>
-            </>
-          ) : (
-            <button
-              onClick={handleLogout}
-              style={logoutButtonStyle}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'}
-            >
-              Logout
-            </button>
-          )}
-          </nav>{/* end header-nav-links */}
+                {isAdmin && (
+                  <>
+                    <Link href="/goals" style={getNavLinkStyle('/goals')} {...navHoverHandlers('/goals')}>
+                      Goals
+                    </Link>
+                    <Link href="/performance-dashboard" style={getNavLinkStyle('/performance-dashboard')} {...navHoverHandlers('/performance-dashboard')}>
+                      Performance
+                    </Link>
+                    <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
+                      User Management
+                    </Link>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Link href="/" style={getNavLinkStyle('/')} {...navHoverHandlers('/')}>
+                  Home
+                </Link>
+                <Link href="/survey" style={getNavLinkStyle('/survey')} {...navHoverHandlers('/survey')}>
+                  Take Survey
+                </Link>
+                <Link href="/login" style={getNavLinkStyle('/login')} {...navHoverHandlers('/login')}>
+                  Login
+                </Link>
+              </>
+            )}
 
-          {/* User info — shown inside dropdown on mobile, inline on desktop */}
+            {isLoggedIn && (
+              <button
+                onClick={handleLogout}
+                style={logoutButtonStyle}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)';
+                }}
+              >
+                Logout
+              </button>
+            )}
+          </nav>
+
           {isLoggedIn && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
@@ -276,8 +194,8 @@ export default function Header() {
               </div>
             </div>
           )}
-        </div>{/* end header-nav-area */}
-      </div>{/* end right section */}
+        </div>
+      </div>
     </header>
   );
 }

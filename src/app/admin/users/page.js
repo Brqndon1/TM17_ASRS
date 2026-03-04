@@ -3,10 +3,11 @@
 import Header from '@/components/Header';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
 
 export default function AdminUsersPage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { user } = useAuthStore();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,14 +38,17 @@ export default function AdminUsersPage() {
     }
   }, [successMsg]);
 
-  // Check auth on mount
+  // Check auth based on shared auth singleton state
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) { router.push('/login'); return; }
-    const parsed = JSON.parse(storedUser);
-    if (parsed.user_type !== 'admin') { router.push('/'); return; }
-    setUser(parsed);
-  }, [router]);
+    if (user === undefined) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (user.user_type !== 'admin') {
+      router.push('/');
+    }
+  }, [router, user]);
 
   // Fetch users
   const fetchUsers = async () => {

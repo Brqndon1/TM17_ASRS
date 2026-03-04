@@ -1,23 +1,21 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
-import {db, initializeDatabase} from '@/lib/db';
 import path from 'path';
+import { getServiceContainer } from '@/lib/container/service-container';
+import { toInitiativeCreateInput, toInitiativeDto } from '@/lib/adapters/initiative-adapter';
 
 const INITIATIVES_PATH = path.join(process.cwd(), 'src', 'data', 'initiatives.json');
-
-// Read and write initiative from file. 
 
 async function readInitiatives() {
   try {
     const data = await fs.readFile(INITIATIVES_PATH, 'utf8');
     const parsed = JSON.parse(data);
     return Array.isArray(parsed.initiatives) ? parsed.initiatives : [];
-  } catch (err) {
-    if (err.code === 'ENOENT') return [];
-    throw err;
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
   }
 }
-  
 
 async function writeInitiatives(initiatives) {
   await fs.writeFile(
@@ -27,149 +25,69 @@ async function writeInitiatives(initiatives) {
   );
 }
 
-
-
-// GET - Fetch all initiatives from initiatives.json
 export async function GET() {
-// Old code that reads from file.
- 
-//   try {
-//     const initiatives = await readInitiatives();
-//     return NextResponse.json({ initiatives });
-//   } catch (error) {
-//     console.error('Error reading initiatives:', error);
-//     return NextResponse.json(
-//       { error: 'Failed to load initiatives', details: error.message },
-//       { status: 500 }
-//     );
-//   }
-// }
-  
-
-  try
-    {
-      initializeDatabase();
-
-      // Pull data and map rows and dictionaries to necessary variables. 
-      const initiatives = db.prepare('SELECT * FROM initiative').all().map(row => ({
-        id: row.initiative_id,
-        name: row.initiative_name,
-        description: row.description || '',
-        attributes: row.attributes ? JSON.parse(row.attributes) : [],
-        questions: row.questions ? JSON.parse(row.questions) : [],
-        settings: row.settings ? JSON.parse(row.settings) : {},
-      }));
-      return NextResponse.json({initiatives});
-    }
-    catch(error)
-    {
-      console.error('Error fetching initiatives: ', error);
-      return NextResponse.json({error: "Failed to load initiatives"}, {status: 500});
-    }
-  }
-
-// POST - Create a new initiative and save to initiatives.json
-export async function POST(request) {
-  // Old code that stores in file. 
-  /*
   try {
+    const { db } = getServiceContainer();
+    const rows = db.prepare('SELECT * FROM initiative').all();
+    const initiatives = rows.map(toInitiativeDto);
+    return NextResponse.json({ initiatives });
+  } catch (error) {
+    console.error('Error fetching initiatives:', error);
+    return NextResponse.json({ error: 'Failed to load initiatives' }, { status: 500 });
+  }
+}
+
+export async function POST(request) {
+  try {
+    const { db } = getServiceContainer();
     const body = await request.json();
-    const { name, description, attributes, settings, questions} = body;
+    const input = toInitiativeCreateInput(body);
 
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400 }
-      );
+    if (!input.name) {
+      return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
-    
-    const docinitiatives = await readInitiatives();
-    const nextId =
-      docinitiatives.length > 0
-        ? Math.max(...initiatives.map((i) => i.id)) + 1
-        : 1;
 
-    const newdocInitiative = {
-      id: nextId,
-      name: name.trim(),
-      description: (description || '').trim(),
-      attributes: Array.isArray(attributes) ? attributes : [],
-      questions: Array.isArray(questions) ? questions: [],
-      ...(settings && typeof settings === 'object' ? { settings } : {}),
-    };
+    const result = db.prepare(
+      'INSERT INTO initiative (initiative_name, description, attributes, questions, settings) VALUES (?, ?, ?, ?, ?)'
+    ).run(
+      input.name,
+      input.description,
+      JSON.stringify(input.attributes),
+      JSON.stringify(input.questions),
+      JSON.stringify(input.settings)
+    );
 
-    docinitiatives.push(newInitiative);
-    await writeInitiatives(initiatives);
+    const fileInitiatives = await readInitiatives();
+    const nextFileId = fileInitiatives.length > 0
+      ? Math.max(...fileInitiatives.map((item) => Number(item.id) || 0)) + 1
+      : 1;
+
+    fileInitiatives.push({
+      id: nextFileId,
+      name: input.name,
+      description: input.description,
+      attributes: input.attributes,
+      questions: input.questions,
+      ...(Object.keys(input.settings).length > 0 ? { settings: input.settings } : {}),
+    });
+
+    await writeInitiatives(fileInitiatives);
+
+    const row = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(result.lastInsertRowid));
 
     return NextResponse.json({
       success: true,
-      message: 'Initiative created and added to initiatives.json',
-      initiative: newdocInitiative,
+      initiative: toInitiativeDto(row),
     });
-    */
-
-
-  try
-  {
-    // if (!verifyAdmin(requesterEmail)) {
-    //   error.code = "FORBIDDEN"
-    //   return NextResponse.json(
-    //     { error: 'Forbidden: Admin access required' },
-    //     { status: 403 }
-    //   );
-    // }
-
-    initializeDatabase(); // initialize the database first
-    
-    const body = await request.json(); // Get the body from the request
-    const {name, description, attributes, settings, questions} = body;
-
-    if (!name || !name.trim()){ // Ensure name field is in there
-      return NextResponse.json({error: "Missing required field: name"}, {status: 400});
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return NextResponse.json({ error: 'Initiative with the same name already exists' }, { status: 409 });
     }
-    // Prepare to insert data into the database in this specific order. 
-    const stmt = db.prepare('INSERT INTO initiative (initiative_name, description, attributes, questions, settings) VALUES (?, ?, ?, ?, ?)');
 
-    // Insert the data into the database. 
-    const result = stmt.run(
-      name.trim(),
-      description || '',
-      JSON.stringify(attributes || []),
-      JSON.stringify(questions || []),
-      JSON.stringify(settings || {}),
-    );
-
-    // Store in the document still
-    const docinitiatives = await readInitiatives();
-    const nextId =
-      docinitiatives.length > 0
-        ? Math.max(...docinitiatives.map((i) => i.id)) + 1
-        : 1;
-
-    const newdocInitiative = {
-      id: nextId,
-      name: name.trim(),
-      description: (description || '').trim(),
-      attributes: Array.isArray(attributes) ? attributes : [],
-      questions: Array.isArray(questions) ? questions: [],
-      ...(settings && typeof settings === 'object' ? { settings } : {}),
-    };
-
-    docinitiatives.push(newdocInitiative);
-    await writeInitiatives(docinitiatives);
-
-    // Pull the new initiative that was just created to print. 
-    const newInitiative = db.prepare('SELECT initiative_id, initiative_name, description FROM initiative WHERE initiative_id = ?').get(result.lastInsertRowid);
-
-    return NextResponse.json({success: true, initiative: newInitiative});
-  }
-  catch (error)
-  {
-    // Catch same initiative name error. 
-    if (error.code == 'SQLITE_CONSTRAINT_UNIQUE'){ 
-      return NextResponse.json({error: "Initiative with the same name already exists"}, {status: 409});
-    }
     console.error('Error creating initiative:', error);
-    return NextResponse.json({ error: 'Failed to create initiative', details: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to create initiative', details: error.message },
+      { status: 500 }
+    );
   }
 }

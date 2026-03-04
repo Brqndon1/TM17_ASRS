@@ -1,8 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
 
 const routes = [
   {
@@ -21,7 +23,6 @@ const routes = [
     href: '/survey',
     label: 'Survey',
     description: 'Fill out and submit surveys.',
-    // No requiresAuth — publicly accessible
   },
   {
     href: '/report-creation',
@@ -58,29 +59,23 @@ const routes = [
 ];
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
+  const { user } = useAuthStore();
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
   const router = useRouter();
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    setIsLoggedIn(!!storedUser);
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setIsAdmin(parsed.user_type === 'admin');
-      setIsStaff(parsed.user_type === 'staff' || parsed.user_type === 'admin');
-    }
+  const isLoggedIn = Boolean(user);
+  const isAdmin = isLoggedIn && user.user_type === 'admin';
+  const isStaff = isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
 
+  useEffect(() => {
     fetch('/api/initiatives')
-      .then(res => res.json())
-      .then(data => setInitiatives(Array.isArray(data.initiatives) ? data.initiatives : []))
+      .then((res) => res.json())
+      .then((data) => setInitiatives(Array.isArray(data.initiatives) ? data.initiatives : []))
       .catch(() => setInitiatives([]));
   }, []);
 
-  const visibleRoutes = routes.filter(route => {
+  const visibleRoutes = routes.filter((route) => {
     if (route.showOnlyWhenLoggedOut) {
       return !isLoggedIn;
     }
@@ -104,15 +99,15 @@ export default function Home() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
             ASRS Initiatives Reporting System
           </h1>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
-            Select a section to get started.
-          </p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>Select a section to get started.</p>
         </div>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '1rem',
-        }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '1rem',
+          }}
+        >
           {visibleRoutes.map(({ href, label, description }) => {
             const isSurvey = href === '/survey';
             const cardContent = (
@@ -123,40 +118,44 @@ export default function Home() {
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   height: '100%',
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(event) => {
                   if (!isSurvey) {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                    event.currentTarget.style.transform = 'translateY(-3px)';
+                    event.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
                   }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(event) => {
                   if (!isSurvey) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '';
+                    event.currentTarget.style.transform = 'translateY(0)';
+                    event.currentTarget.style.boxShadow = '';
                   }
                 }}
               >
-                <h2 style={{
-                  fontSize: '1.15rem',
-                  fontWeight: '700',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: '0.5rem',
-                }}>
+                <h2
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: '700',
+                    color: 'var(--color-text-primary)',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   {label}
                 </h2>
-                <p style={{
-                  fontSize: '0.9rem',
-                  color: 'var(--color-text-secondary)',
-                  margin: 0,
-                }}>
+                <p
+                  style={{
+                    fontSize: '0.9rem',
+                    color: 'var(--color-text-secondary)',
+                    margin: 0,
+                  }}
+                >
                   {description}
                 </p>
 
                 {isSurvey && (
-                  <div style={{ marginTop: '1rem' }} onClick={e => e.preventDefault()}>
+                  <div style={{ marginTop: '1rem' }} onClick={(event) => event.preventDefault()}>
                     <select
                       value={selectedInitiative}
-                      onChange={e => setSelectedInitiative(e.target.value)}
+                      onChange={(event) => setSelectedInitiative(event.target.value)}
                       style={{
                         width: '100%',
                         padding: '0.4rem 0.6rem',
@@ -168,16 +167,20 @@ export default function Home() {
                         marginBottom: '0.6rem',
                       }}
                     >
-                      <option value=''>— Select an initiative —</option>
-                      {initiatives.map(ini => (
-                        <option key={ini.id} value={ini.id}>{ini.name}</option>
+                      <option value="">- Select an initiative -</option>
+                      {initiatives.map((initiative) => (
+                        <option key={initiative.id} value={initiative.id}>
+                          {initiative.name}
+                        </option>
                       ))}
                     </select>
                     <button
                       disabled={!selectedInitiative}
-                      onClick={e => {
-                        e.preventDefault();
-                        if (selectedInitiative) router.push(`/survey?initiativeId=${selectedInitiative}`);
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (selectedInitiative) {
+                          router.push(`/survey?initiativeId=${selectedInitiative}`);
+                        }
                       }}
                       style={{
                         width: '100%',

@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { db, initializeDatabase } from '@/lib/db';
+import { getServiceContainer } from '@/lib/container/service-container';
+import { toReportDetailDto } from '@/lib/adapters/report-adapter';
 
-// GET /api/reports/:id — fetch a single report by ID
 export async function GET(_request, { params }) {
   try {
-    initializeDatabase();
-
+    const { db } = getServiceContainer();
     const { id } = await params;
 
     const row = db.prepare(
@@ -16,13 +15,10 @@ export async function GET(_request, { params }) {
     ).get(Number(id));
 
     if (!row) {
-      return NextResponse.json(
-        { error: 'Report not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ report: row });
+    return NextResponse.json({ report: toReportDetailDto(row) });
   } catch (error) {
     console.error('Error fetching report:', error);
     return NextResponse.json(
