@@ -1,3 +1,16 @@
+/**
+ * ============================================================================
+ * HEADER COMPONENT — The top navigation bar of the reporting system.
+ * ============================================================================
+ * Displays:
+ * - The ASRS logo (loaded from /public/asrs-logo.png)
+ * - The system title
+ * - Navigation tabs (shown only when logged in) with active highlighting
+ * - "User Management" tab (shown only for admin users)
+ * - Login/Logout button
+ * - User info when logged in
+ * ============================================================================
+ */
 'use client';
 
 import Link from 'next/link';
@@ -10,7 +23,12 @@ export default function Header() {
   const pathname = usePathname();
   const { user, clearUser } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const headerRef = useRef(null);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -112,6 +130,8 @@ export default function Header() {
 
         <div className={`header-nav-area${menuOpen ? ' open' : ''}`}>
           <nav className="header-nav-links">
+          {isHydrated && (
+          <>
           {/* Show all navigation tabs only when logged in */}
           {isLoggedIn ? (
             <>
@@ -200,9 +220,11 @@ export default function Header() {
                 Logout
               </button>
             )}
+          </>
+          )}
           </nav>
 
-          {isLoggedIn && (
+          {isLoggedIn && isHydrated && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
               <div style={{ fontSize: '0.85rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
