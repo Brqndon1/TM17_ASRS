@@ -14,34 +14,15 @@ const routes = [
     requiresAuth: true,
   },
   {
-    href: '/form-creation',
-    label: 'Form Creation',
-    description: 'Build and configure survey forms for initiatives.',
-    requiresAuth: true,
-  },
-  {
     href: '/survey',
     label: 'Survey',
     description: 'Fill out and submit surveys.',
-  },
-  {
-    href: '/report-creation',
-    label: 'Report Creation',
-    description: 'Generate reports from collected survey data.',
-    requiresAuth: true,
   },
   {
     href: '/reporting',
     label: 'Reporting',
     description: 'View published reports and dashboards.',
     requiresAuth: true,
-  },
-  {
-    href: '/manage-reports',
-    label: 'Manage Reports',
-    description: 'Add, update, delete, and reorder the report library.',
-    requiresAuth: true,
-    staffOnly: true,
   },
   {
     href: '/goals',

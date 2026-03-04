@@ -112,34 +112,75 @@ export default function Header() {
 
         <div className={`header-nav-area${menuOpen ? ' open' : ''}`}>
           <nav className="header-nav-links">
-            {isLoggedIn ? (
-              <>
-                <Link href="/" style={getNavLinkStyle('/')} {...navHoverHandlers('/')}>
-                  Home
+          {/* Show all navigation tabs only when logged in */}
+          {isLoggedIn ? (
+            <>
+              <Link 
+                href="/" 
+                style={getNavLinkStyle('/')}
+                onMouseEnter={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Home
+              </Link>
+              <Link 
+                href="/form-creation" 
+                style={getNavLinkStyle('/form-creation')}
+                onMouseEnter={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/form-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Form Creation
+              </Link>
+              <Link 
+                href="/survey" 
+                style={getNavLinkStyle('/survey')}
+                onMouseEnter={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/survey') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Survey
+              </Link>
+              {isAdmin && (
+                <Link 
+                  href="/survey-distribution" 
+                  style={getNavLinkStyle('/survey-distribution')}
+                  onMouseEnter={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                  onMouseLeave={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                >
+                  Distribute
                 </Link>
-                <Link href="/form-creation" style={getNavLinkStyle('/form-creation')} {...navHoverHandlers('/form-creation')}>
-                  Form Creation
-                </Link>
-                <Link href="/survey" style={getNavLinkStyle('/survey')} {...navHoverHandlers('/survey')}>
-                  Survey
-                </Link>
-                {isAdmin && (
-                  <Link href="/survey-distribution" style={getNavLinkStyle('/survey-distribution')} {...navHoverHandlers('/survey-distribution')}>
-                    Distribute
-                  </Link>
-                )}
-                <Link href="/report-creation" style={getNavLinkStyle('/report-creation')} {...navHoverHandlers('/report-creation')}>
-                  Report Creation
-                </Link>
-                <Link href="/reporting" style={getNavLinkStyle('/reporting')} {...navHoverHandlers('/reporting')}>
-                  Reporting
-                </Link>
-                <Link href="/manage-reports" style={getNavLinkStyle('/manage-reports')} {...navHoverHandlers('/manage-reports')}>
-                  Manage Reports
-                </Link>
-                <Link href="/initiative-creation" style={getNavLinkStyle('/initiative-creation')} {...navHoverHandlers('/initiative-creation')}>
-                  Initiatives
-                </Link>
+              )}
+              <Link 
+                href="/report-creation" 
+                style={getNavLinkStyle('/report-creation')}
+                onMouseEnter={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/report-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Report Creation
+              </Link>
+              <Link 
+                href="/reporting" 
+                style={getNavLinkStyle('/reporting')}
+                onMouseEnter={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Reporting
+              </Link>
+              <Link 
+                href="/manage-reports" 
+                style={getNavLinkStyle('/manage-reports')}
+                onMouseEnter={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/manage-reports') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Manage Reports
+              </Link>
+              <Link 
+                href="/initiative-creation" 
+                style={getNavLinkStyle('/initiative-creation')}
+                onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+              >
+                Initiatives
+              </Link>
 
                 {isAdmin && (
                   <>

@@ -1,59 +1,70 @@
+/**
+ * ============================================================================
+ * REPORTING PAGE — Displays reports generated from the Report Creation page.
+ * ============================================================================
+ */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
-import { useAuthStore } from '@/lib/auth/use-auth-store';
-import { toReportMapByInitiative, toReportingViewModel } from '@/lib/adapters/report-api-adapter';
-import { getUiEventBus } from '@/lib/events/ui-event-bus';
-import EVENTS from '@/lib/events/event-types';
+import { normalizeSnapshot } from '@/lib/report-snapshot';
 
 export default function ReportingPage() {
-  const { user } = useAuthStore();
   const [selectedInitiative, setSelectedInitiative] = useState(null);
   const [initiatives, setInitiatives] = useState([]);
   const [reportData, setReportData] = useState(null);
   const [trendData, setTrendData] = useState([]);
+  const [userRole, setUserRole] = useState('public');
   const [isLoading, setIsLoading] = useState(true);
+  const [noReport, setNoReport] = useState(false);
   const [reportMap, setReportMap] = useState({});
 
-  // social sharing state
+  /**
+   * ================================
+   * SOCIAL MEDIA STATE (NEW)
+   * ================================
+   */
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [uploadStatus, setUploadStatus] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showSocialMenu, setShowSocialMenu] = useState(false);
 
-  const userRole = user?.user_type || 'public';
-  const canAccess = userRole === 'staff' || userRole === 'admin';
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setUserRole(parsed.user_type || 'public');
+    }
+  }, []);
 
   useEffect(() => {
-    if (!canAccess) {
-      setIsLoading(false);
-      return;
-    }
-
     async function loadInitialData() {
       try {
         const [initiativesRes, reportsRes] = await Promise.all([
           fetch('/api/initiatives'),
           fetch('/api/reports'),
         ]);
-
         const initiativesData = await initiativesRes.json();
         const reportsData = await reportsRes.json();
 
         const initiativesList = initiativesData.initiatives || [];
         setInitiatives(initiativesList);
 
-        const nextMap = toReportMapByInitiative(reportsData.reports || []);
-        setReportMap(nextMap);
+        const map = {};
+        for (const r of (reportsData.reports || [])) {
+          if (!map[r.initiative_id]) {
+            map[r.initiative_id] = r;
+          }
+        }
+        setReportMap(map);
 
         if (initiativesList.length > 0) {
-          const first = initiativesList[0];
-          setSelectedInitiative(first);
-          loadReportForInitiative(first, nextMap);
+          setSelectedInitiative(initiativesList[0]);
+          loadReportForInitiative(initiativesList[0], map);
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -61,63 +72,75 @@ export default function ReportingPage() {
         setIsLoading(false);
       }
     }
-
     loadInitialData();
-  }, [canAccess]);
+  }, []);
 
-  useEffect(() => {
-    const bus = getUiEventBus();
-    const unsubscribe = bus.subscribe(EVENTS.REPORT_UPDATED, async () => {
-      if (!canAccess) return;
-      try {
-        const res = await fetch('/api/reports');
-        const data = await res.json();
-        const nextMap = toReportMapByInitiative(data.reports || []);
-        setReportMap(nextMap);
-        if (selectedInitiative) {
-          loadReportForInitiative(selectedInitiative, nextMap);
-        }
-      } catch (error) {
-        console.error('Failed to refresh reports after update event:', error);
-      }
-    });
-    return unsubscribe;
-  }, [canAccess, selectedInitiative]);
-
-  function loadReportForInitiative(initiative, mapOverride) {
-    const currentMap = mapOverride || reportMap;
-    const report = currentMap[initiative.id];
+  function loadReportForInitiative(initiative, map) {
+    const rMap = map || reportMap;
+    const report = rMap[initiative.id];
 
     if (!report) {
       setReportData(null);
       setTrendData([]);
+      setNoReport(true);
       return;
     }
 
-    const viewModel = toReportingViewModel(report);
-    setReportData(viewModel.reportData);
-    setTrendData(viewModel.trendData);
+    setNoReport(false);
+
+    let parsed = null;
+    try {
+      parsed = typeof report.report_data === 'string'
+        ? JSON.parse(report.report_data)
+        : report.report_data;
+    } catch {
+      parsed = null;
+    }
+
+    const normalized = normalizeSnapshot(parsed);
+    if (normalized) {
+      const results = normalized.results;
+      setReportData({
+        reportId: results.reportId,
+        initiativeId: normalized.config.initiativeId,
+        initiativeName: results.initiativeName,
+        generatedDate: results.generatedDate,
+        summary: results.summary,
+        chartData: results.chartData,
+        tableData: results.filteredTableData,
+        explainability: results.explainability,
+      });
+      setTrendData(results.trendData || []);
+    } else {
+      setReportData(null);
+      setTrendData([]);
+      setNoReport(true);
+    }
   }
 
   async function handleInitiativeSelect(initiative) {
     setIsLoading(true);
     setSelectedInitiative(initiative);
-    setShowSocialMenu(false);
     loadReportForInitiative(initiative);
     setIsLoading(false);
   }
 
+  /**
+   * ================================
+   * SOCIAL MEDIA FUNCTIONS
+   * ================================
+   */
   function togglePlatform(platform) {
     setSelectedPlatforms((prev) =>
       prev.includes(platform)
-        ? prev.filter((item) => item !== platform)
+        ? prev.filter((p) => p !== platform)
         : [...prev, platform]
     );
   }
 
   async function handlePostToSocialMedia() {
     if (!reportData || selectedPlatforms.length === 0) {
-      alert('Select at least one platform.');
+      alert("Select at least one platform.");
       return;
     }
 
@@ -130,16 +153,19 @@ export default function ReportingPage() {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      setUploadStatus('Upload successful.');
+      setUploadStatus("Upload successful.");
       setSelectedPlatforms([]);
     } catch (error) {
       console.error(error);
-      setUploadStatus('Upload failed. Please try again.');
+      setUploadStatus("Upload failed. Please try again.");
     } finally {
       setIsUploading(false);
     }
   }
 
+  /**
+   * Create shareable link
+   */
   function handleCreateShareableLink() {
     if (!reportData || !selectedInitiative) return;
 
@@ -147,14 +173,20 @@ export default function ReportingPage() {
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareableUrl)
-        .then(() => alert('Shareable link copied to clipboard!'))
-        .catch(() => window.prompt('Copy this shareable report link:', shareableUrl));
-      return;
+        .then(() => {
+          alert("Shareable link copied to clipboard!");
+        })
+        .catch(() => {
+          window.prompt("Copy this shareable report link:", shareableUrl);
+        });
+    } else {
+      window.prompt("Copy this shareable report link:", shareableUrl);
     }
-
-    window.prompt('Copy this shareable report link:', shareableUrl);
   }
 
+  /**
+   * handleDownload — Exports the current report
+   */
   function handleDownload(format) {
     if (!reportData || !selectedInitiative) return;
 
@@ -162,14 +194,14 @@ export default function ReportingPage() {
 
     if (format === 'csv') {
       const csvContent =
-        'data:text/csv;charset=utf-8,' +
-        Object.keys(reportData).join(',') +
-        '\n' +
-        Object.values(reportData).join(',');
+        "data:text/csv;charset=utf-8," +
+        Object.keys(reportData).join(",") +
+        "\n" +
+        Object.values(reportData).join(",");
       const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `${fileName}.csv`);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `${fileName}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -186,7 +218,7 @@ export default function ReportingPage() {
         </html>
       `;
       const blob = new Blob([htmlContent], { type: 'text/html' });
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${fileName}.html`;
       link.click();
@@ -199,43 +231,22 @@ export default function ReportingPage() {
     if (format === 'xlsx') {
       const worksheet = Object.entries(reportData)
         .map(([key, value]) => `${key}\t${value}`)
-        .join('\n');
+        .join("\n");
 
       const blob = new Blob([worksheet], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       });
 
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${fileName}.xlsx`;
       link.click();
     }
   }
 
-  if (!canAccess) {
-    return (
-      <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
-          <BackButton />
-        </div>
-        <section style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem 1.5rem 2rem' }}>
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              Reporting Access Required
-            </h2>
-            <p style={{ color: 'var(--color-text-secondary)' }}>
-              Only staff and admin users can view this page.
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+      <Header userRole={userRole} onRoleChange={setUserRole} />
 
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
         <BackButton />
@@ -250,18 +261,6 @@ export default function ReportingPage() {
       </section>
 
       <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
-        {isLoading && (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '2rem' }}>
-            Loading reports...
-          </div>
-        )}
-
-        {!isLoading && !reportData && selectedInitiative && (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '2rem' }}>
-            No generated report found for this initiative yet.
-          </div>
-        )}
-
         {reportData && (
           <>
             {(userRole === 'staff' || userRole === 'admin') && (
@@ -274,10 +273,12 @@ export default function ReportingPage() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   backgroundColor: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-bg-tertiary)',
+                  border: '1px solid var(--color-bg-tertiary)'
                 }}
               >
-                <div style={{ fontWeight: 600 }}>Download Report</div>
+                <div style={{ fontWeight: 600 }}>
+                  Download Report
+                </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   {['pdf', 'csv', 'xlsx', 'html'].map((format) => (
@@ -291,7 +292,7 @@ export default function ReportingPage() {
                         borderRadius: '6px',
                         border: '1px solid var(--color-bg-tertiary)',
                         backgroundColor: 'var(--color-bg-primary)',
-                        cursor: 'pointer',
+                        cursor: 'pointer'
                       }}
                     >
                       {format.toUpperCase()}
@@ -307,16 +308,17 @@ export default function ReportingPage() {
                       borderRadius: '6px',
                       border: '1px solid var(--color-bg-tertiary)',
                       backgroundColor: 'var(--color-bg-primary)',
-                      cursor: 'pointer',
+                      cursor: 'pointer'
                     }}
                   >
                     Create Shareable Link
                   </button>
 
+                  {/* SMALL SHARE DROPDOWN (ADMIN ONLY) */}
                   {userRole === 'admin' && (
                     <div style={{ position: 'relative' }}>
                       <button
-                        onClick={() => setShowSocialMenu((prev) => !prev)}
+                        onClick={() => setShowSocialMenu(!showSocialMenu)}
                         style={{
                           padding: '0.4rem 0.75rem',
                           fontSize: '0.8rem',
@@ -324,7 +326,7 @@ export default function ReportingPage() {
                           border: '1px solid var(--color-bg-tertiary)',
                           backgroundColor: 'transparent',
                           cursor: 'pointer',
-                          opacity: 0.8,
+                          opacity: 0.8
                         }}
                       >
                         Share ▾
@@ -342,7 +344,7 @@ export default function ReportingPage() {
                             padding: '0.75rem',
                             width: '220px',
                             zIndex: 1000,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                           }}
                         >
                           <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>
@@ -373,17 +375,20 @@ export default function ReportingPage() {
                               fontSize: '0.8rem',
                               borderRadius: '6px',
                               border: '1px solid var(--color-bg-tertiary)',
-                              backgroundColor: 'var(--color-asrs-orange)',
+                              backgroundColor: 'var(--color-brand-primary)',
                               color: '#fff',
-                              cursor: isUploading ? 'not-allowed' : 'pointer',
-                              opacity: isUploading ? 0.8 : 1,
+                              cursor: isUploading ? 'not-allowed' : 'pointer'
                             }}
                           >
                             {isUploading ? 'Posting...' : 'Post'}
                           </button>
 
                           {uploadStatus && (
-                            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                            <div style={{
+                              marginTop: '0.5rem',
+                              fontSize: '0.75rem',
+                              opacity: 0.8
+                            }}>
                               {uploadStatus}
                             </div>
                           )}
@@ -403,6 +408,50 @@ export default function ReportingPage() {
             />
           </>
         )}
+      </section>
+
+      {/* Footer Navigation Buttons */}
+      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <Link href="/report-creation">
+            <button
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: 'var(--color-asrs-orange)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+            >
+              Report Creation
+            </button>
+          </Link>
+          <Link href="/manage-reports">
+            <button
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: 'var(--color-asrs-orange)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+            >
+              Manage Reports
+            </button>
+          </Link>
+        </div>
       </section>
     </main>
   );
