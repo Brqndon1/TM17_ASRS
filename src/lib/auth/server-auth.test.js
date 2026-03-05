@@ -109,6 +109,41 @@ describe('server-auth helper', () => {
     expect(run).toHaveBeenCalled();
   });
 
+  test('requireAccess idle expiry boundary: valid at exact time, revoked after', () => {
+    process.env.NODE_ENV = 'development';
+    vi.useFakeTimers();
+    const boundaryIso = '2026-03-05T00:00:00.000Z';
+    const run = vi.fn();
+    const db = {
+      prepare: vi.fn((sql) => {
+        if (sql.includes('WHERE s.token_hash = ?')) {
+          return { get: vi.fn(() => ({
+            session_id: 2,
+            user_id: 9,
+            csrf_token: 'abc',
+            expires_at: boundaryIso,
+            absolute_expires_at: '2026-03-06T00:00:00.000Z',
+            revoked_at: null,
+            first_name: 'A', last_name: 'B', email: 'a@x.com', verified: 1, user_type: 'staff', access_rank: 50,
+          })) };
+        }
+        return { run, get: vi.fn(), all: vi.fn(() => []) };
+      }),
+    };
+
+    vi.setSystemTime(new Date(boundaryIso));
+    const req = new Request('http://localhost:3000/api/x', { headers: { cookie: `${SESSION_COOKIE_NAME}=tok` } });
+    const atBoundary = requireAccess(req, db, { requireCsrf: false });
+    expect(atBoundary.user.email).toBe('a@x.com');
+
+    vi.setSystemTime(new Date('2026-03-05T00:00:00.001Z'));
+    const afterBoundary = requireAccess(req, db, { requireCsrf: false });
+    expect(afterBoundary.error.status).toBe(401);
+    expect(run).toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   test('cookie helpers set and clear cookies and token extraction works', () => {
     const response = { cookies: { set: vi.fn() } };
     applySessionCookies(response, 'token', 'csrf');

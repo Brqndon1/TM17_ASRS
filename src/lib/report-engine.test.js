@@ -55,4 +55,71 @@ describe('report-engine', () => {
     expect(first[0].confidenceScore).toBeGreaterThanOrEqual(0);
     expect(first[0].confidenceScore).toBeLessThanOrEqual(100);
   });
+
+  test('computeTrendData handles empty and short datasets as stable with zero confidence', () => {
+    const configResult = validateTrendConfig(
+      { variables: ['Score'], method: 'delta_halves', thresholdPct: 2 },
+      ['Score']
+    );
+    expect(configResult.valid).toBe(true);
+
+    const empty = computeTrendData([], configResult.normalized, { initiativeId: 2, reportName: 'Empty' });
+    const short = computeTrendData([{ score: 10 }, { score: 20 }, { score: 30 }], configResult.normalized);
+
+    expect(empty).toHaveLength(1);
+    expect(empty[0].direction).toBe('stable');
+    expect(empty[0].confidenceScore).toBe(0);
+
+    expect(short).toHaveLength(1);
+    expect(short[0].direction).toBe('stable');
+    expect(short[0].confidenceScore).toBe(0);
+  });
+
+  test('computeTrendData skips malformed values and still computes categorical trend when possible', () => {
+    const configResult = validateTrendConfig(
+      { variables: ['Score', 'Status'], method: 'delta_halves', thresholdPct: 1 },
+      ['Score', 'Status']
+    );
+    expect(configResult.valid).toBe(true);
+
+    const mixedRows = [
+      { score: 'n/a', status: 'low' },
+      { score: null, status: 'low' },
+      { score: undefined, status: 'low' },
+      { score: '', status: 'high' },
+      { score: 'bad', status: 'high' },
+      { score: 'bad2', status: 'high' },
+    ];
+
+    const trends = computeTrendData(mixedRows, configResult.normalized, { reportName: 'Mixed' });
+    expect(trends).toHaveLength(1);
+    expect(trends[0].direction).toBe('down');
+    expect(trends[0].confidenceScore).toBeGreaterThan(0);
+    expect(trends[0].description).toContain('skipped');
+  });
+
+  test('computeTrendData handles boundary threshold for stable vs direction', () => {
+    const rowsBoundary = [
+      { score: 100 },
+      { score: 100 },
+      { score: 102 },
+      { score: 102 },
+    ];
+
+    const stableConfig = validateTrendConfig(
+      { variables: ['Score'], method: 'delta_halves', thresholdPct: 2 },
+      ['Score']
+    );
+    expect(stableConfig.valid).toBe(true);
+    const stableTrend = computeTrendData(rowsBoundary, stableConfig.normalized);
+    expect(stableTrend[0].direction).toBe('stable');
+
+    const upConfig = validateTrendConfig(
+      { variables: ['Score'], method: 'delta_halves', thresholdPct: 1.9 },
+      ['Score']
+    );
+    expect(upConfig.valid).toBe(true);
+    const upTrend = computeTrendData(rowsBoundary, upConfig.normalized);
+    expect(upTrend[0].direction).toBe('up');
+  });
 });

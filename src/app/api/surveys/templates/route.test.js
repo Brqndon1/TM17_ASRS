@@ -1,38 +1,114 @@
-const prepareMock = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../../lib/db.js', () => ({
-  default: { prepare: prepareMock, transaction: vi.fn((fn) => fn) },
+const state = vi.hoisted(() => ({ db: null }));
+const dbProxy = vi.hoisted(() => ({
+  prepare: (...args) => state.db.prepare(...args),
+  transaction: (...args) => state.db.transaction(...args),
 }));
 
-vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { user_id: 1, access_rank: 100 } }),
+vi.mock('../../../../lib/db.js', () => ({
+  default: dbProxy,
 }));
 
 import { GET, POST } from '@/app/api/surveys/templates/route';
+import {
+  closeTestDb,
+  createAuthedRequestHeaders,
+  createSessionForRank,
+  createTestDb,
+} from '@/test/integration/api-test-harness';
 
-describe('/api/surveys/templates', () => {
+describe('/api/surveys/templates integration', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
-    prepareMock.mockReset();
+    state.db = createTestDb();
   });
 
-  test('GET returns template list', async () => {
-    prepareMock.mockImplementation((sql) => {
-      if (sql.includes('FROM form')) return { all: vi.fn(() => []) };
-      return { all: vi.fn(() => []) };
-    });
+  afterEach(() => {
+    closeTestDb(state.db);
+    state.db = null;
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  test('GET returns published templates with question options', async () => {
+    const formId = Number(state.db.prepare(
+      'INSERT INTO form (initiative_id, form_name, description, is_published) VALUES (1, ?, ?, 1)'
+    ).run('Student Pulse', 'weekly check-in').lastInsertRowid);
+
+    const fieldId = Number(state.db.prepare(
+      'INSERT INTO field (field_key, field_label, field_type, scope) VALUES (?, ?, ?, ?)' 
+    ).run('pulse_1', 'How are you?', 'choice', 'common').lastInsertRowid);
+
+    state.db.prepare(
+      'INSERT INTO form_field (form_id, field_id, display_order, required, help_text) VALUES (?, ?, 0, 1, ?)'
+    ).run(formId, fieldId, 'Select one');
+
+    state.db.prepare(
+      'INSERT INTO field_options (field_id, option_value, display_label, display_order) VALUES (?, ?, ?, ?), (?, ?, ?, ?)'
+    ).run(fieldId, 'good', 'Good', 0, fieldId, 'bad', 'Bad', 1);
 
     const res = await GET();
+    const payload = await res.json();
+
     expect(res.status).toBe(200);
+    expect(payload).toHaveLength(1);
+    expect(payload[0].questions[0].text.options).toEqual(['good', 'bad']);
   });
 
-  test('POST returns 400 for invalid payload', async () => {
+  test('POST returns 401 without auth in non-test env', async () => {
+    process.env.NODE_ENV = 'development';
+
     const req = new Request('http://localhost:3000/api/surveys/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: '' }),
+      body: JSON.stringify({ title: 'No Auth', questions: [] }),
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
+  });
+
+  test('POST validates payload and persists form/fields/options', async () => {
+    process.env.NODE_ENV = 'development';
+    const tokens = createSessionForRank(state.db, { rank: 50 });
+
+    const invalidReq = new Request('http://localhost:3000/api/surveys/templates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...createAuthedRequestHeaders(tokens, { csrf: true }),
+      },
+      body: JSON.stringify({ title: '', questions: 'x' }),
+    });
+    expect((await POST(invalidReq)).status).toBe(400);
+
+    const validReq = new Request('http://localhost:3000/api/surveys/templates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...createAuthedRequestHeaders(tokens, { csrf: true }),
+      },
+      body: JSON.stringify({
+        title: 'Readiness Survey',
+        description: 'A readiness template',
+        questions: [
+          { text: { question: 'Q1', type: 'choice', required: true, options: ['yes', 'no'] } },
+          { text: { question: 'Q2', type: 'text', required: false } },
+        ],
+      }),
+    });
+
+    const res = await POST(validReq);
+    const payload = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(payload.title).toBe('Readiness Survey');
+
+    const formCount = state.db.prepare('SELECT COUNT(*) AS c FROM form WHERE form_name = ?').get('Readiness Survey').c;
+    const fieldCount = state.db.prepare('SELECT COUNT(*) AS c FROM field').get().c;
+    const optionCount = state.db.prepare('SELECT COUNT(*) AS c FROM field_options').get().c;
+
+    expect(formCount).toBe(1);
+    expect(fieldCount).toBe(2);
+    expect(optionCount).toBe(2);
   });
 });
