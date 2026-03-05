@@ -59,6 +59,9 @@ export async function POST(request) {
     const { db, mailer, clock, eventBus } = getServiceContainer();
     const body = await request.json();
     const { requesterEmail, first_name, last_name, phone_number, email, user_type } = body;
+    const normalizedFirstName = String(first_name || '').trim();
+    const normalizedLastName = String(last_name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (!verifyAdmin(db, requesterEmail)) {
       return NextResponse.json(
@@ -67,7 +70,7 @@ export async function POST(request) {
       );
     }
 
-    if (!first_name || !last_name || !email || !user_type) {
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !user_type) {
       return NextResponse.json(
         { error: 'All fields are required (first_name, last_name, email, user_type)' },
         { status: 400 }
@@ -82,11 +85,11 @@ export async function POST(request) {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    const existing = db.prepare('SELECT user_id, verified FROM user WHERE email = ?').get(email);
+    const existing = db.prepare('SELECT user_id, verified FROM user WHERE email = ?').get(normalizedEmail);
     if (existing) {
       if (!existing.verified) {
         const token = randomBytes(32).toString('hex');
@@ -95,20 +98,32 @@ export async function POST(request) {
         db.prepare('UPDATE user SET verification_token = ?, token_expires_at = ? WHERE user_id = ?')
           .run(token, expiresAt, existing.user_id);
 
-        await mailer.sendAdminInviteEmail({ to: email, firstName: first_name, role: user_type, token });
+        let emailSent = true;
+        try {
+          await mailer.sendAdminInviteEmail({ to: normalizedEmail, firstName: normalizedFirstName, role: user_type, token });
+        } catch (error) {
+          emailSent = false;
+          console.error('Admin invite resend email error:', error);
+        }
 
         eventBus.publish(EVENTS.USER_INVITED, {
           invitedBy: requesterEmail,
-          email,
+          email: normalizedEmail,
           role: user_type,
           userId: Number(existing.user_id),
           resent: true,
           invitedAt: clock.nowIso(),
         });
 
+        const devVerificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
+
         return NextResponse.json({
           success: true,
-          message: 'This user exists but hasn\'t verified yet. A new invite email has been sent.',
+          emailSent,
+          message: emailSent
+            ? 'This user exists but hasn\'t verified yet. A new invite email has been sent.'
+            : 'This user exists but hasn\'t verified yet. Email delivery is unavailable; use the verification link below.',
+          verificationUrl: process.env.NODE_ENV === 'production' ? undefined : devVerificationUrl,
         });
       }
 
@@ -130,27 +145,39 @@ export async function POST(request) {
     const result = db.prepare(`
       INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id, verified, verification_token, token_expires_at)
       VALUES (?, ?, ?, ?, '', ?, 0, ?, ?)
-    `).run(first_name, last_name, phone_number || null, email, typeRow.user_type_id, token, expiresAt);
+    `).run(normalizedFirstName, normalizedLastName, phone_number || null, normalizedEmail, typeRow.user_type_id, token, expiresAt);
 
-    await mailer.sendAdminInviteEmail({ to: email, firstName: first_name, role: user_type, token });
+    let emailSent = true;
+    try {
+      await mailer.sendAdminInviteEmail({ to: normalizedEmail, firstName: normalizedFirstName, role: user_type, token });
+    } catch (error) {
+      emailSent = false;
+      console.error('Admin invite email error:', error);
+    }
 
     eventBus.publish(EVENTS.USER_INVITED, {
       invitedBy: requesterEmail,
-      email,
+      email: normalizedEmail,
       role: user_type,
       userId: Number(result.lastInsertRowid),
       resent: false,
       invitedAt: clock.nowIso(),
     });
 
+    const devVerificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
+
     return NextResponse.json({
       success: true,
-      message: `User created. An invite email has been sent to ${email}.`,
+      emailSent,
+      message: emailSent
+        ? `User created. An invite email has been sent to ${normalizedEmail}.`
+        : `User created. Email delivery is unavailable; use the verification link below for ${normalizedEmail}.`,
+      verificationUrl: process.env.NODE_ENV === 'production' ? undefined : devVerificationUrl,
       user: {
         user_id: result.lastInsertRowid,
-        first_name,
-        last_name,
-        email,
+        first_name: normalizedFirstName,
+        last_name: normalizedLastName,
+        email: normalizedEmail,
         user_type,
         verified: false,
       },

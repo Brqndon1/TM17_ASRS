@@ -5,8 +5,9 @@ export async function POST(request) {
   try {
     const { db } = getServiceContainer();
     const { email, password } = await request.json();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 
@@ -15,7 +16,7 @@ export async function POST(request) {
       FROM user u
       LEFT JOIN user_type ut ON u.user_type_id = ut.user_type_id
       WHERE u.email = ?
-    `).get(email);
+    `).get(normalizedEmail);
 
     if (!user || user.password !== password) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });

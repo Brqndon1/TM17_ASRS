@@ -14,6 +14,8 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [resultMessage, setResultMessage] = useState('');
+  const [verificationUrl, setVerificationUrl] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -45,6 +47,8 @@ export default function SignupPage() {
       const data = await response.json();
 
       if (response.ok) {
+        setResultMessage(data.message || 'Account created!');
+        setVerificationUrl(data.verificationUrl || '');
         setSubmitted(true);
       } else {
         setError(data.error || 'Signup failed');
@@ -92,6 +96,28 @@ export default function SignupPage() {
               We sent a verification link to <strong>{formData.email}</strong>.
               Click the link in that email to verify your address and set your password.
             </p>
+            {resultMessage && (
+              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                {resultMessage}
+              </p>
+            )}
+            {verificationUrl && (
+              <div style={{
+                backgroundColor: '#fff8e1',
+                border: '1px solid #ffe082',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                textAlign: 'left',
+                marginBottom: '1rem',
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#795548', fontSize: '0.85rem' }}>
+                  Email delivery is unavailable in this environment. Open this verification link directly:
+                </p>
+                <a href={verificationUrl} style={{ color: '#1a4a8a', fontSize: '0.8rem', wordBreak: 'break-all' }}>
+                  {verificationUrl}
+                </a>
+              </div>
+            )}
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
               Didn't get it? Check your spam folder, or{' '}
               <button

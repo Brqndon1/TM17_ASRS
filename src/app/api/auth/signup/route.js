@@ -7,7 +7,11 @@ export async function POST(request) {
     const { db, mailer, clock } = getServiceContainer();
     const { first_name, last_name, phone_number, email } = await request.json();
 
-    if (!first_name || !last_name || !email) {
+    const normalizedFirstName = String(first_name || '').trim();
+    const normalizedLastName = String(last_name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedFirstName || !normalizedLastName || !normalizedEmail) {
       return NextResponse.json(
         { error: 'First name, last name, and email are required' },
         { status: 400 }
@@ -15,11 +19,11 @@ export async function POST(request) {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    const existingUser = db.prepare('SELECT user_id, verified FROM user WHERE email = ?').get(email);
+    const existingUser = db.prepare('SELECT user_id, verified FROM user WHERE email = ?').get(normalizedEmail);
 
     if (existingUser) {
       if (!existingUser.verified) {
@@ -29,11 +33,23 @@ export async function POST(request) {
         db.prepare('UPDATE user SET verification_token = ?, token_expires_at = ? WHERE user_id = ?')
           .run(token, expiresAt, existingUser.user_id);
 
-        await mailer.sendSignupVerificationEmail({ to: email, firstName: first_name, token });
+        let emailSent = true;
+        try {
+          await mailer.sendSignupVerificationEmail({ to: normalizedEmail, firstName: normalizedFirstName, token });
+        } catch (error) {
+          emailSent = false;
+          console.error('Signup resend email error:', error);
+        }
+
+        const devVerificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
 
         return NextResponse.json({
           success: true,
-          message: 'A new verification email has been sent. Please check your inbox.',
+          emailSent,
+          message: emailSent
+            ? 'A new verification email has been sent. Please check your inbox.'
+            : 'Account exists and a new verification link was generated. Email delivery is unavailable in this environment.',
+          verificationUrl: process.env.NODE_ENV === 'production' ? undefined : devVerificationUrl,
         });
       }
 
@@ -58,14 +74,26 @@ export async function POST(request) {
     db.prepare(`
       INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id, verified, verification_token, token_expires_at)
       VALUES (?, ?, ?, ?, '', ?, 0, ?, ?)
-    `).run(first_name, last_name, phone_number || null, email, publicType.user_type_id, token, expiresAt);
+    `).run(normalizedFirstName, normalizedLastName, phone_number || null, normalizedEmail, publicType.user_type_id, token, expiresAt);
 
-    await mailer.sendSignupVerificationEmail({ to: email, firstName: first_name, token });
+    let emailSent = true;
+    try {
+      await mailer.sendSignupVerificationEmail({ to: normalizedEmail, firstName: normalizedFirstName, token });
+    } catch (error) {
+      emailSent = false;
+      console.error('Signup email error:', error);
+    }
+
+    const devVerificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Account created! Please check your email to verify your address.',
+        emailSent,
+        message: emailSent
+          ? 'Account created! Please check your email to verify your address.'
+          : 'Account created! Email delivery is unavailable in this environment, use the verification link below.',
+        verificationUrl: process.env.NODE_ENV === 'production' ? undefined : devVerificationUrl,
       },
       { status: 201 }
     );

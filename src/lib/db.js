@@ -124,6 +124,113 @@ function migrationFixFieldTableConstraint() {
   }
 }
 
+/**
+ * Migration: Repair foreign keys that incorrectly reference field_backup
+ *
+ * A previous field-table migration can leave dependent tables referencing
+ * "field_backup" as the parent table. This migration rebuilds those tables
+ * so they correctly reference "field".
+ */
+function migrationRepairFieldBackupForeignKeys() {
+  const tableSpecs = [
+    {
+      name: 'field_options',
+      temp: 'field_options_old',
+      createSql: `
+        CREATE TABLE field_options (
+          field_option_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          field_id INTEGER NOT NULL REFERENCES field(field_id) ON DELETE CASCADE,
+          option_value TEXT NOT NULL,
+          display_label TEXT NOT NULL,
+          display_order INTEGER NOT NULL DEFAULT 0
+        );
+      `,
+      columns: 'field_option_id, field_id, option_value, display_label, display_order',
+    },
+    {
+      name: 'form_field',
+      temp: 'form_field_old',
+      createSql: `
+        CREATE TABLE form_field (
+          form_field_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          form_id INTEGER NOT NULL REFERENCES form(form_id) ON DELETE CASCADE,
+          field_id INTEGER NOT NULL REFERENCES field(field_id),
+          display_order INTEGER NOT NULL DEFAULT 0,
+          required INTEGER NOT NULL DEFAULT 0,
+          is_hidden INTEGER NOT NULL DEFAULT 0,
+          help_text TEXT
+        );
+      `,
+      columns: 'form_field_id, form_id, field_id, display_order, required, is_hidden, help_text',
+    },
+    {
+      name: 'submission_value',
+      temp: 'submission_value_old',
+      createSql: `
+        CREATE TABLE submission_value (
+          submission_value_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          submission_id INTEGER NOT NULL REFERENCES submission(submission_id) ON DELETE CASCADE,
+          field_id INTEGER NOT NULL REFERENCES field(field_id),
+          value_text TEXT,
+          value_number REAL,
+          value_date TEXT,
+          value_bool INTEGER,
+          value_json TEXT,
+          UNIQUE(submission_id, field_id)
+        );
+      `,
+      columns: 'submission_value_id, submission_id, field_id, value_text, value_number, value_date, value_bool, value_json',
+    },
+  ];
+
+  try {
+    for (const spec of tableSpecs) {
+      const tableExists = db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?"
+      ).get(spec.name);
+      if (!tableExists) continue;
+
+      const fkRows = db.prepare(`PRAGMA foreign_key_list(${spec.name})`).all();
+      const needsRepair = fkRows.some((row) => row.table === 'field_backup');
+      if (!needsRepair) continue;
+
+      console.log(`[db] Repairing foreign key references for ${spec.name}...`);
+
+      db.pragma('foreign_keys = OFF');
+      try {
+        db.exec('BEGIN TRANSACTION;');
+        db.exec(`DROP TABLE IF EXISTS ${spec.temp};`);
+        db.exec(`ALTER TABLE ${spec.name} RENAME TO ${spec.temp};`);
+        db.exec(spec.createSql);
+        db.exec(`
+          INSERT INTO ${spec.name} (${spec.columns})
+          SELECT ${spec.columns}
+          FROM ${spec.temp};
+        `);
+        db.exec(`DROP TABLE ${spec.temp};`);
+        db.exec('COMMIT;');
+        console.log(`[db] ✓ Repaired ${spec.name}`);
+      } catch (error) {
+        try {
+          db.exec('ROLLBACK;');
+        } catch (rollbackError) {
+          // Ignore
+        }
+        throw error;
+      } finally {
+        db.pragma('foreign_keys = ON');
+      }
+    }
+  } catch (error) {
+    try {
+      db.pragma('foreign_keys = ON');
+    } catch (e) {
+      // Ignore
+    }
+    console.error('[db] Foreign key repair migration error:', error.message);
+  }
+}
+
 // Initialize database schema on module load
 initializeDatabase();
 
@@ -139,6 +246,7 @@ function initializeDatabase() {
     // ── Migrations for existing databases ──────────────────────────────
     migrationAddFormColumns();
     migrationFixFieldTableConstraint();
+    migrationRepairFieldBackupForeignKeys();
 
     // ── Design-doc tables ──────────────────────────────────
 

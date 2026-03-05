@@ -145,7 +145,9 @@ export default function AdminUsersPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        setSuccessMsg(`Invite sent to ${addForm.email} — they'll set their own password via email.`);
+        const defaultMsg = `Invite sent to ${addForm.email} — they'll set their own password via email.`;
+        const withLink = data.verificationUrl ? `${data.message}\n${data.verificationUrl}` : (data.message || defaultMsg);
+        setSuccessMsg(withLink);
         setShowAddForm(false);
         setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', user_type: 'staff' });
         fetchUsers();
@@ -229,6 +231,7 @@ export default function AdminUsersPage() {
             borderRadius: '8px',
             color: '#2e7d32',
             fontSize: '0.9rem',
+            whiteSpace: 'pre-line',
           }}>
             ✅ {successMsg}
           </div>
