@@ -3,6 +3,13 @@ import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
 import { requireAccess } from '@/lib/auth/server-auth';
 
+function toLocalYyyyMmDd(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // POST - Submit a survey
 export async function POST(request) {
   try {
@@ -26,7 +33,7 @@ export async function POST(request) {
     const reportData = await generateAIReport(responses, basicStats);
 
     // Use a transaction so survey + report are atomic
-    const insertSurveyAndReport = db.transaction((name, email, responsesJSON, reportJSON) => {
+    const insertSurveyAndReport = db.transaction((name, email, responsesJSON, reportJSON, templateId) => {
       const surveyInfo = db.prepare(
         `INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)`
       ).run(name, email, responsesJSON);
@@ -37,6 +44,27 @@ export async function POST(request) {
         `INSERT INTO reports (survey_id, report_data) VALUES (?, ?)`
       ).run(surveyId, reportJSON);
 
+      if (templateId) {
+        const today = toLocalYyyyMmDd(new Date());
+        const activeDistribution = db.prepare(`
+          SELECT distribution_id
+          FROM survey_distribution
+          WHERE survey_template_id = ?
+            AND ? >= start_date
+            AND ? <= end_date
+          ORDER BY created_at DESC
+          LIMIT 1
+        `).get(String(templateId), today, today);
+
+        if (activeDistribution?.distribution_id) {
+          db.prepare(`
+            UPDATE survey_distribution
+            SET response_count = response_count + 1
+            WHERE distribution_id = ?
+          `).run(activeDistribution.distribution_id);
+        }
+      }
+
       return surveyId;
     });
 
@@ -44,7 +72,8 @@ export async function POST(request) {
       name,
       email,
       JSON.stringify(responses),
-      JSON.stringify(reportData)
+      JSON.stringify(reportData),
+      responses.templateId
     );
 
     return NextResponse.json({

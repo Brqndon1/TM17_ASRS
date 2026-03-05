@@ -139,6 +139,10 @@ export default function QRCodeManager({
     setLoading(true);
 
     try {
+      if (qrType === 'survey' && !selectedTemplateId) {
+        throw new Error('Please select a survey template before generating a survey QR code.');
+      }
+
       // ─────────────────────────────────────────────────────────────────
       // STEP 1: Prepare Request Body
       // ─────────────────────────────────────────────────────────────────
@@ -304,7 +308,7 @@ export default function QRCodeManager({
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-asrs-red focus:border-transparent"
             disabled={loading || templatesLoading}
           >
-            <option value="">General Survey (Default)</option>
+            <option value="">Select a survey template</option>
             {surveyTemplates.map((template) => (
               <option key={template.id} value={template.id}>
                 {template.title || `Survey Template #${template.id}`}
@@ -314,7 +318,7 @@ export default function QRCodeManager({
           <p className="text-xs text-gray-500 mt-1">
             {selectedTemplateId
               ? '✓ QR code will link to the selected survey template'
-              : 'Select a template or use default survey form'}
+              : 'A template selection is required for survey QR codes.'}
           </p>
         </div>
 

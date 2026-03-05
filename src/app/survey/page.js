@@ -10,7 +10,10 @@ import { toSurveyTemplateViewModel } from '@/lib/adapters/survey-template-adapte
 
 export default function SurveyPage() {
   const { user } = useAuthStore();
-  const userRole = user?.user_type || 'public';
+  const [isMounted, setIsMounted] = useState(false);
+  const [isQrAccess, setIsQrAccess] = useState(false);
+  const userRole = isMounted ? (user?.user_type || 'public') : 'public';
+  const isPublicView = isQrAccess || userRole === 'public';
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -39,10 +42,27 @@ export default function SurveyPage() {
   const [surveyTemplate, setSurveyTemplate] = useState(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateResponses, setTemplateResponses] = useState({});
+  const [staffTemplates, setStaffTemplates] = useState([]);
+  const [staffQrCodes, setStaffQrCodes] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState('');
+  const [copiedQrKey, setCopiedQrKey] = useState('');
+
+  useEffect(() => {
+    setIsMounted(true);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasQrParam = Boolean(urlParams.get('qr'));
+
+    if (hasQrParam) {
+      setIsQrAccess(true);
+      setSurveyOpen(true);
+    }
+  }, []);
 
   // Check for an active distribution on mount (public users only)
   useEffect(() => {
-    if (userRole !== 'public') return;
+    if (!isPublicView) return;
 
     // Bypass distribution check when arriving via QR code link
     const urlParams = new URLSearchParams(window.location.search);
@@ -73,7 +93,7 @@ export default function SurveyPage() {
         // If the API fails, default to allowing the survey (graceful degradation)
         setSurveyOpen(true);
       });
-  }, [userRole]);
+  }, [isPublicView]);
 
   // Load survey template if ?template= parameter is present,
   // or if there is an active distribution and no ?template= in the URL
@@ -106,8 +126,6 @@ export default function SurveyPage() {
     } else if (activeDistribution && activeDistribution.survey_template_id) {
       fetchTemplate(activeDistribution.survey_template_id);
     }
-    // Only run when activeDistribution changes or on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDistribution]);
 
   // Track QR code scan if ?qr= parameter is present
@@ -138,6 +156,48 @@ export default function SurveyPage() {
         console.error('Error recording QR scan:', err);
       });
   }, []);
+
+  useEffect(() => {
+    if (isPublicView) return;
+
+    let isCancelled = false;
+    setStaffLoading(true);
+    setStaffError('');
+
+    Promise.all([
+      fetch('/api/surveys/templates').then((res) => (res.ok ? res.json() : [])),
+      fetch('/api/qr-codes?scope=survey').then((res) => (res.ok ? res.json() : { qrCodes: [] })),
+    ])
+      .then(([templatesData, qrCodesData]) => {
+        if (isCancelled) return;
+        setStaffTemplates(Array.isArray(templatesData) ? templatesData : []);
+        setStaffQrCodes(Array.isArray(qrCodesData?.qrCodes) ? qrCodesData.qrCodes : []);
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        setStaffTemplates([]);
+        setStaffQrCodes([]);
+        setStaffError('Unable to load survey QR inventory right now.');
+      })
+      .finally(() => {
+        if (isCancelled) return;
+        setStaffLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isPublicView]);
+
+  const handleCopyQrUrl = async (qrCode) => {
+    try {
+      await navigator.clipboard.writeText(qrCode.targetUrl);
+      setCopiedQrKey(qrCode.qrCodeKey);
+      setTimeout(() => setCopiedQrKey(''), 1500);
+    } catch {
+      setStaffError('Copy failed. Please copy the URL manually.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -300,12 +360,12 @@ export default function SurveyPage() {
       <Header />
 
       <main style={{ 
-        maxWidth: userRole === 'public' ? '680px' : '1100px', 
+        maxWidth: isPublicView ? '680px' : '1100px', 
         margin: '0 auto', 
-        padding: userRole === 'public' ? '2rem 1.5rem' : '1.5rem' 
+        padding: isPublicView ? '2rem 1.5rem' : '1.5rem' 
       }}>
         <BackButton />
-        {userRole === 'public' ? (
+        {isPublicView ? (
           // Public user view - Take a Survey (completed form)
           <div className="asrs-card">
             {/* ---- Loading distribution check ---- */}
@@ -508,7 +568,7 @@ export default function SurveyPage() {
                             </>
                           )}
 
-                          {questionType === 'numeric' && (
+                          {(questionType === 'numeric' || questionType === 'number') && (
                             <>
                             <input
                               type="number"
@@ -694,6 +754,118 @@ export default function SurveyPage() {
         ) : (
           // Staff/Admin user view - Create Survey & QR Code Management
           <section>
+            <div className="asrs-card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--color-asrs-dark)' }}>Survey Management</h2>
+              <p style={{ margin: '0.4rem 0 0.85rem', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+                Manage templates and your saved survey QR distributors in one place.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-bg-tertiary)', borderRadius: '8px', padding: '0.65rem 0.8rem', minWidth: '160px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Templates</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>{staffLoading ? '...' : staffTemplates.length}</div>
+                </div>
+                <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-bg-tertiary)', borderRadius: '8px', padding: '0.65rem 0.8rem', minWidth: '160px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Saved Survey QR Codes</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
+                    {staffLoading ? '...' : staffQrCodes.length}
+                  </div>
+                </div>
+              </div>
+              {staffError && (
+                <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.85rem' }}>{staffError}</p>
+              )}
+              {!staffLoading && !staffError && (
+                <div style={{ overflowX: 'auto', marginTop: '0.25rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
+                        {['Survey', 'QR Key', 'Status', 'Scans', 'Submissions', 'Created', 'Actions'].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              textAlign: 'left',
+                              padding: '0.5rem',
+                              color: 'var(--color-text-secondary)',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                              letterSpacing: '0.03em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffQrCodes.map((qr) => {
+                        const isExpired = Boolean(qr.isExpired);
+                        const isActive = Boolean(qr.isActive) && !isExpired;
+                        return (
+                          <tr key={qr.qrCodeKey} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
+                            <td style={{ padding: '0.5rem', color: 'var(--color-text-primary)' }}>
+                              <div style={{ fontWeight: 600 }}>{qr.templateTitle || 'General Survey'}</div>
+                              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-light)' }}>
+                                {qr.description || 'No description'}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.5rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{qr.qrCodeKey}</td>
+                            <td style={{ padding: '0.5rem' }}>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                borderRadius: '999px',
+                                padding: '0.2rem 0.6rem',
+                                border: '1px solid',
+                                backgroundColor: isActive ? '#d1fae5' : '#fee2e2',
+                                borderColor: isActive ? '#a7f3d0' : '#fecaca',
+                                color: isActive ? '#065f46' : '#991b1b',
+                              }}>
+                                {isActive ? 'active' : 'inactive'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.5rem', color: 'var(--color-text-secondary)' }}>{qr.stats.totalScans}</td>
+                            <td style={{ padding: '0.5rem', color: 'var(--color-text-secondary)' }}>{qr.stats.conversions}</td>
+                            <td style={{ padding: '0.5rem', color: 'var(--color-text-secondary)' }}>
+                              {new Date(qr.createdAt).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <a href={qr.targetUrl} target="_blank" rel="noreferrer" className="asrs-btn-secondary" style={{ textDecoration: 'none', padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}>
+                                  Open
+                                </a>
+                                <button
+                                  type="button"
+                                  className="asrs-btn-secondary"
+                                  style={{ padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}
+                                  onClick={() => handleCopyQrUrl(qr)}
+                                >
+                                  {copiedQrKey === qr.qrCodeKey ? 'Copied' : 'Copy URL'}
+                                </button>
+                                <a
+                                  href={`/api/qr-codes/download?qrCodeKey=${encodeURIComponent(qr.qrCodeKey)}&format=png&size=400&download=true`}
+                                  className="asrs-btn-secondary"
+                                  style={{ textDecoration: 'none', padding: '0.3rem 0.55rem', fontSize: '0.75rem' }}
+                                >
+                                  PNG
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {staffQrCodes.length === 0 && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: '0.75rem', color: 'var(--color-text-light)', textAlign: 'center' }}>
+                            No survey QR codes yet. Generate your first one below.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div style={{
               justifyContent: 'center',
               textAlign: 'center',
