@@ -1,5 +1,6 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 const MAX_CATEGORIES = 7;
 
@@ -10,6 +11,8 @@ const MAX_CATEGORIES = 7;
 export async function GET(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    if (auth.error) return auth.error;
 
     const categories = db
       .prepare('SELECT * FROM category ORDER BY created_at DESC')
@@ -37,6 +40,8 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const body = await request.json();
     const { category_name, description } = body;

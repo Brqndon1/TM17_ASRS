@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
+import { applySessionCookies, createSession } from '@/lib/auth/server-auth';
+import { verifyPassword } from '@/lib/auth/passwords';
 
 export async function POST(request) {
   try {
@@ -18,7 +20,7 @@ export async function POST(request) {
       WHERE u.email = ?
     `).get(normalizedEmail);
 
-    if (!user || user.password !== password) {
+    if (!user || !verifyPassword(password, user.password)) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
@@ -29,15 +31,20 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({
+    const { token, csrfToken } = createSession(db, user.user_id);
+
+    const response = NextResponse.json({
       success: true,
       user: {
+        user_id: user.user_id,
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
         user_type: user.user_type,
       },
     });
+
+    return applySessionCookies(response, token, csrfToken);
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -1,5 +1,6 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 /**
  * GET /api/categories/[id]
@@ -8,6 +9,8 @@ import { NextResponse } from 'next/server';
 export async function GET(_request, { params }) {
   try {
     initializeDatabase();
+    const auth = requireAccess(_request, db, { minAccessRank: 50, requireCsrf: false });
+    if (auth.error) return auth.error;
 
     // Next.js 15+ requires await on params
     const { id } = await params;
@@ -44,6 +47,8 @@ export async function GET(_request, { params }) {
 export async function PUT(request, { params }) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const { id } = await params;
     const body = await request.json();
@@ -113,6 +118,8 @@ export async function PUT(request, { params }) {
 export async function DELETE(_request, { params }) {
   try {
     initializeDatabase();
+    const auth = requireAccess(_request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const { id } = await params;
     const categoryId = Number(id);

@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 
 const ATTRIBUTE_CATALOG = [
   'Grade',
@@ -132,7 +133,7 @@ export default function InitiativeCreationPage() {
       : [];
 
     try {
-      const response = await fetch('/api/initiatives', {
+      const response = await apiFetch('/api/initiatives', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

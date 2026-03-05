@@ -1,5 +1,6 @@
 import db, { initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 function toLocalYyyyMmDd(date) {
   const year = date.getFullYear();
@@ -12,6 +13,8 @@ function toLocalYyyyMmDd(date) {
 export async function POST(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const body = await request.json();
     const {
@@ -96,9 +99,11 @@ export async function POST(request) {
 }
 
 // GET - List all distributions with auto-computed status
-export async function GET() {
+export async function GET(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    if (auth.error) return auth.error;
 
     const rows = db.prepare(`
       SELECT * FROM survey_distribution ORDER BY created_at DESC

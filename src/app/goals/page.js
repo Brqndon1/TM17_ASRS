@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 
 export default function GoalsPage() {
   const router = useRouter();
@@ -97,7 +98,7 @@ export default function GoalsPage() {
     setMessage('');
 
     try {
-      const res = await fetch('/api/goals', {
+      const res = await apiFetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,7 +139,7 @@ export default function GoalsPage() {
     setMessage('');
 
     try {
-      const res = await fetch('/api/goals', {
+      const res = await apiFetch('/api/goals', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,7 +171,7 @@ export default function GoalsPage() {
     setMessage('');
 
     try {
-      const res = await fetch(`/api/goals?goalId=${goalId}`, {
+      const res = await apiFetch(`/api/goals?goalId=${goalId}`, {
         method: 'DELETE',
       });
 

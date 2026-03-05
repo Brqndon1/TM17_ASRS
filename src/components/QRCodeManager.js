@@ -9,6 +9,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api/client';
 
 /**
  * QRCodeManager Component
@@ -157,7 +158,7 @@ export default function QRCodeManager({
       // ─────────────────────────────────────────────────────────────────
       // STEP 2: Call API to Generate QR Code
       // ─────────────────────────────────────────────────────────────────
-      const response = await fetch('/api/qr-codes/generate', {
+      const response = await apiFetch('/api/qr-codes/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ export default function QRCodeManager({
   const loadStats = async (qrCodeKey) => {
     setStatsLoading(true);
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/qr-codes/scan?qrCodeKey=${encodeURIComponent(qrCodeKey)}`
       );
 

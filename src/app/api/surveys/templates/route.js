@@ -1,4 +1,5 @@
 import db from '../../../../lib/db.js';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 export async function GET() {
   // Query all forms (survey templates)
@@ -49,6 +50,9 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     const body = await request.json();
     const { title, description, questions } = body || {};
     if (!title || !Array.isArray(questions)) {

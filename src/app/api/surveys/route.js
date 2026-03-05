@@ -1,6 +1,7 @@
 import db, { initializeDatabase } from '@/lib/db';
 import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 // POST - Submit a survey
 export async function POST(request) {
@@ -61,9 +62,11 @@ export async function POST(request) {
 }
 
 // GET - Fetch all surveys and reports
-export async function GET() {
+export async function GET(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    if (auth.error) return auth.error;
 
     const rows = db.prepare(`
       SELECT

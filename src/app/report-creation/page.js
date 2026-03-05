@@ -16,6 +16,7 @@ import StepPreview from '@/components/report-steps/StepPreview';
 import { validateTrendConfig } from '@/lib/report-engine';
 import { getUiEventBus } from '@/lib/events/ui-event-bus';
 import EVENTS from '@/lib/events/event-types';
+import { apiFetch } from '@/lib/api/client';
 
 const TOTAL_STEPS = 6;
 
@@ -248,7 +249,7 @@ export default function ReportCreationPage() {
     setSuccessMessage('');
 
     try {
-      const res = await fetch('/api/reports', {
+      const res = await apiFetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

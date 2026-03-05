@@ -7,6 +7,10 @@ vi.mock('@/lib/db', () => ({
   initializeDatabase: initializeDatabaseMock,
 }));
 
+vi.mock('@/lib/auth/server-auth', () => ({
+  requireAccess: () => ({ user: { user_id: 2, user_type: 'staff', access_rank: 50 } }),
+}));
+
 import { GET, POST } from '@/app/api/surveys/distributions/route';
 
 describe('/api/surveys/distributions date handling', () => {
@@ -108,7 +112,8 @@ describe('/api/surveys/distributions date handling', () => {
       return { run: vi.fn(), all: vi.fn(() => []) };
     });
 
-    const res = await GET();
+    const req = new Request('http://localhost:3000/api/surveys/distributions');
+    const res = await GET(req);
     const payload = await res.json();
 
     expect(res.status).toBe(200);

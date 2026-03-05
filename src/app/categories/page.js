@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 
 export default function CategoriesPage() {
   const [userRole, setUserRole] = useState('public');
@@ -48,7 +49,7 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/categories');
+      const response = await apiFetch('/api/categories');
       const data = await response.json();
 
       if (response.ok) {
@@ -58,7 +59,7 @@ export default function CategoriesPage() {
         const initiativesMap = {};
         for (const category of (data.categories || [])) {
           try {
-            const initiativesResponse = await fetch(
+            const initiativesResponse = await apiFetch(
               `/api/initiative-categories?category_id=${category.category_id}`
             );
             const initiativesData = await initiativesResponse.json();
@@ -120,7 +121,7 @@ export default function CategoriesPage() {
         : '/api/categories';
       const method = editingId ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -154,7 +155,7 @@ export default function CategoriesPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/categories/${deleteTarget.category_id}`, {
+      const response = await apiFetch(`/api/categories/${deleteTarget.category_id}`, {
         method: 'DELETE',
       });
 
@@ -177,7 +178,7 @@ export default function CategoriesPage() {
 
   const handleRemoveInitiativeFromCategory = async (initiativeId, categoryId) => {
     try {
-      const response = await fetch('/api/initiative-categories', {
+      const response = await apiFetch('/api/initiative-categories', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

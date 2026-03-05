@@ -3,6 +3,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { hashPassword, isPasswordHash } from '@/lib/auth/passwords';
 
 // Store the database file in <project>/data/asrs.db
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -270,6 +271,18 @@ function initializeDatabase() {
       token_expires_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS session (
+      session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES user(user_id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      csrf_token TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      absolute_expires_at TEXT NOT NULL,
+      revoked_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS initiative (
       initiative_id INTEGER PRIMARY KEY AUTOINCREMENT,
       initiative_name TEXT NOT NULL UNIQUE
@@ -512,6 +525,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_report_generation_log_status ON report_generation_log(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
+    CREATE INDEX IF NOT EXISTS idx_session_user_id ON session(user_id);
+    CREATE INDEX IF NOT EXISTS idx_session_expires_at ON session(expires_at);
   `);
 
   // ── Seed survey templates from surveys.json if no forms exist ─────────────
@@ -578,6 +593,14 @@ function initializeDatabase() {
   addColumnIfNotExists('user', 'verified INTEGER NOT NULL DEFAULT 0');
   addColumnIfNotExists('user', 'verification_token TEXT');
   addColumnIfNotExists('user', 'token_expires_at TEXT');
+
+  const usersForMigration = db.prepare('SELECT user_id, password FROM user').all();
+  const updatePasswordHash = db.prepare('UPDATE user SET password = ? WHERE user_id = ?');
+  for (const row of usersForMigration) {
+    const currentPassword = String(row.password || '');
+    if (!currentPassword || isPasswordHash(currentPassword)) continue;
+    updatePasswordHash.run(hashPassword(currentPassword), row.user_id);
+  }
 
   // Add deadline column to goals if it doesn't exist
   addColumnIfNotExists('initiative_goal', 'deadline TEXT');
@@ -745,10 +768,10 @@ function initializeDatabase() {
     'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id, verified) VALUES (?, ?, ?, ?, ?, 1)'
   );
   if (adminType) {
-    insertUser.run('Test', 'Admin', 'admin@test.com', 'admin123', adminType.user_type_id);
+    insertUser.run('Test', 'Admin', 'admin@test.com', hashPassword('admin123'), adminType.user_type_id);
   }
   if (staffType) {
-    insertUser.run('Test', 'Staff', 'staff@test.com', 'staff123', staffType.user_type_id);
+    insertUser.run('Test', 'Staff', 'staff@test.com', hashPassword('staff123'), staffType.user_type_id);
   }
 
   // Ensure seeded dev test accounts can log in without email verification.

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
+import { apiFetch } from '@/lib/api/client';
 
 export default function ManageReportsPage() {
   const router = useRouter();
@@ -93,7 +94,7 @@ export default function ManageReportsPage() {
     if (!editingReport) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/reports', {
+      const res = await apiFetch('/api/reports', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,7 +120,7 @@ export default function ManageReportsPage() {
   async function handleDelete(id) {
     setSaving(true);
     try {
-      const res = await fetch(`/api/reports?id=${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/reports?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       showToast('Report deleted');
       setDeletingId(null);
@@ -145,7 +146,7 @@ export default function ManageReportsPage() {
     setSaving(true);
     try {
       const order = reports.map((r, i) => ({ id: r.id, display_order: i }));
-      const res = await fetch('/api/reports/reorder', {
+      const res = await apiFetch('/api/reports/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order }),

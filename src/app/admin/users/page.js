@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
+import { apiFetch } from '@/lib/api/client';
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/admin/users?email=${encodeURIComponent(user.email)}`);
+      const response = await apiFetch('/api/admin/users');
       const data = await response.json();
       if (response.ok) {
         setUsers(data.users);
@@ -76,11 +77,10 @@ export default function AdminUsersPage() {
   const handleRoleChange = async (userId, newRole) => {
     setError('');
     try {
-      const response = await fetch('/api/admin/users', {
+      const response = await apiFetch('/api/admin/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requesterEmail: user.email,
           user_id: userId,
           new_role: newRole,
         }),
@@ -102,8 +102,8 @@ export default function AdminUsersPage() {
     if (!deleteTarget) return;
     setError('');
     try {
-      const response = await fetch(
-        `/api/admin/users?email=${encodeURIComponent(user.email)}&user_id=${deleteTarget.user_id}`,
+      const response = await apiFetch(
+        `/api/admin/users?user_id=${deleteTarget.user_id}`,
         { method: 'DELETE' }
       );
       const data = await response.json();
@@ -135,11 +135,10 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const response = await fetch('/api/admin/users', {
+      const response = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requesterEmail: user.email,
           ...addForm,
         }),
       });

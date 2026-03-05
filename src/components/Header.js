@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
+import { apiFetch } from '@/lib/api/client';
 
 export default function Header() {
   const router = useRouter();
@@ -44,7 +45,12 @@ export default function Header() {
   const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    }
     clearUser();
     router.push('/login');
   }

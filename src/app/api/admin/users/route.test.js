@@ -7,6 +7,12 @@ vi.mock('@/lib/db', () => ({
   initializeDatabase: initializeDatabaseMock,
 }));
 
+vi.mock('@/lib/auth/server-auth', () => ({
+  requireAccess: () => ({
+    user: { user_id: 1, email: 'admin@test.com', user_type: 'admin', access_rank: 100 },
+  }),
+}));
+
 import { GET } from '@/app/api/admin/users/route';
 
 describe('/api/admin/users GET', () => {
@@ -16,23 +22,19 @@ describe('/api/admin/users GET', () => {
   });
 
   test('uses staff/admin-only filter and returns user list for admin requester', async () => {
-    const getAdmin = vi.fn(() => ({ user_id: 1, user_type: 'admin' }));
     const listAll = vi.fn(() => [
       { user_id: 2, email: 'staff@test.com', user_type: 'staff' },
       { user_id: 1, email: 'admin@test.com', user_type: 'admin' },
     ]);
 
     prepareMock.mockImplementation((sql) => {
-      if (sql.includes('WHERE u.email = ?')) {
-        return { get: getAdmin };
-      }
       if (sql.includes("WHERE ut.type IN ('staff', 'admin')")) {
         return { all: listAll };
       }
       return { get: vi.fn(), all: vi.fn(() => []), run: vi.fn() };
     });
 
-    const req = new Request('http://localhost:3000/api/admin/users?email=admin@test.com');
+    const req = new Request('http://localhost:3000/api/admin/users');
     const res = await GET(req);
     const payload = await res.json();
 

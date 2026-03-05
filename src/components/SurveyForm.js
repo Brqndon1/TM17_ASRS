@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/api/client";
 
 const SURVEY_FORM_DRAFT_KEY = "surveyTemplateDraft:v1";
 
@@ -113,7 +114,7 @@ export default function SurveyForm() {
         }))
       };
       
-      const res = await fetch("/api/surveys/templates", {
+      const res = await apiFetch("/api/surveys/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

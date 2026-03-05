@@ -1,4 +1,7 @@
 vi.mock('@/lib/db', () => ({
+  default: {
+    prepare: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })),
+  },
   db: {
     prepare: vi.fn(() => ({ get: vi.fn(), all: vi.fn(), run: vi.fn() })),
   },
@@ -7,6 +10,10 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/query-helpers', () => ({
   queryTableData: vi.fn(() => []),
+}));
+
+vi.mock('@/lib/auth/server-auth', () => ({
+  requireAccess: () => ({ user: { user_id: 1, user_type: 'staff', access_rank: 50 } }),
 }));
 
 import { GET, PUT } from '@/app/api/reports/route';

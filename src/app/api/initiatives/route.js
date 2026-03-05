@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getServiceContainer } from '@/lib/container/service-container';
 import { toInitiativeCreateInput, toInitiativeDto } from '@/lib/adapters/initiative-adapter';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 const INITIATIVES_PATH = path.join(process.cwd(), 'src', 'data', 'initiatives.json');
 
@@ -40,6 +41,9 @@ export async function GET() {
 export async function POST(request) {
   try {
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     const body = await request.json();
     const input = toInitiativeCreateInput(body);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 // Compute individual score for a goal based on its scoring method
 function computeGoalScore(goal) {
@@ -103,6 +104,8 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const body = await request.json();
     const {
@@ -191,6 +194,8 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const body = await request.json();
     const { goal_id, ...updates } = body;
@@ -271,6 +276,8 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
     const goalId = searchParams.get('goalId');

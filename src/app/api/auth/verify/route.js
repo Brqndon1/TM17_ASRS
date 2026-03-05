@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
+import { hashPassword } from '@/lib/auth/passwords';
 
 export async function GET(request) {
   try {
@@ -84,7 +85,7 @@ export async function POST(request) {
           verification_token = NULL,
           token_expires_at = NULL
       WHERE user_id = ?
-    `).run(password, user.user_id);
+    `).run(hashPassword(password), user.user_id);
 
     eventBus.publish(EVENTS.USER_VERIFIED, {
       userId: Number(user.user_id),

@@ -2,34 +2,13 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
-
-function verifyAdmin(db, requesterEmail) {
-  if (!requesterEmail) return null;
-
-  const requester = db.prepare(`
-    SELECT u.user_id, ut.type as user_type
-    FROM user u
-    JOIN user_type ut ON u.user_type_id = ut.user_type_id
-    WHERE u.email = ?
-  `).get(requesterEmail);
-
-  if (!requester || requester.user_type !== 'admin') return null;
-  return requester;
-}
+import { requireAccess } from '@/lib/auth/server-auth';
 
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-
-    const { searchParams } = new URL(request.url);
-    const requesterEmail = searchParams.get('email');
-
-    if (!verifyAdmin(db, requesterEmail)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
+    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    if (auth.error) return auth.error;
 
     const users = db.prepare(`
       SELECT
@@ -57,18 +36,14 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db, mailer, clock, eventBus } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
     const body = await request.json();
-    const { requesterEmail, first_name, last_name, phone_number, email, user_type } = body;
+    const { first_name, last_name, phone_number, email, user_type } = body;
     const normalizedFirstName = String(first_name || '').trim();
     const normalizedLastName = String(last_name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
-
-    if (!verifyAdmin(db, requesterEmail)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
 
     if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !user_type) {
       return NextResponse.json(
@@ -107,7 +82,7 @@ export async function POST(request) {
         }
 
         eventBus.publish(EVENTS.USER_INVITED, {
-          invitedBy: requesterEmail,
+          invitedBy: auth.user.email,
           email: normalizedEmail,
           role: user_type,
           userId: Number(existing.user_id),
@@ -156,7 +131,7 @@ export async function POST(request) {
     }
 
     eventBus.publish(EVENTS.USER_INVITED, {
-      invitedBy: requesterEmail,
+      invitedBy: auth.user.email,
       email: normalizedEmail,
       role: user_type,
       userId: Number(result.lastInsertRowid),
@@ -191,15 +166,11 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const { db } = getServiceContainer();
-    const body = await request.json();
-    const { requesterEmail, user_id, new_role } = body;
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
 
-    if (!verifyAdmin(db, requesterEmail)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
+    const body = await request.json();
+    const { user_id, new_role } = body;
 
     if (!user_id || !new_role) {
       return NextResponse.json({ error: 'user_id and new_role are required' }, { status: 400 });
@@ -217,7 +188,7 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (targetUser.email === requesterEmail && new_role !== 'admin') {
+    if (targetUser.email === auth.user.email && new_role !== 'admin') {
       return NextResponse.json({ error: 'You cannot demote your own account' }, { status: 400 });
     }
 
@@ -237,17 +208,11 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
-    const requesterEmail = searchParams.get('email');
     const userId = searchParams.get('user_id');
-
-    if (!verifyAdmin(db, requesterEmail)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
 
     if (!userId) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
@@ -258,7 +223,7 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (targetUser.email === requesterEmail) {
+    if (targetUser.email === auth.user.email) {
       return NextResponse.json({ error: 'You cannot delete your own account' }, { status: 400 });
     }
 

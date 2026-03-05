@@ -9,6 +9,7 @@ import {
 import { toReportDetailDto, toReportListItemDto } from '@/lib/adapters/report-adapter';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 function startGenerationLog(db, payload) {
   return db.prepare(`
@@ -101,14 +102,16 @@ export async function POST(request) {
   const startedAt = Date.now();
 
   try {
-    const container = getServiceContainer();
-    const { db, reportEngine, eventBus, clock } = container;
-
     const body = await request.json();
     const payloadValidation = validateReportCreatePayload(body);
     if (!payloadValidation.valid) {
       return NextResponse.json({ error: payloadValidation.error }, { status: 400 });
     }
+
+    const container = getServiceContainer();
+    const { db, reportEngine, eventBus, clock } = container;
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const payload = payloadValidation.value;
     const initiativeId = Number(payload.initiativeId);
@@ -245,8 +248,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: payloadValidation.error }, { status: 400 });
     }
 
-    const { id, name, description, status } = payloadValidation.value;
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
+    const { id, name, description, status } = payloadValidation.value;
 
     const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(id));
     if (!existing) {
@@ -291,13 +297,15 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
-    const { db } = getServiceContainer();
-
     const { searchParams } = new URL(request.url);
     const deleteValidation = validateReportDeleteParams(searchParams);
     if (!deleteValidation.valid) {
       return NextResponse.json({ error: deleteValidation.error }, { status: 400 });
     }
+
+    const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
 
     const { id } = deleteValidation;
 

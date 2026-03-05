@@ -3,6 +3,7 @@
 import Header from '@/components/Header';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 
 export default function SurveyDistributionPage() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function SurveyDistributionPage() {
 
   const fetchDistributions = () => {
     setLoadingDistributions(true);
-    fetch('/api/surveys/distributions')
+    apiFetch('/api/surveys/distributions')
       .then((res) => res.json())
       .then((data) => setDistributions(data.distributions || []))
       .catch(() => setDistributions([]))
@@ -105,7 +106,7 @@ export default function SurveyDistributionPage() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('/api/surveys/distributions', {
+      const res = await apiFetch('/api/surveys/distributions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

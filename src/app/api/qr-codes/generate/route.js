@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 // ──────────────────────────────────────────────────────────────────────────
 // INITIALIZE DATABASE
@@ -107,6 +108,9 @@ function buildTargetUrl(qrType, targetId, qrCodeKey, baseUrl) {
 // ══════════════════════════════════════════════════════════════════════════
 export async function POST(request) {
   try {
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     // ─────────────────────────────────────────────────────────────────────
     // STEP 1: Parse and Validate Request Body
     // ─────────────────────────────────────────────────────────────────────
@@ -115,8 +119,7 @@ export async function POST(request) {
       qrType,      // Type: 'survey', 'report', or 'survey_template'
       targetId,    // ID of the entity this QR code links to
       description, // Optional description for this QR code
-      expiresAt,   // Optional expiration date (ISO string)
-      userId       // ID of the user creating this QR code
+      expiresAt    // Optional expiration date (ISO string)
     } = body;
 
     // Validate required field: qrType
@@ -220,7 +223,7 @@ export async function POST(request) {
       qrType,                       // Type: survey, report, or survey_template
       targetId || null,             // ID of the target entity (can be null for general survey)
       targetUrl,                    // Full URL the QR code redirects to
-      userId || null,               // User who created this (null until auth is implemented)
+      auth.user.user_id,            // Authenticated user who created this QR code
       expiresAt || null,            // Optional expiration date
       1,                            // is_active = 1 (active by default)
       description || null           // Optional description

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
 import QRCode from 'qrcode';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 // ──────────────────────────────────────────────────────────────────────────
 // INITIALIZE DATABASE
@@ -67,6 +68,9 @@ initializeDatabase();
 // ══════════════════════════════════════════════════════════════════════════
 export async function GET(request) {
   try {
+    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    if (auth.error) return auth.error;
+
     // ─────────────────────────────────────────────────────────────────────
     // STEP 1: Parse Query Parameters
     // ─────────────────────────────────────────────────────────────────────
