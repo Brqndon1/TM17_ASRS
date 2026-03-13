@@ -33,7 +33,8 @@ function getDefaultTrendConfig() {
 const DRAFT_KEY_PREFIX = 'reportDraft';
 
 export default function ReportCreationPage() {
-  const [userRole, setUserRole] = useState('staff');
+  const [userRole, setUserRole] = useState('public');
+  const [authChecked, setAuthChecked] = useState(false);
 
   // ---- DATA ----
   const [initiatives, setInitiatives] = useState([]);
@@ -49,6 +50,7 @@ export default function ReportCreationPage() {
     expressions: [],
     sorts: [],
     trendConfig: getDefaultTrendConfig(),
+    selectedAttributes: [],
     startDate: '',
     endDate: '',
   });
@@ -62,6 +64,22 @@ export default function ReportCreationPage() {
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Detect user role on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setUserRole(parsed.user_type || 'public');
+      } catch {
+        setUserRole('public');
+      }
+    } else {
+      setUserRole('public');
+    }
+    setAuthChecked(true);
+  }, []);
 
   // Load initiatives on mount
   useEffect(() => {
@@ -118,6 +136,7 @@ export default function ReportCreationPage() {
           expressions: Array.isArray(parsedDraft.expressions) ? parsedDraft.expressions : [],
           sorts: Array.isArray(parsedDraft.sorts) ? parsedDraft.sorts : [],
           trendConfig: restoredTrend,
+          selectedAttributes: Array.isArray(parsedDraft.selectedAttributes) ? parsedDraft.selectedAttributes : [],
           startDate: parsedDraft.startDate || '',
           endDate: parsedDraft.endDate || '',
         }));
@@ -170,6 +189,7 @@ export default function ReportCreationPage() {
         expressions: reportConfig.expressions,
         sorts: reportConfig.sorts,
         trendConfig: reportConfig.trendConfig,
+        selectedAttributes: reportConfig.selectedAttributes,
         startDate: reportConfig.startDate,
         endDate: reportConfig.endDate,
         currentStep,
@@ -260,6 +280,7 @@ export default function ReportCreationPage() {
           filters: reportConfig.filters,
           expressions: reportConfig.expressions,
           sorts: reportConfig.sorts,
+          selectedAttributes: reportConfig.selectedAttributes,
           trendConfig: reportConfig.trendConfig,
         }),
       });
@@ -284,6 +305,7 @@ export default function ReportCreationPage() {
         expressions: [],
         sorts: [],
         trendConfig: getDefaultTrendConfig(),
+        selectedAttributes: [],
         startDate: '',
         endDate: '',
       });
@@ -386,9 +408,41 @@ export default function ReportCreationPage() {
 
   const isOptionalStep = currentStep >= 1 && currentStep <= 4;
 
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+        <Header />
+        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+          <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
+            Loading...
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (authChecked && userRole !== 'staff' && userRole !== 'admin') {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+        <Header />
+        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+          <BackButton />
+          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--color-asrs-dark)' }}>
+              Access Denied
+            </h1>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1rem' }}>
+              You do not have permission to create reports. Please contact an administrator.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
+      <Header />
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <BackButton />
