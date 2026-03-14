@@ -10,6 +10,7 @@ import { toReportDetailDto, toReportListItemDto } from '@/lib/adapters/report-ad
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { alertDb } from '@/lib/db-alerts';
 
 function startGenerationLog(db, payload) {
   return db.prepare(`
@@ -89,6 +90,11 @@ export async function GET(request) {
 
     return NextResponse.json({ reports: rows.map(toReportListItemDto) });
   } catch (error) {
+    try {
+      alertDb(error, { route: '/api/reports GET' }).catch(() => void 0);
+    } catch (e) {
+      // ignore
+    }
     console.error('Error fetching reports:', error);
     return NextResponse.json(
       { error: 'Failed to fetch reports', details: error.message },
@@ -231,7 +237,11 @@ export async function POST(request) {
         errorMessage: error.message,
       });
     }
-
+    try {
+      alertDb(error, { route: '/api/reports POST' }).catch(() => void 0);
+    } catch (e) {
+      // ignore
+    }
     console.error('Error creating report:', error);
     return NextResponse.json(
       { error: 'Failed to create report', details: error.message },

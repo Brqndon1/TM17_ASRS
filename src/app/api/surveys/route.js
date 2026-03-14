@@ -2,6 +2,8 @@ import db, { initializeDatabase } from '@/lib/db';
 import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { validateAndCleanSurvey } from '@/lib/survey-validation';
+import { alertDb } from '@/lib/db-alerts';
 
 function toLocalYyyyMmDd(date) {
   const year = date.getFullYear();
@@ -16,21 +18,13 @@ export async function POST(request) {
     initializeDatabase();
 
     const body = await request.json();
-    const { name, email, responses } = body;
+    const cleaned = validateAndCleanSurvey(body);
 
-    // Validate required fields
-    if (!name || !email || !responses) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, email, responses' },
-        { status: 400 }
-      );
-    }
-
-    // Generate basic statistics
-    const basicStats = generateBasicStats(responses);
+    // Generate basic statistics on cleaned responses
+    const basicStats = generateBasicStats(cleaned.responses);
 
     // Generate AI-enhanced report using GPT-4
-    const reportData = await generateAIReport(responses, basicStats);
+    const reportData = await generateAIReport(cleaned.responses, basicStats);
 
     // Use a transaction so survey + report are atomic
     const insertSurveyAndReport = db.transaction((name, email, responsesJSON, reportJSON, templateId) => {
@@ -69,11 +63,11 @@ export async function POST(request) {
     });
 
     const surveyId = insertSurveyAndReport(
-      name,
-      email,
-      JSON.stringify(responses),
+      cleaned.name,
+      cleaned.email,
+      JSON.stringify(cleaned.responses),
       JSON.stringify(reportData),
-      responses.templateId
+      cleaned.templateId
     );
 
     return NextResponse.json({
@@ -82,6 +76,11 @@ export async function POST(request) {
       report: reportData,
     });
   } catch (error) {
+    try {
+      alertDb(error, { route: '/api/surveys POST' }).catch(() => void 0);
+    } catch (e) {
+      // ignore
+    }
     console.error('Error submitting survey:', error);
     return NextResponse.json(
       { error: 'Failed to submit survey', details: error.message },

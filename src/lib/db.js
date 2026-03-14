@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { hashPassword, isPasswordHash } from '@/lib/auth/passwords';
+import { alertDb } from '@/lib/db-alerts';
 
 // Store the database file in <project>/data/asrs.db
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -789,6 +790,13 @@ function initializeDatabase() {
     console.error('[db] ===== CRITICAL ERROR DURING DATABASE INITIALIZATION =====');
     console.error('[db] Error:', err.message);
     console.error('[db] Stack:', err.stack);
+    try {
+      // Send alert via configured channels (webhook / email) in addition to logging
+      // fire-and-forget but do not block app startup
+      alertDb(err, { location: 'initializeDatabase' }).catch(() => void 0);
+    } catch (e) {
+      // ignore alert errors
+    }
     // Mark as initialized anyway to prevent infinite retry loops on startup
     _initialized = true;
   }
