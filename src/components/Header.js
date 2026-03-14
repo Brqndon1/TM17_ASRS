@@ -19,6 +19,43 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
 
+function ProfileAvatar({ user, picture }) {
+  const initials =
+    `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`.toUpperCase();
+
+  const base = {
+    width: 36, height: 36, borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.5)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+    cursor: 'pointer', flexShrink: 0,
+  };
+
+  if (picture) {
+    return (
+      <img
+        src={picture}
+        alt="Profile"
+        title={`${user?.first_name} ${user?.last_name}`}
+        style={{ ...base, objectFit: 'cover' }}
+      />
+    );
+  }
+
+  return (
+    <div
+      title={`${user?.first_name} ${user?.last_name}`}
+      style={{
+        ...base,
+        background: 'linear-gradient(135deg, #C0392B 0%, #E67E22 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'white', fontWeight: '700', fontSize: '0.8rem', userSelect: 'none',
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -26,6 +63,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const headerRef = useRef(null);
+  const [profilePic, setProfilePic] = useState(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -41,6 +79,13 @@ export default function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!user) { setProfilePic(null); return; }
+    apiFetch('/api/user/profile')
+      .then((data) => setProfilePic(data?.user?.profile_picture ?? null))
+      .catch(() => setProfilePic(null));
+  }, [user]);
 
   const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
@@ -211,31 +256,31 @@ export default function Header() {
                 </Link>
               </>
             )}
-
-            {isLoggedIn && (
-              <button
-                onClick={handleLogout}
-                style={logoutButtonStyle}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)';
-                }}
-              >
-                Logout
-              </button>
+            </>
             )}
-          </>
-          )}
-          </nav>
-
-          {isLoggedIn && isHydrated && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            </nav>
+  
+            {isLoggedIn && isHydrated && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.3)' }} />
-              <div style={{ fontSize: '0.85rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
-                {user.first_name} {user.last_name}
-                <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>{user.user_type}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                <Link href="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <ProfileAvatar user={user} picture={profilePic} />
+                  <div style={{ fontSize: '0.82rem', color: 'white', opacity: 0.9, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+                    {user.first_name} {user.last_name}
+                    <div style={{ fontSize: '0.68rem', opacity: 0.65, textTransform: 'capitalize' }}>
+                      {user.user_type}
+                    </div>
+                  </div>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  style={{ ...logoutButtonStyle, fontSize: '0.75rem', padding: '0.25rem 0.75rem', width: '100%' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'; }}
+                >
+                  Logout
+                </button>
               </div>
             </div>
           )}
