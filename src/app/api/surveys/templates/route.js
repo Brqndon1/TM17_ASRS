@@ -1,5 +1,6 @@
 import db from '../../../../lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { validateReason, recordAudit } from '@/lib/audit';
 
 export async function GET() {
   // Query all forms (survey templates)
@@ -54,7 +55,12 @@ export async function POST(request) {
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { title, description, questions } = body || {};
+    const { title, description, questions, reasonType, reasonText } = body || {};
+
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return new Response(JSON.stringify({ error: reasonValidation.error }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
     if (!title || !Array.isArray(questions)) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
@@ -135,6 +141,11 @@ export async function POST(request) {
 
     // Execute the transaction
     const newSurvey = createSurvey();
+    try {
+      recordAudit('survey_template.created', auth.user.email, 'survey_template', newSurvey.id, reasonType, reasonText, { title: newSurvey.title });
+    } catch (e) {
+      // continue on audit failure
+    }
     return new Response(JSON.stringify(newSurvey), { status: 201, headers: { "Content-Type": "application/json" } });
   } catch (err) {
     console.error('[surveys/templates POST] Error:', err);

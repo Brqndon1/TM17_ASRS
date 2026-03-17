@@ -109,7 +109,15 @@ export function validateReportUpdatePayload(body) {
     return { valid: false, error: 'No fields to update' };
   }
 
-  return { valid: true, value: { id, name: body.name, description: body.description, status: body.status } };
+  // Validate reason fields
+  if (typeof body.reasonType !== 'string' || body.reasonType.trim() === '') {
+    return { valid: false, error: 'reasonType is required and must be a non-empty string' };
+  }
+  if (body.reasonText !== undefined && typeof body.reasonText !== 'string') {
+    return { valid: false, error: 'reasonText must be a string if provided' };
+  }
+
+  return { valid: true, value: { id, name: body.name, description: body.description, status: body.status, reasonType: body.reasonType, reasonText: body.reasonText } };
 }
 
 export function validateReportDeleteParams(searchParams) {

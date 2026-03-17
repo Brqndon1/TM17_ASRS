@@ -5,6 +5,7 @@ import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
+import ReasonModal from '@/components/ReasonModal';
 
 const ATTRIBUTE_CATALOG = [
   'Grade',
@@ -69,6 +70,8 @@ export default function InitiativeCreationPage() {
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const allAttributes = [...ATTRIBUTE_CATALOG, ...customAttributes];
 
   const handleAttributeToggle = (attribute) => {
@@ -133,16 +136,27 @@ export default function InitiativeCreationPage() {
       : [];
 
     try {
+      // collect reason before creating initiative
+      setPendingAction({ type: 'createInitiative', payload: { name: name.trim(), description: description.trim(), attributes: selectedAttributes, questions: cleanedQuestions, settings: { status, isPublic } } });
+      setShowReasonModal(true);
+    } catch (error) {
+      setMessage('Connection error. Please try again.');
+      console.error('Error creating initiative:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReasonSubmit = async ({ reasonType, reasonText }) => {
+    setShowReasonModal(false);
+    if (!pendingAction) return;
+    setIsSubmitting(true);
+    try {
+      const body = { ...pendingAction.payload, reasonType, reasonText };
       const response = await apiFetch('/api/initiatives', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim(),
-          attributes: selectedAttributes,
-          questions: cleanedQuestions,
-          settings: { status, isPublic },
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -167,6 +181,7 @@ export default function InitiativeCreationPage() {
       console.error('Error creating initiative:', error);
     } finally {
       setIsSubmitting(false);
+      setPendingAction(null);
     }
   };
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import { apiFetch } from '@/lib/api/client';
+import ReasonModal from '@/components/ReasonModal';
 
 export default function ManageReportsPage() {
   const router = useRouter();
@@ -21,6 +22,8 @@ export default function ManageReportsPage() {
 
   // Delete confirmation state
   const [deletingId, setDeletingId] = useState(null);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Toast message
   const [toast, setToast] = useState(null);
@@ -30,21 +33,7 @@ export default function ManageReportsPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      router.push('/login');
-      return;
-    }
-    const parsed = JSON.parse(storedUser);
-    if (parsed.user_type !== 'staff' && parsed.user_type !== 'admin') {
-      router.push('/');
-      return;
-    }
-    loadData();
-  }, [router]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [reportsRes, initRes] = await Promise.all([
@@ -61,7 +50,21 @@ export default function ManageReportsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showToast]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) {
+      router.push('/login');
+      return;
+    }
+    const parsed = JSON.parse(storedUser);
+    if (parsed.user_type !== 'staff' && parsed.user_type !== 'admin') {
+      router.push('/');
+      return;
+    }
+    loadData();
+  }, [router, loadData]);
 
   function getInitiativeName(initId) {
     const init = initiatives.find(i => i.initiative_id === initId || i.id === initId);
@@ -91,46 +94,51 @@ export default function ManageReportsPage() {
   }
 
   async function handleSaveEdit() {
+    // open reason modal before saving edit
     if (!editingReport) return;
-    setSaving(true);
-    try {
-      const res = await apiFetch('/api/reports', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingReport.id,
-          name: editName,
-          description: editDescription,
-          status: editStatus,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      showToast('Report updated successfully');
-      closeEdit();
-      await loadData();
-    } catch {
-      showToast('Failed to update report', 'error');
-    } finally {
-      setSaving(false);
-    }
+    setPendingAction({ type: 'editReport', id: editingReport.id, name: editName, description: editDescription, status: editStatus });
+    setShowReasonModal(true);
   }
 
   // ── Delete ──
 
   async function handleDelete(id) {
+    // ask for reason before deleting
+    setPendingAction({ type: 'deleteReport', id });
+    setShowReasonModal(true);
+  }
+
+  // Called when modal confirms
+  const handleReasonSubmit = async ({ reasonType, reasonText }) => {
+    setShowReasonModal(false);
+    if (!pendingAction) return;
     setSaving(true);
     try {
-      const res = await apiFetch(`/api/reports?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      showToast('Report deleted');
-      setDeletingId(null);
-      await loadData();
-    } catch {
-      showToast('Failed to delete report', 'error');
+      if (pendingAction.type === 'editReport') {
+        const res = await apiFetch('/api/reports', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: pendingAction.id, name: pendingAction.name, description: pendingAction.description, status: pendingAction.status, reasonType, reasonText }),
+        });
+        if (!res.ok) throw new Error();
+        showToast('Report updated successfully');
+        closeEdit();
+        await loadData();
+      } else if (pendingAction.type === 'deleteReport') {
+        const url = `/api/reports?id=${pendingAction.id}&reasonType=${encodeURIComponent(reasonType)}&reasonText=${encodeURIComponent(reasonText)}`;
+        const res = await apiFetch(url, { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        showToast('Report deleted');
+        setDeletingId(null);
+        await loadData();
+      }
+    } catch (e) {
+      showToast('Operation failed', 'error');
     } finally {
       setSaving(false);
+      setPendingAction(null);
     }
-  }
+  };
 
   // ── Reorder ──
 
@@ -218,7 +226,6 @@ export default function ManageReportsPage() {
         <BackButton />
 
         <div className="asrs-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <div>
               <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0 }}>Manage Reports</h1>
               <p style={{ color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
@@ -236,7 +243,6 @@ export default function ManageReportsPage() {
             >
               {saving ? 'Saving...' : 'Save Order'}
             </button>
-          </div>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-light)' }}>
@@ -470,6 +476,7 @@ export default function ManageReportsPage() {
           {toast.message}
         </div>
       )}
+      <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
     </div>
   );
 }

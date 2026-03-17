@@ -11,6 +11,7 @@ import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { alertDb } from '@/lib/db-alerts';
+import { validateReason, recordAudit } from '@/lib/audit';
 
 function startGenerationLog(db, payload) {
   return db.prepare(`
@@ -114,12 +115,11 @@ export async function POST(request) {
       return NextResponse.json({ error: payloadValidation.error }, { status: 400 });
     }
 
+    const payload = payloadValidation.value;
     const container = getServiceContainer();
     const { db, reportEngine, eventBus, clock } = container;
     const auth = requireAccess(request, db, { minAccessRank: 50 });
     if (auth.error) return auth.error;
-
-    const payload = payloadValidation.value;
     const initiativeId = Number(payload.initiativeId);
 
     const initiative = db.prepare(
@@ -264,6 +264,13 @@ export async function PUT(request) {
 
     const { id, name, description, status } = payloadValidation.value;
 
+    // Require reason for report update
+    const { reasonType, reasonText } = payloadValidation.value;
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
+    }
+
     const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(id));
     if (!existing) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
@@ -294,7 +301,8 @@ export async function PUT(request) {
        LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
        WHERE r.id = ?`
     ).get(Number(id));
-
+    // Record audit before returning
+    recordAudit('report.updated', auth.user.email, 'report', id, reasonType, reasonText, { updates });
     return NextResponse.json({ success: true, report: toReportDetailDto(updated) });
   } catch (error) {
     console.error('Error updating report:', error);
@@ -319,12 +327,21 @@ export async function DELETE(request) {
 
     const { id } = deleteValidation;
 
+    // Require reason for deletion via query params
+    const reasonType = searchParams.get('reasonType');
+    const reasonText = searchParams.get('reasonText');
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
+    }
+
     const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(id);
     if (!existing) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
     db.prepare('DELETE FROM reports WHERE id = ?').run(id);
+    recordAudit('report.deleted', auth.user.email, 'report', id, reasonType, reasonText, {});
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting report:', error);

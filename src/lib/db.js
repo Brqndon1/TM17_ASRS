@@ -524,6 +524,20 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_report_generation_log_created_at ON report_generation_log(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_report_generation_log_status ON report_generation_log(status);
+    
+    -- Audit log table: records reasons for administrative changes
+    CREATE TABLE IF NOT EXISTS audit_log (
+      audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event TEXT NOT NULL,
+      user_email TEXT,
+      target_type TEXT,
+      target_id TEXT,
+      reason_type TEXT,
+      reason_text TEXT,
+      payload TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_distribution_status ON survey_distribution(status);
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
     CREATE INDEX IF NOT EXISTS idx_session_user_id ON session(user_id);

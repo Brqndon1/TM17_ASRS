@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
+import ReasonModal from '@/components/ReasonModal';
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function AdminUsersPage() {
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Add user form state (password removed — user sets it via email link)
   const [showAddForm, setShowAddForm] = useState(false);
@@ -75,50 +78,17 @@ export default function AdminUsersPage() {
 
   // ── Change user role ──────────────────────────────────────────────────────
   const handleRoleChange = async (userId, newRole) => {
-    setError('');
-    try {
-      const response = await apiFetch('/api/admin/users', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          new_role: newRole,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setSuccessMsg(`Role updated to ${newRole}`);
-        fetchUsers();
-      } else {
-        setError(data.error || 'Failed to update role');
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.');
-    }
+    // Open reason modal for role change
+    setPendingAction({ type: 'roleChange', userId, newRole });
+    setShowReasonModal(true);
   };
 
   // ── Delete user ───────────────────────────────────────────────────────────
   const handleDelete = async () => {
+    // Ask for a reason before deleting
     if (!deleteTarget) return;
-    setError('');
-    try {
-      const response = await apiFetch(
-        `/api/admin/users?user_id=${deleteTarget.user_id}`,
-        { method: 'DELETE' }
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setSuccessMsg(`${deleteTarget.first_name} ${deleteTarget.last_name} has been removed`);
-        setDeleteTarget(null);
-        fetchUsers();
-      } else {
-        setError(data.error || 'Failed to delete user');
-        setDeleteTarget(null);
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.');
-      setDeleteTarget(null);
-    }
+    setPendingAction({ type: 'delete', user: deleteTarget });
+    setShowReasonModal(true);
   };
 
   // ── Add new user ──────────────────────────────────────────────────────────
@@ -134,29 +104,73 @@ export default function AdminUsersPage() {
       return;
     }
 
+    // Instead of immediately submitting, open reason modal to collect reason
+    setPendingAction({ type: 'add', form: { ...addForm } });
+    setShowReasonModal(true);
+    setAddLoading(false);
+  };
+
+  // Called when ReasonModal confirms
+  const handleReasonSubmit = async ({ reasonType, reasonText }) => {
+    setShowReasonModal(false);
+    if (!pendingAction) return;
+    setError('');
     try {
-      const response = await apiFetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...addForm,
-        }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        const defaultMsg = `Invite sent to ${addForm.email} — they'll set their own password via email.`;
-        const withLink = data.verificationUrl ? `${data.message}\n${data.verificationUrl}` : (data.message || defaultMsg);
-        setSuccessMsg(withLink);
-        setShowAddForm(false);
-        setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', user_type: 'staff' });
-        fetchUsers();
-      } else {
-        setAddError(data.error || 'Failed to add user');
+      if (pendingAction.type === 'roleChange') {
+        const resp = await apiFetch('/api/admin/users', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: pendingAction.userId,
+            new_role: pendingAction.newRole,
+            reasonType,
+            reasonText,
+          }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          setSuccessMsg(`Role updated to ${pendingAction.newRole}`);
+          fetchUsers();
+        } else {
+          setError(data.error || 'Failed to update role');
+        }
+      } else if (pendingAction.type === 'delete') {
+        const userId = pendingAction.user.user_id;
+        const url = `/api/admin/users?user_id=${userId}&reasonType=${encodeURIComponent(reasonType)}&reasonText=${encodeURIComponent(reasonText)}`;
+        const resp = await apiFetch(url, { method: 'DELETE' });
+        const data = await resp.json();
+        if (resp.ok) {
+          setSuccessMsg(`${pendingAction.user.first_name} ${pendingAction.user.last_name} has been removed`);
+          setDeleteTarget(null);
+          fetchUsers();
+        } else {
+          setError(data.error || 'Failed to delete user');
+        }
+      } else if (pendingAction.type === 'add') {
+        setAddLoading(true);
+        const resp = await apiFetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...pendingAction.form, reasonType, reasonText }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          const defaultMsg = `Invite sent to ${pendingAction.form.email} — they'll set their own password via email.`;
+          const withLink = data.verificationUrl ? `${data.message}\n${data.verificationUrl}` : (data.message || defaultMsg);
+          setSuccessMsg(withLink);
+          setShowAddForm(false);
+          setAddForm({ first_name: '', last_name: '', phone_number: '', email: '', user_type: 'staff' });
+          fetchUsers();
+        } else {
+          setAddError(data.error || 'Failed to add user');
+        }
+        setAddLoading(false);
       }
     } catch (err) {
-      setAddError('Connection error. Please try again.');
-    } finally {
+      setError('Connection error. Please try again.');
       setAddLoading(false);
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -438,7 +452,7 @@ export default function AdminUsersPage() {
                 {deleteTarget.user_type}
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setDeleteTarget(null)}
                 style={{
@@ -450,7 +464,11 @@ export default function AdminUsersPage() {
                 Cancel
               </button>
               <button
-                onClick={handleDelete}
+                onClick={() => {
+                  // open reason modal for delete
+                  setPendingAction({ type: 'delete', user: deleteTarget });
+                  setShowReasonModal(true);
+                }}
                 style={{
                   padding: '0.5rem 1.25rem', borderRadius: '8px',
                   border: '1px solid #ef5350', backgroundColor: '#ef5350',
@@ -463,6 +481,8 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
 
       {/* ── Add User Modal ────────────────────────────────────────────────── */}
       {showAddForm && (

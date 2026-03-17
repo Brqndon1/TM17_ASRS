@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { getServiceContainer } from '@/lib/container/service-container';
+import { validateReason, recordAudit } from '@/lib/audit';
 import EVENTS from '@/lib/events/event-types';
 import { requireAccess } from '@/lib/auth/server-auth';
 
@@ -40,7 +41,13 @@ export async function POST(request) {
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { first_name, last_name, phone_number, email, user_type } = body;
+    const { first_name, last_name, phone_number, email, user_type, reasonType, reasonText } = body;
+
+    // Require a reason for administrative user creation
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
+    }
     const normalizedFirstName = String(first_name || '').trim();
     const normalizedLastName = String(last_name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -139,6 +146,8 @@ export async function POST(request) {
       invitedAt: clock.nowIso(),
     });
 
+    recordAudit('user.created', auth.user.email, 'user', result.lastInsertRowid, reasonType, reasonText, { email: normalizedEmail, role: user_type });
+
     const devVerificationUrl = `${process.env.APP_URL || 'http://localhost:3000'}/verify?token=${token}`;
 
     return NextResponse.json({
@@ -170,7 +179,12 @@ export async function PUT(request) {
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { user_id, new_role } = body;
+    const { user_id, new_role, reasonType, reasonText } = body;
+
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
+    }
 
     if (!user_id || !new_role) {
       return NextResponse.json({ error: 'user_id and new_role are required' }, { status: 400 });
@@ -195,6 +209,8 @@ export async function PUT(request) {
     const typeRow = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(new_role);
     db.prepare('UPDATE user SET user_type_id = ? WHERE user_id = ?').run(typeRow.user_type_id, user_id);
 
+    recordAudit('user.updated', auth.user.email, 'user', user_id, reasonType, reasonText, { new_role });
+
     return NextResponse.json({
       success: true,
       message: `User role updated to ${new_role}`,
@@ -213,6 +229,13 @@ export async function DELETE(request) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id');
+    const reasonType = searchParams.get('reasonType');
+    const reasonText = searchParams.get('reasonText');
+
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
+    }
 
     if (!userId) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
@@ -228,6 +251,8 @@ export async function DELETE(request) {
     }
 
     db.prepare('DELETE FROM user WHERE user_id = ?').run(Number(userId));
+
+    recordAudit('user.deleted', auth.user.email, 'user', userId, reasonType, reasonText, { deletedEmail: targetUser.email });
 
     return NextResponse.json({
       success: true,
