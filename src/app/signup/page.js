@@ -119,7 +119,7 @@ export default function SignupPage() {
               </div>
             )}
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-              Didn't get it? Check your spam folder, or{' '}
+              Didn&apos;t get it? Check your spam folder, or{' '}
               <button
                 onClick={() => setSubmitted(false)}
                 style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: '600', cursor: 'pointer', fontSize: '0.85rem' }}

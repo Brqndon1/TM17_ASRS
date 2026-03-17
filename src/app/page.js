@@ -43,17 +43,17 @@ export default function Home() {
   const { user } = useAuthStore();
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
-  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydration detection: avoids setState in useEffect
+  const [isHydrated] = useState(() => typeof window !== 'undefined');
+
   const router = useRouter();
 
   const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
   const isStaff = isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
+  // Fetch initiatives
   useEffect(() => {
     fetch('/api/initiatives')
       .then((res) => res.json())
@@ -61,19 +61,13 @@ export default function Home() {
       .catch(() => setInitiatives([]));
   }, []);
 
+  if (!isHydrated) return null;
+
   const visibleRoutes = routes.filter((route) => {
-    if (route.showOnlyWhenLoggedOut) {
-      return !isLoggedIn;
-    }
-    if (route.adminOnly) {
-      return isLoggedIn && isAdmin;
-    }
-    if (route.staffOnly) {
-      return isLoggedIn && isStaff;
-    }
-    if (route.requiresAuth) {
-      return isLoggedIn;
-    }
+    if (route.showOnlyWhenLoggedOut) return !isLoggedIn;
+    if (route.adminOnly) return isLoggedIn && isAdmin;
+    if (route.staffOnly) return isLoggedIn && isStaff;
+    if (route.requiresAuth) return isLoggedIn;
     return true;
   });
 
@@ -82,11 +76,19 @@ export default function Home() {
       <Header />
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <div className="asrs-card" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
+          <h1
+            style={{
+              fontSize: '1.75rem',
+              fontWeight: '700',
+              color: 'var(--color-text-primary)',
+              marginBottom: '0.5rem',
+            }}
+          >
             ASRS Initiatives Reporting System
           </h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>Select a section to get started.</p>
         </div>
+
         <div
           style={{
             display: 'grid',
@@ -94,8 +96,23 @@ export default function Home() {
             gap: '1rem',
           }}
         >
-          {isHydrated && visibleRoutes.map(({ href, label, description }) => {
+          {visibleRoutes.map(({ href, label, description }) => {
             const isSurvey = href === '/survey';
+
+            const handleMouseEnter = (event) => {
+              if (!isSurvey) {
+                event.currentTarget.style.transform = 'translateY(-3px)';
+                event.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+              }
+            };
+
+            const handleMouseLeave = (event) => {
+              if (!isSurvey) {
+                event.currentTarget.style.transform = 'translateY(0)';
+                event.currentTarget.style.boxShadow = '';
+              }
+            };
+
             const cardContent = (
               <div
                 className="asrs-card"
@@ -104,18 +121,8 @@ export default function Home() {
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                   height: '100%',
                 }}
-                onMouseEnter={(event) => {
-                  if (!isSurvey) {
-                    event.currentTarget.style.transform = 'translateY(-3px)';
-                    event.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
-                  }
-                }}
-                onMouseLeave={(event) => {
-                  if (!isSurvey) {
-                    event.currentTarget.style.transform = 'translateY(0)';
-                    event.currentTarget.style.boxShadow = '';
-                  }
-                }}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
               >
                 <h2
                   style={{

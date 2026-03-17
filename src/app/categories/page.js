@@ -537,8 +537,9 @@ export default function CategoriesPage() {
               Confirm Deletion
             </h2>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-              Are you sure you want to delete the category "
-              <strong>{deleteTarget.category_name}</strong>"? This action cannot be undone.
+              Are you sure you want to delete the category &quot;
+              <strong>{deleteTarget.category_name}</strong>
+              &quot;? This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button

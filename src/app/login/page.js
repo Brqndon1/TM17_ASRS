@@ -149,7 +149,7 @@ export default function LoginPage() {
               color: 'var(--color-text-secondary)',
             }}
           >
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link
               href="/signup"
               style={{

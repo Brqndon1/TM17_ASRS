@@ -211,7 +211,7 @@ function VerifyContent() {
       <div style={containerStyle}>
         <div style={cardStyle}>
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>✅</div>
-          <h1 style={headingStyle}>You're all set, {firstName}!</h1>
+          <h1 style={headingStyle}>You&apos;re all set, {firstName}!</h1>
           <div style={successBoxStyle}>
             Your account has been verified and your password has been set.<br />
             Redirecting you to the login page…

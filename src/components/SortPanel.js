@@ -65,7 +65,7 @@ export default function SortPanel({ attributes, activeSorts, onSortsChange }) {
       {/* List of active sort levels */}
       {activeSorts.length === 0 ? (
         <p style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
-          No sorting applied. Click "Add Level" to sort the data.
+          No sorting applied. Click &quot;Add Level&quot; to sort the data.
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

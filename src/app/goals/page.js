@@ -477,7 +477,7 @@ export default function GoalsPage() {
             {/* Goals Cards */}
             {goals.length === 0 && !showAddForm && (
               <div className="asrs-card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                No goals configured for this initiative yet. Click "+ Add Goal" to create one.
+                No goals configured for this initiative yet. Click &quot;+ Add Goal&quot; to create one.
               </div>
             )}
 

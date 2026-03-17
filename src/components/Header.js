@@ -61,13 +61,9 @@ export default function Header() {
   const pathname = usePathname();
   const { user, clearUser } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const isHydrated = typeof window !== 'undefined';
   const headerRef = useRef(null);
   const [profilePic, setProfilePic] = useState(null);
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -81,7 +77,8 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setProfilePic(null); return; }
+    if (!user) return;
+
     apiFetch('/api/user/profile')
       .then((data) => setProfilePic(data?.user?.profile_picture ?? null))
       .catch(() => setProfilePic(null));
