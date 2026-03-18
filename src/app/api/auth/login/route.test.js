@@ -37,6 +37,17 @@ describe('/api/auth/login POST', () => {
     expect(res.status).toBe(400);
   });
 
+  test('returns 400 when password is only whitespace', async () => {
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@test.com', password: '   ' }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
   test('returns success for valid credentials and verified user', async () => {
     prepareMock.mockReturnValue({
       get: vi.fn(() => ({

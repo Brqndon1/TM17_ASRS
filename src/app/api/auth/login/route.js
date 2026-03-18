@@ -8,8 +8,9 @@ export async function POST(request) {
     const { db } = getServiceContainer();
     const { email, password } = await request.json();
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPassword = String(password || '');
 
-    if (!normalizedEmail || !password) {
+    if (!normalizedEmail || !normalizedPassword.trim()) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 
@@ -20,7 +21,7 @@ export async function POST(request) {
       WHERE u.email = ?
     `).get(normalizedEmail);
 
-    if (!user || !verifyPassword(password, user.password)) {
+    if (!user || !verifyPassword(normalizedPassword, user.password)) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 

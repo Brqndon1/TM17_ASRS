@@ -49,12 +49,13 @@ export async function POST(request) {
   try {
     const { db, eventBus, clock } = getServiceContainer();
     const { token, password } = await request.json();
+    const normalizedPassword = String(password || '');
 
-    if (!token || !password) {
+    if (!token || !normalizedPassword.trim()) {
       return NextResponse.json({ error: 'Token and password are required' }, { status: 400 });
     }
 
-    if (password.length < 8) {
+    if (normalizedPassword.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
     }
 
@@ -85,7 +86,7 @@ export async function POST(request) {
           verification_token = NULL,
           token_expires_at = NULL
       WHERE user_id = ?
-    `).run(hashPassword(password), user.user_id);
+    `).run(hashPassword(normalizedPassword), user.user_id);
 
     eventBus.publish(EVENTS.USER_VERIFIED, {
       userId: Number(user.user_id),
