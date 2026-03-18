@@ -202,6 +202,7 @@ export default function SurveyPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isSubmitting) return;
     setError(null);
 
     const newInvalidFields = {};
@@ -438,7 +439,7 @@ export default function SurveyPage() {
               </div>
             ) : (
               /* ---- Survey Form ---- */
-              <form onSubmit={handleSubmit} noValidate>
+              <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
                 {/* Error banner */}
                 {error && (
                   <div style={{
@@ -455,6 +456,10 @@ export default function SurveyPage() {
                   </div>
                 )}
 
+                <fieldset
+                  disabled={isSubmitting}
+                  style={{ border: 'none', margin: 0, padding: 0, minInlineSize: 0 }}
+                >
                 {/* ---- Section: Personal Information ---- */}
                 <div style={{
                   borderBottom: '1px solid var(--color-bg-tertiary)',
@@ -719,6 +724,7 @@ export default function SurveyPage() {
                     </div>
                   </div>
                 )}
+                </fieldset>
 
                 {/* ---- Submit Button ---- */}
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
