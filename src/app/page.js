@@ -41,25 +41,36 @@ const routes = [
 
 export default function Home() {
   const { user } = useAuthStore();
+
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
 
-  // Hydration detection: avoids setState in useEffect
-  const [isHydrated] = useState(() => typeof window !== 'undefined');
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const router = useRouter();
 
   const isLoggedIn = Boolean(user);
-  const isAdmin = isLoggedIn && user.user_type === 'admin';
-  const isStaff = isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
+  const isAdmin = isLoggedIn && user?.user_type === 'admin';
+  const isStaff =
+    isLoggedIn &&
+    (user?.user_type === 'staff' || user?.user_type === 'admin');
 
-  // Fetch initiatives
   useEffect(() => {
+    if (!isHydrated) return;
+
     fetch('/api/initiatives')
       .then((res) => res.json())
-      .then((data) => setInitiatives(Array.isArray(data.initiatives) ? data.initiatives : []))
+      .then((data) =>
+        setInitiatives(
+          Array.isArray(data.initiatives) ? data.initiatives : []
+        )
+      )
       .catch(() => setInitiatives([]));
-  }, []);
+  }, [isHydrated]);
 
   if (!isHydrated) return null;
 
@@ -72,10 +83,25 @@ export default function Home() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--color-bg-primary)',
+      }}
+    >
       <Header />
-      <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <div className="asrs-card" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+
+      <main
+        style={{
+          maxWidth: '800px',
+          margin: '0 auto',
+          padding: '2rem 1.5rem',
+        }}
+      >
+        <div
+          className="asrs-card"
+          style={{ textAlign: 'center', marginBottom: '2rem' }}
+        >
           <h1
             style={{
               fontSize: '1.75rem',
@@ -86,7 +112,9 @@ export default function Home() {
           >
             ASRS Initiatives Reporting System
           </h1>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Select a section to get started.</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>
+            Select a section to get started.
+          </p>
         </div>
 
         <div
@@ -102,7 +130,8 @@ export default function Home() {
             const handleMouseEnter = (event) => {
               if (!isSurvey) {
                 event.currentTarget.style.transform = 'translateY(-3px)';
-                event.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                event.currentTarget.style.boxShadow =
+                  '0 6px 20px rgba(0,0,0,0.12)';
               }
             };
 
@@ -134,6 +163,7 @@ export default function Home() {
                 >
                   {label}
                 </h2>
+
                 <p
                   style={{
                     fontSize: '0.9rem',
@@ -145,10 +175,12 @@ export default function Home() {
                 </p>
 
                 {isSurvey && (
-                  <div style={{ marginTop: '1rem' }} onClick={(event) => event.preventDefault()}>
+                  <div style={{ marginTop: '1rem' }}>
                     <select
                       value={selectedInitiative}
-                      onChange={(event) => setSelectedInitiative(event.target.value)}
+                      onChange={(event) =>
+                        setSelectedInitiative(event.target.value)
+                      }
                       style={{
                         width: '100%',
                         padding: '0.4rem 0.6rem',
@@ -167,12 +199,14 @@ export default function Home() {
                         </option>
                       ))}
                     </select>
+
                     <button
                       disabled={!selectedInitiative}
-                      onClick={(event) => {
-                        event.preventDefault();
+                      onClick={() => {
                         if (selectedInitiative) {
-                          router.push(`/survey?initiativeId=${selectedInitiative}`);
+                          router.push(
+                            `/survey?initiativeId=${selectedInitiative}`
+                          );
                         }
                       }}
                       style={{
@@ -185,7 +219,9 @@ export default function Home() {
                           : 'var(--color-border, #ccc)',
                         color: '#fff',
                         fontSize: '0.85rem',
-                        cursor: selectedInitiative ? 'pointer' : 'not-allowed',
+                        cursor: selectedInitiative
+                          ? 'pointer'
+                          : 'not-allowed',
                       }}
                     >
                       Start Survey
@@ -194,9 +230,16 @@ export default function Home() {
                 )}
               </div>
             );
+            if (isSurvey) {
+              return <div key={href}>{cardContent}</div>;
+            }
 
             return (
-              <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+              <Link
+                key={href}
+                href={href}
+                style={{ textDecoration: 'none' }}
+              >
                 {cardContent}
               </Link>
             );
