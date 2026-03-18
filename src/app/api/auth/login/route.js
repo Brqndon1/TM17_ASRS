@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
 import { applySessionCookies, createSession } from '@/lib/auth/server-auth';
 import { verifyPassword } from '@/lib/auth/passwords';
+import { isPasswordHash } from '@/lib/auth/passwords';
+import { hashPassword } from '@/lib/auth/passwords';
 
 export async function POST(request) {
   try {
@@ -20,9 +22,31 @@ export async function POST(request) {
       WHERE u.email = ?
     `).get(normalizedEmail);
 
-    if (!user || !verifyPassword(password, user.password)) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: 'User does not exist' }, { status: 401 });
     }
+
+    const isValid = verifyPassword(password, user.password);
+
+    if (!isValid){
+      return NextResponse.json({ error: 'Password is incorrect' }, { status: 401 });
+    } 
+
+    if (!isPasswordHash(user.password)) {
+      const newHash = hashPassword(user.password);
+
+      // Migrate any plaintext passwords stored in the DB to a hashed format.
+      // This uses the same SQLite DB API used elsewhere in the codebase.
+      db.prepare(`
+        UPDATE user
+        SET password = ?
+        WHERE user_id = ?
+      `).run(newHash, user.user_id);
+    }
+
+    // if (!user || !verifyPassword(password, user.password)) {
+    //   return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+    // }
 
     if (!user.verified) {
       return NextResponse.json(

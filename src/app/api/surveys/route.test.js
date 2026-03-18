@@ -92,7 +92,7 @@ describe('/api/surveys integration', () => {
       'INSERT INTO reports (survey_id, report_data, created_at) VALUES (?, ?, ?)'
     ).run(surveyId, JSON.stringify({ summary: 'great' }), '2026-03-05T00:00:00.000Z');
 
-    const tokens = createSessionForRank(state.db, { rank: 50, verified: 1 });
+    const tokens = createSessionForRank(state.db, { rank: 100, verified: 1 });
 
     const res = await GET(new Request('http://localhost:3000/api/surveys', {
       headers: createAuthedRequestHeaders(tokens),
@@ -105,6 +105,19 @@ describe('/api/surveys integration', () => {
     expect(payload.surveys[0].report.summary).toBe('great');
   });
 
+  test('GET denies staff access to PII endpoint', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const tokens = createSessionForRank(state.db, { rank: 50, verified: 1 });
+    const res = await GET(new Request('http://localhost:3000/api/surveys', {
+      headers: createAuthedRequestHeaders(tokens),
+    }));
+    const payload = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(payload.error).toContain('insufficient permissions');
+  });
+
   test('GET returns 500 when stored survey JSON is malformed', async () => {
     process.env.NODE_ENV = 'development';
 
@@ -112,7 +125,7 @@ describe('/api/surveys integration', () => {
       'INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)'
     ).run('Broken', 'b@example.com', 'not-json');
 
-    const tokens = createSessionForRank(state.db, { rank: 50, verified: 1 });
+    const tokens = createSessionForRank(state.db, { rank: 100, verified: 1 });
 
     const res = await GET(new Request('http://localhost:3000/api/surveys', {
       headers: createAuthedRequestHeaders(tokens),

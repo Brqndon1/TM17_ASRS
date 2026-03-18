@@ -76,15 +76,20 @@ export async function POST(request) {
       report: reportData,
     });
   } catch (error) {
+    const errorMessage = String(error?.message || '');
+    const isValidationError = /missing|required|invalid/i.test(errorMessage);
+
     try {
-      alertDb(error, { route: '/api/surveys POST' }).catch(() => void 0);
+      if (!isValidationError) {
+        alertDb(error, { route: '/api/surveys POST' }).catch(() => void 0);
+      }
     } catch (e) {
       // ignore
     }
     console.error('Error submitting survey:', error);
     return NextResponse.json(
-      { error: 'Failed to submit survey', details: error.message },
-      { status: 500 }
+      { error: isValidationError ? 'Invalid survey payload' : 'Failed to submit survey', details: errorMessage },
+      { status: isValidationError ? 400 : 500 }
     );
   }
 }
@@ -93,7 +98,8 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    // PII-sensitive endpoint: only admins can retrieve raw survey submissions.
+    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
     if (auth.error) return auth.error;
 
     const rows = db.prepare(`

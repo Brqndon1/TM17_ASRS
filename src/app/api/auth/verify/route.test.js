@@ -40,6 +40,17 @@ describe('/api/auth/verify', () => {
     expect(res.status).toBe(400);
   });
 
+  test('POST returns 400 for whitespace-only password', async () => {
+    const req = new Request('http://localhost:3000/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'abc', password: '        ' }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
   test('POST verifies account when token is valid', async () => {
     const tokenLookup = vi.fn(() => ({
       user_id: 11,
