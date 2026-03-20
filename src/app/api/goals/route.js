@@ -173,6 +173,18 @@ export async function POST(request) {
 
     const newGoal = db.prepare('SELECT * FROM initiative_goal WHERE goal_id = ?').get(result.lastInsertRowid);
 
+    // Record initial progress snapshot
+    db.prepare(`
+      INSERT INTO goal_progress_history (goal_id, initiative_id, recorded_value, target_value, score)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      newGoal.goal_id,
+      newGoal.initiative_id,
+      newGoal.current_value,
+      newGoal.target_value,
+      parseFloat(computeGoalScore(newGoal).toFixed(2))
+    );
+
     return NextResponse.json({
       success: true,
       goal: {
@@ -254,6 +266,21 @@ export async function PUT(request) {
     `).run(...values);
 
     const updatedGoal = db.prepare('SELECT * FROM initiative_goal WHERE goal_id = ?').get(goal_id);
+    
+
+    // After the UPDATE runs and updatedGoal is fetched:
+    if (updates.current_value !== undefined) {
+      db.prepare(`
+        INSERT INTO goal_progress_history (goal_id, initiative_id, recorded_value, target_value, score)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        goal_id,
+        updatedGoal.initiative_id,
+        updatedGoal.current_value,
+        updatedGoal.target_value,
+        computeGoalScore(updatedGoal)
+      );
+    }
 
     return NextResponse.json({
       success: true,

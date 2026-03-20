@@ -506,8 +506,19 @@ function initializeDatabase() {
       added_at TEXT DEFAULT (datetime('now')),
       UNIQUE(initiative_id, category_id)
     );
+    CREATE TABLE IF NOT EXISTS goal_progress_history (
+      history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      goal_id INTEGER NOT NULL REFERENCES initiative_goal(goal_id) ON DELETE CASCADE,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      recorded_value REAL NOT NULL,
+      target_value REAL NOT NULL,
+      score REAL NOT NULL,
+      recorded_at TEXT DEFAULT (datetime('now'))
+    );
 
-    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_goal_history_initiative ON goal_progress_history(initiative_id, recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_goal_history_goal ON goal_progress_history(goal_id, recorded_at);
+      -- Indexes for performance optimization
 
     CREATE INDEX IF NOT EXISTS idx_goal_initiative ON initiative_goal(initiative_id);
     CREATE INDEX IF NOT EXISTS idx_category_name ON category(category_name);
