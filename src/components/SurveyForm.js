@@ -7,7 +7,7 @@ const SURVEY_FORM_DRAFT_KEY = "surveyTemplateDraft:v1";
 export default function SurveyForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""], subQuestions: [""], required: false }]);
+  const [questions, setQuestions] = useState([{ question: "", type: "text", options: [""], required: false }]);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const hasLoadedDraft = useRef(false);
@@ -53,19 +53,13 @@ export default function SurveyForm() {
     return () => clearTimeout(timeout);
   }, [title, description, questions]);
 
-  const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""], subQuestions: [""], required: false }]);
+  const addQuestion = () => setQuestions([...questions, { question: "", type: "text", options: [""], required: false }]);
   
   const updateQuestion = (idx, field, value) => {
     const copy = [...questions];
     copy[idx][field] = value;
     if (field === 'type' && value === 'choice' && (!copy[idx].options || copy[idx].options.length === 0)) {
       copy[idx].options = [""];
-    }
-    if (field === 'type' && value === 'multiselect' && (!copy[idx].options || copy[idx].options.length === 0)) {
-      copy[idx].options = [""];
-    }
-    if (field === 'type' && value === 'yesno' && (!copy[idx].subQuestions || copy[idx].subQuestions.length === 0)) {
-      copy[idx].subQuestions = [""];
     }
     setQuestions(copy);
   };
@@ -88,23 +82,6 @@ export default function SurveyForm() {
     setQuestions(copy);
   };
 
-  const addSubQuestion = (qIdx) => {
-    const copy = [...questions];
-    if (!copy[qIdx].subQuestions) copy[qIdx].subQuestions = [];
-    copy[qIdx].subQuestions.push("");
-    setQuestions(copy);
-  };
-  const updateSubQuestion = (qIdx, sIdx, val) => {
-    const copy = [...questions];
-    copy[qIdx].subQuestions[sIdx] = val;
-    setQuestions(copy);
-  };
-  const removeSubQuestion = (qIdx, sIdx) => {
-    const copy = [...questions];
-    copy[qIdx].subQuestions = copy[qIdx].subQuestions.filter((_, i) => i !== sIdx);
-    setQuestions(copy);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -116,16 +93,10 @@ export default function SurveyForm() {
     
     for (let i = 0; i < validQuestions.length; i++) {
       if (!validQuestions[i].question.trim()) return alert(`Please enter text for Question ${i + 1}`);
-      if (validQuestions[i].type === 'choice' || validQuestions[i].type === 'multiselect') {
+      if (validQuestions[i].type === 'choice') {
         const validOptions = validQuestions[i].options.filter(opt => opt.trim());
         if (validOptions.length === 0) {
-          return alert(`Question ${i + 1} needs at least one option.`);
-        }
-      }
-      if (validQuestions[i].type === 'yesno') {
-        const validSubs = validQuestions[i].subQuestions.filter(s => s.trim());
-        if (validSubs.length === 0) {
-          return alert(`Question ${i + 1} needs at least one sub-question.`);
+          return alert(`Question ${i + 1} is multiple choice but has no options. Please add at least one option.`);
         }
       }
     }
@@ -139,8 +110,7 @@ export default function SurveyForm() {
           question: q.question,
           type: q.type,
           required: !!q.required,
-          options: (q.type === 'choice' || q.type === 'multiselect') ? q.options.filter(opt => opt.trim()) : undefined,
-          subQuestions: q.type === 'yesno' ? q.subQuestions.filter(s => s.trim()) : undefined,
+          options: q.type === 'choice' ? q.options.filter(opt => opt.trim()) : undefined
         }))
       };
       
@@ -157,7 +127,7 @@ export default function SurveyForm() {
       
       setTitle("");
       setDescription("");
-      setQuestions([{ question: "", type: "text", options: [""], subQuestions: [""], required: false }]);
+      setQuestions([{ question: "", type: "text", options: [""], required: false }]);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(SURVEY_FORM_DRAFT_KEY);
       }
@@ -203,8 +173,6 @@ export default function SurveyForm() {
                     <option value="text">Text Response</option>
                     <option value="number">Numeric</option>
                     <option value="choice">Multiple Choice</option>
-                    <option value="multiselect">Multi-select (select all that apply)</option>
-                    <option value="yesno">Yes / No Grid</option>
                   </select>
                 </div>
 
@@ -215,7 +183,7 @@ export default function SurveyForm() {
                   </label>
                 </div>
 
-                {(q.type === 'choice' || q.type === 'multiselect') && (
+                {q.type === 'choice' && (
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: 6, border: '1px dashed var(--color-bg-tertiary)' }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Answer Options *</span>
                     {q.options && q.options.map((option, oIdx) => (
@@ -225,19 +193,6 @@ export default function SurveyForm() {
                       </div>
                     ))}
                     <button type="button" onClick={() => addOption(i)} className="asrs-btn-secondary" style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', marginTop: '0.25rem' }}>+ Add Option</button>
-                  </div>
-                )}
-
-                {q.type === 'yesno' && (
-                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: 6, border: '1px dashed var(--color-bg-tertiary)' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Sub-questions *</span>
-                    {q.subQuestions && q.subQuestions.map((sub, sIdx) => (
-                      <div key={sIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <input value={sub} onChange={(e) => updateSubQuestion(i, sIdx, e.target.value)} placeholder={`Sub-question ${sIdx + 1}`} style={{ flex: 1, padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)', fontSize: '0.9rem' }} />
-                        <button type="button" onClick={() => removeSubQuestion(i, sIdx)} disabled={q.subQuestions.length === 1} className="asrs-btn-secondary" style={{ padding: '0.5rem 0.75rem', fontSize: '0.875rem' }}>✕</button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => addSubQuestion(i)} className="asrs-btn-secondary" style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', marginTop: '0.25rem' }}>+ Add Sub-question</button>
                   </div>
                 )}
               </div>
@@ -277,35 +232,6 @@ export default function SurveyForm() {
                         </label>
                       ))}
                     </div>
-                  )}
-                  {q.type === 'multiselect' && q.options && (
-                    <div>
-                      {q.options.filter(o => o && o.trim()).map((opt, oIdx) => (
-                        <label key={oIdx} style={{ display: 'block', marginBottom: '0.25rem' }}>
-                          <input type="checkbox" disabled style={{ marginRight: '0.5rem' }} />{opt}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {q.type === 'yesno' && q.subQuestions && (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)', width: '60%' }}></th>
-                          <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)' }}>Yes</th>
-                          <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)' }}>No</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {q.subQuestions.filter(s => s && s.trim()).map((sub, sIdx) => (
-                          <tr key={sIdx} style={{ backgroundColor: sIdx % 2 === 0 ? 'var(--color-bg-primary)' : 'transparent' }}>
-                            <td style={{ padding: '0.5rem' }}>{sub}</td>
-                            <td style={{ textAlign: 'center', padding: '0.5rem' }}><input type="radio" name={`preview-${i}-${sIdx}`} disabled /></td>
-                            <td style={{ textAlign: 'center', padding: '0.5rem' }}><input type="radio" name={`preview-${i}-${sIdx}`} disabled /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   )}
                 </div>
               ))}
