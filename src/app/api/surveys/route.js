@@ -20,23 +20,23 @@ export async function POST(request) {
     const body = await request.json();
     const cleaned = validateAndCleanSurvey(body);
 
-    // Generate basic statistics on cleaned responses
+    // Basic stats and AI report (best-effort)
     const basicStats = generateBasicStats(cleaned.responses);
-
-    // Generate AI-enhanced report using GPT-4
     const reportData = await generateAIReport(cleaned.responses, basicStats);
 
-    // Use a transaction so survey + report are atomic
-    const insertSurveyAndReport = db.transaction((name, email, responsesJSON, reportJSON, templateId) => {
-      const surveyInfo = db.prepare(
-        `INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)`
-      ).run(name, email, responsesJSON);
+    // Duplicate submission guard: exact same email + responses JSON
+    const responsesJSON = JSON.stringify(cleaned.responses);
+    const existing = db.prepare(`SELECT id FROM surveys WHERE email = ? AND responses = ? LIMIT 1`).get(cleaned.email, responsesJSON);
+    if (existing) {
+      return NextResponse.json({ error: 'Duplicate submission detected' }, { status: 409 });
+    }
 
+    // Use a transaction so survey + report + distribution update are atomic
+    const insertSurveyAndReport = db.transaction((name, email, responsesJSONInner, reportJSON, templateId) => {
+      const surveyInfo = db.prepare(`INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)`).run(name, email, responsesJSONInner);
       const surveyId = surveyInfo.lastInsertRowid;
 
-      db.prepare(
-        `INSERT INTO reports (survey_id, report_data) VALUES (?, ?)`
-      ).run(surveyId, reportJSON);
+      db.prepare(`INSERT INTO reports (survey_id, report_data) VALUES (?, ?)`).run(surveyId, reportJSON);
 
       if (templateId) {
         const today = toLocalYyyyMmDd(new Date());
@@ -51,30 +51,93 @@ export async function POST(request) {
         `).get(String(templateId), today, today);
 
         if (activeDistribution?.distribution_id) {
-          db.prepare(`
-            UPDATE survey_distribution
-            SET response_count = response_count + 1
-            WHERE distribution_id = ?
-          `).run(activeDistribution.distribution_id);
+          db.prepare(`UPDATE survey_distribution SET response_count = response_count + 1 WHERE distribution_id = ?`).run(activeDistribution.distribution_id);
         }
       }
 
       return surveyId;
     });
 
+    // Prefer an explicit templateId at top-level; fall back to responses.templateId
+    const effectiveTemplateId = cleaned.templateId || (cleaned.responses && cleaned.responses.templateId) || null;
+
     const surveyId = insertSurveyAndReport(
       cleaned.name,
       cleaned.email,
-      JSON.stringify(cleaned.responses),
+      responsesJSON,
       JSON.stringify(reportData),
-      cleaned.templateId
+      effectiveTemplateId
     );
 
-    return NextResponse.json({
-      success: true,
-      surveyId: Number(surveyId),
-      report: reportData,
-    });
+    // Attempt to populate normalized submission tables when a form mapping exists.
+    // This is best-effort and should not abort the main survey submission.
+    try {
+      const templateCandidate = effectiveTemplateId || (cleaned.responses && cleaned.responses.templateId);
+      if (templateCandidate) {
+        // Try to resolve to a numeric form_id
+        const formRow = db.prepare(`SELECT form_id, initiative_id FROM form WHERE form_id = ? LIMIT 1`).get(Number(templateCandidate));
+        if (formRow && formRow.form_id) {
+          // Build and run a transaction for normalized inserts
+          const insertNormalized = db.transaction((formId, initiativeId, answers) => {
+            const submissionInfo = db.prepare(`INSERT INTO submission (initiative_id, form_id, submitted_by_user_id) VALUES (?, ?, NULL)`).run(initiativeId || 1, formId);
+            const submissionId = submissionInfo.lastInsertRowid;
+
+            const insertVal = db.prepare(`INSERT INTO submission_value (submission_id, field_id, value_text, value_number, value_date, value_bool, value_json) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+            for (const [fieldKey, rawVal] of Object.entries(answers || {})) {
+              const fieldId = Number(fieldKey);
+              if (!fieldId) continue;
+
+              let v_text = null;
+              let v_number = null;
+              let v_date = null;
+              let v_bool = null;
+              let v_json = null;
+
+              if (rawVal === null || rawVal === undefined) {
+                // leave all null
+              } else if (typeof rawVal === 'number') {
+                v_number = rawVal;
+              } else if (typeof rawVal === 'boolean') {
+                v_bool = rawVal ? 1 : 0;
+              } else if (typeof rawVal === 'object') {
+                v_json = JSON.stringify(rawVal);
+              } else if (typeof rawVal === 'string') {
+                // ISO date-ish detection
+                if (/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2})?/.test(rawVal)) {
+                  v_date = rawVal;
+                } else {
+                  v_text = rawVal.slice(0, 1000);
+                }
+              } else {
+                v_text = String(rawVal).slice(0, 1000);
+              }
+
+              try {
+                insertVal.run(submissionId, fieldId, v_text, v_number, v_date, v_bool, v_json);
+              } catch (e) {
+                // Ignore unique constraint or individual value errors; continue
+              }
+            }
+          });
+
+          // Look for answers in the conventional `templateAnswers` object sent by the UI
+          const answers = cleaned.responses && cleaned.responses.templateAnswers ? cleaned.responses.templateAnswers : null;
+          if (answers && Object.keys(answers).length > 0) {
+            insertNormalized(formRow.form_id, formRow.initiative_id, answers);
+          }
+        }
+      }
+    } catch (err) {
+      try {
+        alertDb(err, { route: '/api/surveys POST (normalized insert)' }).catch(() => void 0);
+      } catch (e) {
+        // ignore
+      }
+      console.error('Normalized insert failed:', err);
+    }
+
+    return NextResponse.json({ success: true, surveyId: Number(surveyId), report: reportData });
   } catch (error) {
     const errorMessage = String(error?.message || '');
     const isValidationError = /missing|required|invalid/i.test(errorMessage);
