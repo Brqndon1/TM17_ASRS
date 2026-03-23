@@ -5,12 +5,17 @@ function normalizeQuestion(question, fallbackId) {
     ? text.options.map((opt) => String(opt))
     : [];
 
+  const subQuestions = Array.isArray(text.subQuestions)
+    ? text.subQuestions.map((s) => String(s))
+    : [];
+
   return {
     id: question?.id ?? fallbackId,
     label: text.question || '',
     type: text.type || 'text',
     required: text.required !== false,
     options,
+    subQuestions,
     helpText: text.help_text || '',
   };
 }

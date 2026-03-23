@@ -219,8 +219,22 @@ export default function SurveyPage() {
         const isQuestionRequired = q.required ?? q.text?.required ?? true;
         if (!isQuestionRequired) return;
         const qId = q.id;
-        if (!templateResponses[qId] || !String(templateResponses[qId]).trim()) {
-          newInvalidFields[`question_${qId}`] = true;
+        const questionType = q.type || q.text?.type || 'text';
+        const questionSubQuestions = q.subQuestions || q.text?.subQuestions || [];
+
+        if (questionType === 'yesno') {
+          const answers = templateResponses[qId] || {};
+          if (Object.keys(answers).length < questionSubQuestions.length) {
+            newInvalidFields[`question_${qId}`] = true;
+          }
+        } else if (questionType === 'multiselect') {
+          if (!templateResponses[qId] || templateResponses[qId].length === 0) {
+            newInvalidFields[`question_${qId}`] = true;
+          }
+        } else {
+          if (!templateResponses[qId] || !String(templateResponses[qId]).trim()) {
+            newInvalidFields[`question_${qId}`] = true;
+          }
         }
       });
     } else {
@@ -537,12 +551,10 @@ export default function SurveyPage() {
                     </h2>
 
                     {(surveyTemplate.questions || []).map((q, index) => {
-                      // Handle both formats:
-                      // Old: { id, text: { question, type, options } }
-                      // New: { id, question, type, options }
                       const questionText = q.label || q.text?.question || q.question || '';
                       const questionType = q.type || q.text?.type || 'text';
                       const questionOptions = q.options || q.text?.options || [];
+                      const questionSubQuestions = q.subQuestions || q.text?.subQuestions || [];
                       const qId = q.id;
                       const isRequired = q.required ?? q.text?.required ?? true;
                       const isInvalid = !!invalidFields[`question_${qId}`];
@@ -634,6 +646,110 @@ export default function SurveyPage() {
                               ))}
                             </div>
                             {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please select an option.</span>}
+                            </>
+                          )}
+
+                          {questionType === 'multiselect' && questionOptions.length > 0 && (
+                            <>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                              ...(isInvalid ? { border: '1.5px solid #ef4444', borderRadius: '8px', padding: '0.5rem', backgroundColor: '#fef2f2' } : {}),
+                            }}>
+                              {questionOptions.map((option) => (
+                                <label
+                                  key={option}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.65rem',
+                                    padding: '0.6rem 0.85rem',
+                                    borderRadius: '8px',
+                                    border: (templateResponses[qId] || []).includes(option)
+                                      ? '2px solid var(--color-asrs-orange)'
+                                      : '1px solid var(--color-bg-tertiary)',
+                                    backgroundColor: (templateResponses[qId] || []).includes(option)
+                                      ? '#fdf4e8'
+                                      : 'var(--color-bg-primary)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    value={option}
+                                    checked={(templateResponses[qId] || []).includes(option)}
+                                    onChange={(e) => {
+                                      const prev = templateResponses[qId] || [];
+                                      const updated = e.target.checked
+                                        ? [...prev, option]
+                                        : prev.filter((v) => v !== option);
+                                      setTemplateResponses({ ...templateResponses, [qId]: updated });
+                                      if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                    }}
+                                    style={{ accentColor: 'var(--color-asrs-orange)' }}
+                                  />
+                                  <span style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>{option}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please select at least one option.</span>}
+                            </>
+                          )}
+
+                          {questionType === 'yesno' && questionSubQuestions.length > 0 && (
+                            <>
+                            <table style={{
+                              width: '100%',
+                              borderCollapse: 'collapse',
+                              fontSize: '0.92rem',
+                              ...(isInvalid ? { border: '1.5px solid #ef4444', borderRadius: '8px' } : {}),
+                            }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)', width: '60%' }}></th>
+                                  <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)' }}>Yes</th>
+                                  <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--color-bg-tertiary)' }}>No</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {questionSubQuestions.map((sub, sIdx) => (
+                                  <tr key={sIdx} style={{ backgroundColor: sIdx % 2 === 0 ? 'var(--color-bg-secondary)' : 'transparent' }}>
+                                    <td style={{ padding: '0.5rem', color: 'var(--color-text-primary)' }}>{sub}</td>
+                                    <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                      <input
+                                        type="radio"
+                                        name={`question_${qId}_${sIdx}`}
+                                        value="yes"
+                                        checked={(templateResponses[qId]?.[sIdx]) === 'yes'}
+                                        onChange={() => {
+                                          const prev = templateResponses[qId] || {};
+                                          setTemplateResponses({ ...templateResponses, [qId]: { ...prev, [sIdx]: 'yes' } });
+                                          if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                        }}
+                                        style={{ accentColor: 'var(--color-asrs-orange)' }}
+                                      />
+                                    </td>
+                                    <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                                      <input
+                                        type="radio"
+                                        name={`question_${qId}_${sIdx}`}
+                                        value="no"
+                                        checked={(templateResponses[qId]?.[sIdx]) === 'no'}
+                                        onChange={() => {
+                                          const prev = templateResponses[qId] || {};
+                                          setTemplateResponses({ ...templateResponses, [qId]: { ...prev, [sIdx]: 'no' } });
+                                          if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                        }}
+                                        style={{ accentColor: 'var(--color-asrs-orange)' }}
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please answer all sub-questions.</span>}
                             </>
                           )}
                         </div>

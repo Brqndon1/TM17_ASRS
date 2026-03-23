@@ -80,7 +80,9 @@ export async function GET(request, context) {
       SELECT option_value, display_label FROM field_options WHERE field_id = ? ORDER BY display_order`);
 
     const questions = getQuestions.all(form.id).map(q => {
-      const options = (q.field_type === 'select' || q.field_type === 'multiselect' || q.field_type === 'choice')
+      const isOptionType = q.field_type === 'select' || q.field_type === 'multiselect' || q.field_type === 'choice';
+      const isYesNo = q.field_type === 'yesno';
+      const rawOptions = (isOptionType || isYesNo)
         ? getOptions.all(q.field_id).map(opt => opt.option_value)
         : undefined;
       return {
@@ -89,7 +91,8 @@ export async function GET(request, context) {
           question: q.field_label,
           type: q.field_type,
           required: !!q.required,
-          ...(options ? { options } : {}),
+          ...(isOptionType && rawOptions ? { options: rawOptions } : {}),
+          ...(isYesNo && rawOptions ? { subQuestions: rawOptions } : {}),
           ...(q.help_text ? { help_text: q.help_text } : {})
         }
       };
