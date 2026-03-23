@@ -33,7 +33,21 @@ export default function ManageReportsPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) {
+      router.push('/login');
+      return;
+    }
+    const parsed = JSON.parse(storedUser);
+    if (parsed.user_type !== 'staff' && parsed.user_type !== 'admin') {
+      router.push('/');
+      return;
+    }
+    loadData();
+  }, [router]);
+
+  async function loadData() {
     setLoading(true);
     try {
       const [reportsRes, initRes] = await Promise.all([
@@ -50,21 +64,7 @@ export default function ManageReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      router.push('/login');
-      return;
-    }
-    const parsed = JSON.parse(storedUser);
-    if (parsed.user_type !== 'staff' && parsed.user_type !== 'admin') {
-      router.push('/');
-      return;
-    }
-    loadData();
-  }, [router, loadData]);
+  }
 
   function getInitiativeName(initId) {
     const init = initiatives.find(i => i.initiative_id === initId || i.id === initId);
@@ -226,12 +226,14 @@ export default function ManageReportsPage() {
         <BackButton />
 
         <div className="asrs-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <div>
               <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0 }}>Manage Reports</h1>
               <p style={{ color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
                 Add, update, delete, and reorder the report library.
               </p>
             </div>
+            <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
             <button
               onClick={saveOrder}
               disabled={saving || reports.length === 0}
@@ -243,6 +245,7 @@ export default function ManageReportsPage() {
             >
               {saving ? 'Saving...' : 'Save Order'}
             </button>
+          </div>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-light)' }}>
@@ -476,7 +479,6 @@ export default function ManageReportsPage() {
           {toast.message}
         </div>
       )}
-      <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
     </div>
   );
 }
