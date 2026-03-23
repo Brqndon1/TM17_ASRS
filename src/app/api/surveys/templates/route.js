@@ -1,5 +1,6 @@
 import db from '../../../../lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { validateReason, recordAudit } from '@/lib/audit';
 
 export async function GET() {
   // Query all forms (survey templates)
@@ -22,9 +23,7 @@ export async function GET() {
 
   const surveys = forms.map(form => {
     const questions = getQuestions.all(form.id).map(q => {
-      const isOptionType = q.field_type === 'select' || q.field_type === 'multiselect' || q.field_type === 'choice';
-      const isYesNo = q.field_type === 'yesno';
-      const rawOptions = (isOptionType || isYesNo)
+      const options = (q.field_type === 'select' || q.field_type === 'multiselect' || q.field_type === 'choice')
         ? getOptions.all(q.field_id).map(opt => opt.option_value)
         : undefined;
       return {
@@ -33,8 +32,7 @@ export async function GET() {
           question: q.field_label,
           type: q.field_type,
           required: !!q.required,
-          ...(isOptionType && rawOptions ? { options: rawOptions } : {}),
-          ...(isYesNo && rawOptions ? { subQuestions: rawOptions } : {}),
+          ...(options ? { options } : {}),
           ...(q.help_text ? { help_text: q.help_text } : {})
         }
       };
@@ -57,7 +55,12 @@ export async function POST(request) {
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { title, description, questions } = body || {};
+    const { title, description, questions, reasonType, reasonText } = body || {};
+
+    const reasonValidation = validateReason(reasonType, reasonText);
+    if (!reasonValidation.valid) {
+      return new Response(JSON.stringify({ error: reasonValidation.error }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
     if (!title || !Array.isArray(questions)) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
@@ -106,17 +109,10 @@ export async function POST(request) {
         // Insert form_field
         insertFormField.run(formId, fieldId, displayOrder, required, helpText);
 
-        // Insert options for choice/multiselect types
-        if ((fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
+        // Insert options if present
+        if (textObj.options && Array.isArray(textObj.options)) {
           textObj.options.forEach((opt, idx) => {
             insertOption.run(fieldId, opt, opt, idx);
-          });
-        }
-
-        // Insert sub-questions for yesno type (stored as field_options)
-        if (fieldType === 'yesno' && Array.isArray(textObj.subQuestions)) {
-          textObj.subQuestions.forEach((sub, idx) => {
-            insertOption.run(fieldId, sub, sub, idx);
           });
         }
 
@@ -126,8 +122,7 @@ export async function POST(request) {
             question: fieldLabel,
             type: fieldType,
             required: !!required,
-            ...(( fieldType === 'choice' || fieldType === 'multiselect') && textObj.options ? { options: textObj.options } : {}),
-            ...(fieldType === 'yesno' && textObj.subQuestions ? { subQuestions: textObj.subQuestions } : {}),
+            ...(textObj.options ? { options: textObj.options } : {}),
             ...(helpText ? { help_text: helpText } : {})
           }
         });
@@ -146,6 +141,11 @@ export async function POST(request) {
 
     // Execute the transaction
     const newSurvey = createSurvey();
+    try {
+      recordAudit('survey_template.created', auth.user.email, 'survey_template', newSurvey.id, reasonType, reasonText, { title: newSurvey.title });
+    } catch (e) {
+      // continue on audit failure
+    }
     return new Response(JSON.stringify(newSurvey), { status: 201, headers: { "Content-Type": "application/json" } });
   } catch (err) {
     console.error('[surveys/templates POST] Error:', err);

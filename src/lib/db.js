@@ -89,7 +89,7 @@ function migrationFixFieldTableConstraint() {
           field_id INTEGER PRIMARY KEY AUTOINCREMENT,
           field_key TEXT NOT NULL UNIQUE,
           field_label TEXT NOT NULL,
-          field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice','yesno')),
+          field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice')),
           scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
           initiative_id INTEGER REFERENCES initiative(initiative_id),
           is_filterable INTEGER NOT NULL DEFAULT 0,
@@ -293,7 +293,7 @@ function initializeDatabase() {
       field_id INTEGER PRIMARY KEY AUTOINCREMENT,
       field_key TEXT NOT NULL UNIQUE,
       field_label TEXT NOT NULL,
-      field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice','yesno')),
+      field_type TEXT NOT NULL CHECK (field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice')),
       scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
       initiative_id INTEGER REFERENCES initiative(initiative_id),
       is_filterable INTEGER NOT NULL DEFAULT 0,
@@ -596,7 +596,7 @@ function initializeDatabase() {
     }
     console.log('[db] Seeded survey templates from surveys.json');
   }
-  //seedSurveysFromJson();
+  seedSurveysFromJson();
 
   // ── Seed data ────────────────────────────────────────
 
