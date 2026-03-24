@@ -12,6 +12,7 @@ import EVENTS from '@/lib/events/event-types';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { alertDb } from '@/lib/db-alerts';
 import { validateReason, recordAudit } from '@/lib/audit';
+import { generateReportInsights } from '@/lib/openai-report-insights';
 
 function startGenerationLog(db, payload) {
   return db.prepare(`
@@ -172,6 +173,36 @@ export async function POST(request) {
       reportName: payload.name || '',
     });
 
+    // Optional AI insights generation
+    let aiInsights = null;
+    if (payload.includeAiInsights) {
+      const aiStartedAt = Date.now();
+      try {
+        aiInsights = await generateReportInsights({
+          initiativeName: initiative.initiative_name,
+          summary,
+          metrics,
+          chartData,
+          trendData,
+          sampleTableData: filteredData.slice(0, 50),
+        });
+        if (!aiInsights.aiGenerated) aiInsights = null;
+      } catch {
+        aiInsights = null;
+      }
+      const aiDurationMs = Date.now() - aiStartedAt;
+      // Log AI duration if generation log exists
+      if (generationLogId) {
+        try {
+          db.prepare(
+            'UPDATE report_generation_log SET ai_status = ?, ai_duration_ms = ? WHERE log_id = ?'
+          ).run(aiInsights ? 'completed' : 'failed', aiDurationMs, Number(generationLogId));
+        } catch {
+          // ai columns may not exist yet — ignore
+        }
+      }
+    }
+
     const snapshot = {
       version: 2,
       config: {
@@ -189,6 +220,7 @@ export async function POST(request) {
         chartData,
         trendData,
         summary,
+        aiInsights,
         reportId: `RPT-db-${initiativeId}`,
         initiativeName: initiative.initiative_name,
         generatedDate: clock.todayIsoDate(),

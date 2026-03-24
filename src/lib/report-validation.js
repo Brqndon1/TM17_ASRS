@@ -86,6 +86,7 @@ export function validateReportCreatePayload(body) {
       expressions,
       sorts,
       trendConfig: body.trendConfig,
+      includeAiInsights: body.includeAiInsights === true,
       clientMeta: isPlainObject(body.clientMeta) ? body.clientMeta : {},
     },
   };

@@ -634,6 +634,10 @@ function initializeDatabase() {
   // Add display_order column to reports if it doesn't exist (US-022)
   addColumnIfNotExists('reports', 'display_order INTEGER NOT NULL DEFAULT 0');
 
+  // Add AI insight tracking columns to report_generation_log
+  addColumnIfNotExists('report_generation_log', 'ai_status TEXT');
+  addColumnIfNotExists('report_generation_log', 'ai_duration_ms INTEGER NOT NULL DEFAULT 0');
+
   const insertUserType = db.prepare(
     'INSERT OR IGNORE INTO user_type (type, access_rank) VALUES (?, ?)'
   );

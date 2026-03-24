@@ -13,6 +13,8 @@ export default function ReportingPage() {
   const [initiatives, setInitiatives] = useState([]);
   const [reportData, setReportData] = useState(null);
   const [trendData, setTrendData] = useState([]);
+  const [reportDbId, setReportDbId] = useState(null);
+  const [aiInsights, setAiInsights] = useState(null);
   const [userRole, setUserRole] = useState('public');
   const [isLoading, setIsLoading] = useState(true);
   const [noReport, setNoReport] = useState(false);
@@ -73,11 +75,14 @@ export default function ReportingPage() {
     if (!report) {
       setReportData(null);
       setTrendData([]);
+      setReportDbId(null);
+      setAiInsights(null);
       setNoReport(true);
       return;
     }
 
     setNoReport(false);
+    setReportDbId(report.id ?? null);
 
     let parsed = null;
     try {
@@ -102,9 +107,11 @@ export default function ReportingPage() {
         explainability: results.explainability,
       });
       setTrendData(results.trendData || []);
+      setAiInsights(results.aiInsights || null);
     } else {
       setReportData(null);
       setTrendData([]);
+      setAiInsights(null);
       setNoReport(true);
     }
   }
@@ -647,18 +654,24 @@ export default function ReportingPage() {
     const fileName = `${selectedInitiative.name.replace(/\s+/g, '_')}_Report`;
 
     if (format === 'csv') {
-      const csvContent =
-        'data:text/csv;charset=utf-8,' +
-        Object.keys(reportData).join(',') +
-        '\n' +
-        Object.values(reportData).join(',');
-      const encodedUri = encodeURI(csvContent);
+      const rows = reportData.tableData || [];
+      if (rows.length === 0) return;
+      const columns = Object.keys(rows[0]);
+      const csvLines = [
+        columns.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','),
+        ...rows.map((row) =>
+          columns.map((c) => {
+            const val = row[c] == null ? '' : String(row[c]);
+            return `"${val.replace(/"/g, '""')}"`;
+          }).join(',')
+        ),
+      ];
+      const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `${fileName}.csv`);
-      document.body.appendChild(link);
+      link.href = URL.createObjectURL(blob);
+      link.download = `${fileName}.csv`;
       link.click();
-      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
     }
 
     if (format === 'html') {
@@ -920,6 +933,8 @@ export default function ReportingPage() {
               trendData={trendData}
               selectedInitiative={selectedInitiative}
               userRole={userRole}
+              reportDbId={reportDbId}
+              preloadedInsights={aiInsights}
             />
           </>
         )}

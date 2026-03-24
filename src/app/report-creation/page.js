@@ -282,6 +282,7 @@ export default function ReportCreationPage() {
           sorts: reportConfig.sorts,
           selectedAttributes: reportConfig.selectedAttributes,
           trendConfig: reportConfig.trendConfig,
+          includeAiInsights: reportConfig.includeAiInsights || false,
         }),
       });
 
@@ -308,6 +309,7 @@ export default function ReportCreationPage() {
         selectedAttributes: [],
         startDate: '',
         endDate: '',
+        includeAiInsights: false,
       });
       setSuccessMessage('Report generated and published to Reporting.');
       getUiEventBus().publish(EVENTS.REPORT_UPDATED, {

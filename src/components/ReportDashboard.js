@@ -28,9 +28,10 @@ import DataTable from './DataTable';
 import TrendDisplay from './TrendDisplay';
 import ExportPanel from './ExportPanel';
 import SharePanel from './SharePanel';
+import AIInsightsPanel from './AIInsightsPanel';
 import { getSortedReportData } from '@/lib/data-service';
 
-export default function ReportDashboard({ reportData, trendData, selectedInitiative, userRole }) {
+export default function ReportDashboard({ reportData, trendData, selectedInitiative, userRole, reportDbId, preloadedInsights }) {
   // ---- STATE for filters and sorts ----
   // activeFilters stores the user's current filter selections as key-value pairs
   // Example: { grade: "7th", school: "Lincoln MS" }
@@ -223,6 +224,16 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
       {/* Only shows trends that have enabledDisplay === true (per REP010/REP011) */}
       {trendData && trendData.length > 0 && (
         <TrendDisplay trends={trendData} />
+      )}
+
+      {/* ---- AI INSIGHTS ---- */}
+      {/* On-demand AI analysis — staff/admin only */}
+      {(userRole === 'staff' || userRole === 'admin') && reportDbId && (
+        <AIInsightsPanel
+          reportDbId={reportDbId}
+          userRole={userRole}
+          preloadedInsights={preloadedInsights}
+        />
       )}
 
       {reportData.explainability && (

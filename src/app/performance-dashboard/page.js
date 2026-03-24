@@ -185,7 +185,8 @@ export default function PerformanceDashboard() {
         return a.overallScore - b.overallScore;
       } else if (sortOrder === 'descending') {
         return b.overallScore - a.overallScore;
-      } else if (sortOrder === 'deadline') {
+      } else {
+        // 'deadline' — soonest first, nulls last
         const aDays = a.daysUntilNearest !== null ? a.daysUntilNearest : Infinity;
         const bDays = b.daysUntilNearest !== null ? b.daysUntilNearest : Infinity;
         return aDays - bDays;

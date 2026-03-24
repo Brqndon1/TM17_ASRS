@@ -54,6 +54,24 @@ export default function StepConfig({ initiatives, reportConfig, onChange }) {
           onChange={(e) => onChange({ description: e.target.value })}
         />
       </div>
+
+      {/* AI Insights */}
+      <div style={{ marginTop: '1.25rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={reportConfig.includeAiInsights || false}
+            onChange={(e) => onChange({ includeAiInsights: e.target.checked })}
+            style={{ width: '1rem', height: '1rem' }}
+          />
+          <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            Include AI Analysis (GPT-4o)
+          </span>
+        </label>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', margin: '0.3rem 0 0 1.5rem' }}>
+          Generates a narrative summary, key insights, and recommendations. Adds ~10 seconds to report generation.
+        </p>
+      </div>
     </div>
   );
 }
