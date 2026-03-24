@@ -49,7 +49,7 @@ export async function GET(request) {
     const dateMap = {};
 
     for (const record of history) {
-      const date = record.recorded_at.split('T')[0];
+      const date = record.recorded_at.split(' ')[0];
 
       if (!dateMap[date]) {
         dateMap[date] = {

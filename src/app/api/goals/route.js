@@ -59,7 +59,8 @@ function getDaysUntilDeadline(deadline) {
 export async function GET(request) {
   try {
     initializeDatabase();
-
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
     const { searchParams } = new URL(request.url);
     const initiativeId = searchParams.get('initiativeId');
 

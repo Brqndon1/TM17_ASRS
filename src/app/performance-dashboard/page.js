@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 import {
   LineChart,
   Line,
@@ -69,7 +70,7 @@ export default function PerformanceDashboard() {
       setIsLoading(true);
       setError(null);
 
-      const initiativesRes = await fetch('/api/goals/initiatives');
+      const initiativesRes = await apiFetch('/api/goals/initiatives');
       if (!initiativesRes.ok) throw new Error('Failed to fetch initiatives');
       const initiativesData = await initiativesRes.json();
       const allInitiatives = initiativesData.initiatives || [];
@@ -77,7 +78,7 @@ export default function PerformanceDashboard() {
       const initiativesWithScores = await Promise.all(
         allInitiatives.map(async (init) => {
           try {
-            const goalsRes = await fetch(`/api/goals?initiativeId=${init.initiative_id}`);
+            const goalsRes = await apiFetch(`/api/goals?initiativeId=${init.initiative_id}`);
             if (goalsRes.ok) {
               const goalsData = await goalsRes.json();
               const goals = goalsData.goals || [];
@@ -143,7 +144,7 @@ export default function PerformanceDashboard() {
       setChartLoading(true);
       setChartError(null);
 
-      const res = await fetch(`/api/goals/history?initiativeId=${initiativeId}`);
+      const res = await apiFetch(`/api/goals/history?initiativeId=${initiativeId}`);
       if (!res.ok) throw new Error('Failed to fetch history');
 
       const data = await res.json();
