@@ -34,7 +34,7 @@ export default function GoalsPage() {
   // Edit form state
   const [editGoal, setEditGoal] = useState({});
 
-  // Check admin access
+  // Check staff or admin access
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (!storedUser) {
@@ -42,7 +42,7 @@ export default function GoalsPage() {
       return;
     }
     const parsed = JSON.parse(storedUser);
-    if (parsed.user_type !== 'admin') {
+    if (parsed.user_type !== 'admin' && parsed.user_type !== 'staff') {
       router.push('/');
       return;
     }

@@ -6,7 +6,8 @@
  * - The ASRS logo (loaded from /public/asrs-logo.png)
  * - The system title
  * - Navigation tabs (shown only when logged in) with active highlighting
- * - "User Management" tab (shown only for admin users)
+ * - Distribute, Goals, Performance (staff and admin)
+ * - "User Management" tab (admin only)
  * - Login/Logout button
  * - User info when logged in
  * ============================================================================
@@ -86,6 +87,8 @@ export default function Header() {
 
   const isLoggedIn = Boolean(user);
   const isAdmin = isLoggedIn && user.user_type === 'admin';
+  const isStaffOrAdmin =
+    isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
 
   async function handleLogout() {
     try {
@@ -199,7 +202,7 @@ export default function Header() {
               >
                 Survey
               </Link>
-              {isAdmin && (
+              {isStaffOrAdmin && (
                 <Link 
                   href="/survey-distribution" 
                   style={getNavLinkStyle('/survey-distribution')}
@@ -226,7 +229,7 @@ export default function Header() {
                 Initiatives
               </Link>
 
-                {isAdmin && (
+                {isStaffOrAdmin && (
                   <>
                     <Link href="/goals" style={getNavLinkStyle('/goals')} {...navHoverHandlers('/goals')}>
                       Goals
@@ -234,10 +237,12 @@ export default function Header() {
                     <Link href="/performance-dashboard" style={getNavLinkStyle('/performance-dashboard')} {...navHoverHandlers('/performance-dashboard')}>
                       Performance
                     </Link>
-                    <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
-                      User Management
-                    </Link>
                   </>
+                )}
+                {isAdmin && (
+                  <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
+                    User Management
+                  </Link>
                 )}
               </>
             ) : (
