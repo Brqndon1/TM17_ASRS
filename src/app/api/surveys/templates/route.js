@@ -152,3 +152,62 @@ export async function POST(request) {
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
+    const url = new URL(request.url);
+    const templateId = Number(url.searchParams.get('templateId'));
+
+    if (!templateId || Number.isNaN(templateId)) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid templateId' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const tableExists = (tableName) =>
+      !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(tableName);
+
+    const deleteTx = db.transaction((id) => {
+      const quoteSurveyIds = tableExists('surveys')
+        ? db
+            .prepare(`SELECT id FROM surveys WHERE json_extract(responses, '$.templateId') = ?`)
+            .all(id)
+            .map((r) => r.id)
+        : [];
+
+      if (quoteSurveyIds.length && tableExists('reports')) {
+        const deleteReport = db.prepare('DELETE FROM reports WHERE survey_id = ?');
+        quoteSurveyIds.forEach((sid) => deleteReport.run(sid));
+      }
+
+      if (tableExists('surveys')) {
+        db.prepare(`DELETE FROM surveys WHERE json_extract(responses, '$.templateId') = ?`).run(id);
+      }
+
+      if (tableExists('survey_distribution')) {
+        db.prepare('DELETE FROM survey_distribution WHERE survey_template_id = ?').run(id);
+      }
+
+      if (tableExists('form')) {
+        db.prepare('DELETE FROM form WHERE form_id = ?').run(id);
+      }
+    });
+
+    deleteTx(templateId);
+
+    return new Response(
+      JSON.stringify({ success: true, templateId }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('[surveys/templates DELETE] Error:', err);
+    return new Response(
+      JSON.stringify({ error: 'Failed to delete template', message: err.message || String(err) }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}

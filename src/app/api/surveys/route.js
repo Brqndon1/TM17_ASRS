@@ -137,7 +137,24 @@ export async function POST(request) {
       console.error('Normalized insert failed:', err);
     }
 
-    return NextResponse.json({ success: true, surveyId: Number(surveyId), report: reportData });
+    const savedSurvey = db.prepare('SELECT id, name, email, responses, submitted_at FROM surveys WHERE id = ?').get(surveyId);
+    const submissionInfo = savedSurvey
+      ? {
+          id: savedSurvey.id,
+          name: savedSurvey.name,
+          email: savedSurvey.email,
+          responses: savedSurvey.responses ? JSON.parse(savedSurvey.responses) : null,
+          submittedAt: savedSurvey.submitted_at,
+        }
+      : null;
+
+    return NextResponse.json({
+      success: true,
+      surveyId: Number(surveyId),
+      submittedAt: submissionInfo?.submittedAt || new Date().toISOString(),
+      survey: submissionInfo,
+      report: reportData,
+    });
   } catch (error) {
     const errorMessage = String(error?.message || '');
     const isValidationError = /missing|required|invalid/i.test(errorMessage);
@@ -165,7 +182,10 @@ export async function GET(request) {
     const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
     if (auth.error) return auth.error;
 
-    const rows = db.prepare(`
+    const url = new URL(request.url);
+    const surveyId = url.searchParams.get('surveyId');
+
+    const baseQuery = `
       SELECT
         s.id,
         s.name,
@@ -176,8 +196,11 @@ export async function GET(request) {
         r.created_at AS report_created_at
       FROM surveys s
       LEFT JOIN reports r ON s.id = r.survey_id
-      ORDER BY s.submitted_at DESC
-    `).all();
+    `;
+
+    const rows = surveyId
+      ? db.prepare(`${baseQuery} WHERE s.id = ? ORDER BY s.submitted_at DESC`).all(Number(surveyId))
+      : db.prepare(`${baseQuery} ORDER BY s.submitted_at DESC`).all();
 
     const formattedSurveys = rows.map((survey) => ({
       id: survey.id,
@@ -194,6 +217,38 @@ export async function GET(request) {
     console.error('Error fetching surveys:', error);
     return NextResponse.json(
       { error: 'Failed to fetch surveys', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    initializeDatabase();
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
+    const url = new URL(request.url);
+    const surveyId = Number(url.searchParams.get('surveyId'));
+    if (!surveyId || Number.isNaN(surveyId)) {
+      return NextResponse.json({ error: 'Missing or invalid surveyId' }, { status: 400 });
+    }
+
+    const deleteTransaction = db.transaction((id) => {
+      db.prepare('DELETE FROM reports WHERE survey_id = ?').run(id);
+      db.prepare('DELETE FROM surveys WHERE id = ?').run(id);
+      // If a `submission` table exists with a link, add cascade delete here as well:
+      // db.prepare('DELETE FROM submission WHERE survey_id = ?').run(id);
+      return true;
+    });
+
+    deleteTransaction(surveyId);
+
+    return NextResponse.json({ success: true, surveyId });
+  } catch (error) {
+    console.error('Error deleting survey:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete survey', details: String(error?.message || error) },
       { status: 500 }
     );
   }

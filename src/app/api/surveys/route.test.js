@@ -16,7 +16,7 @@ vi.mock('@/lib/openai', () => ({
   generateAIReport: (...args) => generateAIReportMock(...args),
 }));
 
-import { GET, POST } from '@/app/api/surveys/route';
+import { GET, POST, DELETE } from '@/app/api/surveys/route';
 import {
   closeTestDb,
   createAuthedRequestHeaders,
@@ -72,6 +72,33 @@ describe('/api/surveys integration', () => {
     const reportCount = state.db.prepare('SELECT COUNT(*) AS c FROM reports WHERE survey_id IS NOT NULL').get().c;
     expect(surveyCount).toBe(1);
     expect(reportCount).toBe(1);
+    expect(payload.submittedAt).toBeTruthy();
+    expect(payload.survey).toMatchObject({ name: 'Alex', email: 'a@example.com' });
+  });
+
+  test('DELETE removes survey and related reports', async () => {
+    const surveyId = Number(state.db.prepare(
+      'INSERT INTO surveys (name, email, responses, submitted_at) VALUES (?, ?, ?, ?)' 
+    ).run('DeleteMe', 'del@example.com', JSON.stringify({ q: 'x' }), '2026-03-24T00:00:00.000Z').lastInsertRowid);
+
+    state.db.prepare('INSERT INTO reports (survey_id, report_data, created_at) VALUES (?, ?, ?)').run(surveyId, JSON.stringify({ summary: 'd' }), '2026-03-24T00:00:00.000Z');
+
+    const tokens = createSessionForRank(state.db, { rank: 100, verified: 1 });
+    const res = await DELETE(new Request(`http://localhost:3000/api/surveys?surveyId=${surveyId}`, {
+      method: 'DELETE',
+      headers: createAuthedRequestHeaders(tokens),
+    }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.surveyId).toBe(surveyId);
+
+    const remainingSurveyCount = state.db.prepare('SELECT COUNT(*) AS c FROM surveys WHERE id = ?').get(surveyId).c;
+    const remainingReportCount = state.db.prepare('SELECT COUNT(*) AS c FROM reports WHERE survey_id = ?').get(surveyId).c;
+
+    expect(remainingSurveyCount).toBe(0);
+    expect(remainingReportCount).toBe(0);
   });
 
   test('GET requires auth outside test env', async () => {

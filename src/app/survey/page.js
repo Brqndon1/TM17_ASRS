@@ -5,10 +5,12 @@ import BackButton from '@/components/BackButton';
 import SurveyForm from '@/components/SurveyForm';
 import QRCodeManager from '@/components/QRCodeManager';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { toSurveyTemplateViewModel } from '@/lib/adapters/survey-template-adapter';
 
 export default function SurveyPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [isMounted, setIsMounted] = useState(false);
   const [isQrAccess, setIsQrAccess] = useState(false);
@@ -25,6 +27,7 @@ export default function SurveyPage() {
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submissionInfo, setSubmissionInfo] = useState(null);
   const [error, setError] = useState(null);
 
   // Invalid fields tracking
@@ -309,6 +312,11 @@ export default function SurveyPage() {
         }).catch(() => {});
       }
 
+      setSubmissionInfo({
+        surveyId: data.surveyId,
+        submittedAt: data.submittedAt,
+        survey: data.survey,
+      });
       setSubmitted(true);
     } catch (err) {
       setError(err.message);
@@ -325,8 +333,36 @@ export default function SurveyPage() {
     setInitiativeComments('');
     setTemplateResponses({});
     setSubmitted(false);
+    setSubmissionInfo(null);
     setError(null);
     setInvalidFields({});
+  };
+
+  const formatEasternDateTime = (timestamp) => {
+    if (!timestamp) return '—';
+    try {
+      return new Date(timestamp).toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZoneName: 'short',
+      });
+    } catch {
+      return new Date(timestamp).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      });
+    }
   };
 
   // Shared input style
@@ -380,6 +416,16 @@ export default function SurveyPage() {
         padding: isPublicView ? '2rem 1.5rem' : '1.5rem' 
       }}>
         <BackButton />
+        {!isPublicView && (
+          <button
+            className="asrs-btn-secondary"
+            style={{ margin: '0.8rem 0', padding: '0.55rem 0.85rem', fontSize: '0.95rem' }}
+            onClick={() => router.push('/manage-surveys')}
+          >
+            Manage surveys
+          </button>
+        )}
+
         {isPublicView ? (
           // Public user view - Take a Survey (completed form)
           <div className="asrs-card">
@@ -417,6 +463,15 @@ export default function SurveyPage() {
               </div>
             ) : (
               <>
+            {userRole !== 'public' && (
+              <button
+                onClick={() => router.push('/manage-surveys')}
+                className="asrs-btn-secondary"
+                style={{ marginBottom: '0.75rem', padding: '0.6rem 1rem', fontSize: '0.9rem' }}
+              >
+                Manage surveys
+              </button>
+            )}
             <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
               {surveyTemplate ? surveyTemplate.title : 'Take a Survey'}
             </h1>
@@ -439,10 +494,23 @@ export default function SurveyPage() {
                 <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
                   Thank You!
                 </h2>
-                <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem', lineHeight: 1.6 }}>
                   Your survey response has been submitted successfully.<br />
-                  Your feedback helps improve future initiatives.
+                  {submissionInfo?.submittedAt && (
+                    <span>Submitted at: <strong>{formatEasternDateTime(submissionInfo.submittedAt)} (Eastern)</strong></span>
+                  )}
                 </p>
+                {submissionInfo?.survey && (
+                  <div style={{ margin: '1rem auto', maxWidth: '520px', textAlign: 'left', fontSize: '0.9rem' }}>
+                    <h3 style={{ marginTop: 0, fontSize: '1rem', color: 'var(--color-text-primary)' }}>Submission Details</h3>
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, textAlign: 'left' }}>
+                      <li><strong>ID:</strong> {submissionInfo.surveyId || submissionInfo.survey.id}</li>
+                      <li><strong>Name:</strong> {submissionInfo.survey.name}</li>
+                      <li><strong>Email:</strong> {submissionInfo.survey.email}</li>
+                      <li><strong>Template:</strong> {submissionInfo.survey.responses?.templateTitle || 'N/A'}</li>
+                    </ul>
+                  </div>
+                )}
                 <button
                   onClick={handleReset}
                   className="asrs-btn-primary"

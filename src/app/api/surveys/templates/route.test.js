@@ -8,7 +8,7 @@ vi.mock('../../../../lib/db.js', () => ({
   default: dbProxy,
 }));
 
-import { GET, POST } from '@/app/api/surveys/templates/route';
+import { GET, POST, DELETE } from '@/app/api/surveys/templates/route';
 import {
   closeTestDb,
   createAuthedRequestHeaders,
@@ -110,5 +110,28 @@ describe('/api/surveys/templates integration', () => {
     expect(formCount).toBe(1);
     expect(fieldCount).toBe(2);
     expect(optionCount).toBe(2);
+  });
+
+  test('DELETE template removes template and related submissions/reports', async () => {
+    const formId = Number(state.db.prepare(
+      'INSERT INTO form (initiative_id, form_name, description, is_published) VALUES (1, ?, ?, 1)'
+    ).run('Delete Template', 'template to delete').lastInsertRowid);
+
+    // insert a survey submission linked to template via responses.templateId
+    const responseObj = JSON.stringify({ templateId: formId, templateTitle: 'Delete Template', q1: 'yes' });
+    const surveyId = Number(state.db.prepare(
+      'INSERT INTO surveys (name, email, responses, submitted_at) VALUES (?, ?, ?, ?)' 
+    ).run('User X', 'x@example.com', responseObj, '2026-03-24T00:00:00.000Z').lastInsertRowid);
+
+    state.db.prepare('INSERT INTO reports (survey_id, report_data, created_at) VALUES (?, ?, ?)').run(surveyId, JSON.stringify({ summary: 'x' }), '2026-03-24T00:00:00.000Z');
+
+    const res = await DELETE(new Request(`http://localhost:3000/api/surveys/templates?templateId=${formId}`, { method: 'DELETE' }));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+
+    expect(state.db.prepare('SELECT COUNT(*) AS c FROM form WHERE form_id = ?').get(formId).c).toBe(0);
+    expect(state.db.prepare('SELECT COUNT(*) AS c FROM surveys WHERE id = ?').get(surveyId).c).toBe(0);
+    expect(state.db.prepare('SELECT COUNT(*) AS c FROM reports WHERE survey_id = ?').get(surveyId).c).toBe(0);
   });
 });

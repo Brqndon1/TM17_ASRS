@@ -31,6 +31,7 @@
  */
 
 import db from '@/lib/db.js';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 export async function GET(request, context) {
   try {
@@ -126,6 +127,53 @@ export async function GET(request, context) {
         status: 500,
         headers: { "Content-Type": "application/json" }
       }
+    );
+  }
+}
+
+export async function DELETE(request, context) {
+  try {
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
+    const params = context?.params || {};
+    const templateId = Number(params.id);
+
+    if (!templateId || Number.isNaN(templateId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid template ID' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const deleteTx = db.transaction((id) => {
+      const affectedSurveyIds = db.prepare(`
+        SELECT id FROM surveys
+        WHERE json_extract(responses, '$.templateId') = ?
+      `).all(id).map((r) => r.id);
+
+      if (affectedSurveyIds.length) {
+        const deleteReport = db.prepare('DELETE FROM reports WHERE survey_id = ?');
+        affectedSurveyIds.forEach((sid) => deleteReport.run(sid));
+      }
+
+      db.prepare(`DELETE FROM surveys WHERE json_extract(responses, '$.templateId') = ?`).run(id);
+      db.prepare('DELETE FROM submission WHERE form_id = ?').run(id);
+      db.prepare('DELETE FROM survey_distribution WHERE survey_template_id = ?').run(id);
+      db.prepare('DELETE FROM form WHERE form_id = ?').run(id);
+    });
+
+    deleteTx(templateId);
+
+    return new Response(
+      JSON.stringify({ success: true, templateId }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('Error deleting survey template:', err);
+    return new Response(
+      JSON.stringify({ error: 'Failed to delete template', message: err.message || String(err) }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
