@@ -237,6 +237,9 @@ export default function Header() {
                     <Link href="/performance-dashboard" style={getNavLinkStyle('/performance-dashboard')} {...navHoverHandlers('/performance-dashboard')}>
                       Performance
                     </Link>
+                    <Link href="/historical-reports" style={getNavLinkStyle('/historical-reports')} {...navHoverHandlers('/historical-reports')}>
+                      Historical Reports
+                    </Link>
                   </>
                 )}
                 {isAdmin && (

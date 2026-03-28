@@ -13,13 +13,25 @@ function asFiniteNumber(value) {
 
 export function validateReportQueryParams(searchParams) {
   const initiativeId = searchParams.get('initiativeId');
-  if (initiativeId === null) return { valid: true, initiativeId: null };
-
-  const parsed = asFiniteNumber(initiativeId);
-  if (parsed === null || parsed <= 0) {
-    return { valid: false, error: 'initiativeId must be a positive number' };
+  let parsedInitiativeId = null;
+  if (initiativeId !== null) {
+    parsedInitiativeId = asFiniteNumber(initiativeId);
+    if (parsedInitiativeId === null || parsedInitiativeId <= 0) {
+      return { valid: false, error: 'initiativeId must be a positive number' };
+    }
   }
-  return { valid: true, initiativeId: parsed };
+
+  const startDate = searchParams.get('startDate') || null;
+  const endDate = searchParams.get('endDate') || null;
+  const isoDateRe = /^\d{4}-\d{2}-\d{2}/;
+  if (startDate !== null && !isoDateRe.test(startDate)) {
+    return { valid: false, error: 'startDate must be in YYYY-MM-DD format' };
+  }
+  if (endDate !== null && !isoDateRe.test(endDate)) {
+    return { valid: false, error: 'endDate must be in YYYY-MM-DD format' };
+  }
+
+  return { valid: true, initiativeId: parsedInitiativeId, startDate, endDate };
 }
 
 export function validateReportCreatePayload(body) {

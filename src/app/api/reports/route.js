@@ -73,22 +73,33 @@ export async function GET(request) {
       return NextResponse.json({ error: queryValidation.error }, { status: 400 });
     }
 
-    const { initiativeId } = queryValidation;
+    const { initiativeId, startDate, endDate } = queryValidation;
     const { db } = getServiceContainer();
-    const sql = initiativeId
-      ? `SELECT r.*, i.initiative_name
+
+    const conditions = [];
+    const params = [];
+
+    if (initiativeId) {
+      conditions.push('r.initiative_id = ?');
+      params.push(Number(initiativeId));
+    }
+    if (startDate) {
+      conditions.push('r.created_at >= ?');
+      params.push(startDate);
+    }
+    if (endDate) {
+      conditions.push('r.created_at <= ?');
+      params.push(endDate + 'T23:59:59');
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const sql = `SELECT r.*, i.initiative_name
          FROM reports r
          LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
-         WHERE r.initiative_id = ?
-         ORDER BY r.display_order ASC, r.created_at DESC`
-      : `SELECT r.*, i.initiative_name
-         FROM reports r
-         LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
+         ${whereClause}
          ORDER BY r.display_order ASC, r.created_at DESC`;
 
-    const rows = initiativeId
-      ? db.prepare(sql).all(Number(initiativeId))
-      : db.prepare(sql).all();
+    const rows = db.prepare(sql).all(...params);
 
     return NextResponse.json({ reports: rows.map(toReportListItemDto) });
   } catch (error) {
