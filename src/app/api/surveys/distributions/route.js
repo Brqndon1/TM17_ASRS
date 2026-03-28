@@ -1,6 +1,7 @@
 import db, { initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 function toLocalYyyyMmDd(date) {
   const year = date.getFullYear();
@@ -82,6 +83,20 @@ export async function POST(request) {
       JSON.stringify(recipient_emails),
       created_by_user_id || null
     );
+
+    logAudit(db, {
+      event: 'survey.created',
+      userEmail: auth.user.email,
+      targetType: 'survey',
+      targetId: String(result.lastInsertRowid),
+      payload: {
+        title,
+        survey_template_id,
+        start_date,
+        end_date,
+        recipient_count: recipient_emails.length,
+      },
+    });
 
     return NextResponse.json({
       success: true,

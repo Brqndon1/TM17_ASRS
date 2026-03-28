@@ -11,7 +11,7 @@ import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { alertDb } from '@/lib/db-alerts';
-import { validateReason, recordAudit } from '@/lib/audit';
+import { logAudit } from '@/lib/audit';
 import { generateReportInsights } from '@/lib/openai-report-insights';
 
 function startGenerationLog(db, payload) {
@@ -269,6 +269,18 @@ export async function POST(request) {
       generatedAt: clock.nowIso(),
     });
 
+    logAudit(db, {
+      event: 'report.created',
+      userEmail: auth.user.email,
+      targetType: 'report',
+      targetId: String(result.lastInsertRowid),
+      payload: {
+        name: payload.name || '',
+        initiative_id: initiativeId,
+        initiative_name: initiative.initiative_name,
+      },
+    });
+
     return NextResponse.json({ success: true, reportId: result.lastInsertRowid });
   } catch (error) {
     const { db } = getServiceContainer();
@@ -307,13 +319,6 @@ export async function PUT(request) {
 
     const { id, name, description, status } = payloadValidation.value;
 
-    // Require reason for report update
-    const { reasonType, reasonText } = payloadValidation.value;
-    const reasonValidation = validateReason(reasonType, reasonText);
-    if (!reasonValidation.valid) {
-      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
-    }
-
     const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(Number(id));
     if (!existing) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
@@ -344,8 +349,21 @@ export async function PUT(request) {
        LEFT JOIN initiative i ON r.initiative_id = i.initiative_id
        WHERE r.id = ?`
     ).get(Number(id));
-    // Record audit before returning
-    recordAudit('report.updated', auth.user.email, 'report', id, reasonType, reasonText, { updates });
+
+    logAudit(db, {
+      event: 'report.updated',
+      userEmail: auth.user.email,
+      targetType: 'report',
+      targetId: String(id),
+      payload: {
+        changes: {
+          ...(name !== undefined ? { name } : {}),
+          ...(description !== undefined ? { description } : {}),
+          ...(status !== undefined ? { status } : {}),
+        },
+      },
+    });
+
     return NextResponse.json({ success: true, report: toReportDetailDto(updated) });
   } catch (error) {
     console.error('Error updating report:', error);
@@ -370,21 +388,21 @@ export async function DELETE(request) {
 
     const { id } = deleteValidation;
 
-    // Require reason for deletion via query params
-    const reasonType = searchParams.get('reasonType');
-    const reasonText = searchParams.get('reasonText');
-    const reasonValidation = validateReason(reasonType, reasonText);
-    if (!reasonValidation.valid) {
-      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
-    }
-
-    const existing = db.prepare('SELECT id FROM reports WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id, name FROM reports WHERE id = ?').get(id);
     if (!existing) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
     db.prepare('DELETE FROM reports WHERE id = ?').run(id);
-    recordAudit('report.deleted', auth.user.email, 'report', id, reasonType, reasonText, {});
+
+    logAudit(db, {
+      event: 'report.deleted',
+      userEmail: auth.user.email,
+      targetType: 'report',
+      targetId: String(id),
+      payload: { name: existing.name },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting report:', error);

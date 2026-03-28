@@ -7,6 +7,7 @@
  * - The system title
  * - Navigation tabs (shown only when logged in) with active highlighting
  * - Distribute, Goals, Performance (staff and admin)
+ * - "History" dropdown with Reports + Audit Log (staff/admin; Audit Log admin-only)
  * - "User Management" tab (admin only)
  * - Login/Logout button
  * - User info when logged in
@@ -53,6 +54,130 @@ function ProfileAvatar({ user, picture }) {
       }}
     >
       {initials}
+    </div>
+  );
+}
+
+function HistoryDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const pathname = usePathname();
+
+  const isHistoryActive = pathname.startsWith('/history');
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          ...getNavLinkStyle(isHistoryActive ? '/history' : '__none__'),
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          backgroundColor: isHistoryActive
+            ? 'rgba(255,255,255,0.35)'
+            : 'rgba(255,255,255,0.15)',
+          fontWeight: isHistoryActive ? '700' : '600',
+          boxShadow: isHistoryActive ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+        }}
+        onMouseEnter={(e) => {
+          if (!isHistoryActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isHistoryActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)';
+        }}
+      >
+        History
+        <svg
+          width="12" height="12" viewBox="0 0 12 12" fill="none"
+          style={{
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          }}
+        >
+          <path d="M3 4.5L6 7.5L9 4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            minWidth: '160px',
+            backgroundColor: '#3a3a3a',
+            borderRadius: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            overflow: 'hidden',
+            zIndex: 200,
+          }}
+        >
+          <Link
+            href="/history/reports"
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'block',
+              padding: '0.6rem 1rem',
+              color: 'white',
+              fontSize: '0.85rem',
+              fontWeight: pathname === '/history/reports' ? '700' : '500',
+              textDecoration: 'none',
+              backgroundColor: pathname === '/history/reports'
+                ? 'rgba(255,255,255,0.15)'
+                : 'transparent',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== '/history/reports') e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== '/history/reports') e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Reports
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/history/audit-log"
+              onClick={() => setOpen(false)}
+              style={{
+                display: 'block',
+                padding: '0.6rem 1rem',
+                color: 'white',
+                fontSize: '0.85rem',
+                fontWeight: pathname === '/history/audit-log' ? '700' : '500',
+                textDecoration: 'none',
+                backgroundColor: pathname === '/history/audit-log'
+                  ? 'rgba(255,255,255,0.15)'
+                  : 'transparent',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (pathname !== '/history/audit-log') e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                if (pathname !== '/history/audit-log') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Audit Log
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -237,9 +362,12 @@ export default function Header() {
                     <Link href="/performance-dashboard" style={getNavLinkStyle('/performance-dashboard')} {...navHoverHandlers('/performance-dashboard')}>
                       Performance
                     </Link>
-                    <Link href="/historical-reports" style={getNavLinkStyle('/historical-reports')} {...navHoverHandlers('/historical-reports')}>
-                      Historical Reports
-                    </Link>
+                    <HistoryDropdown
+                      isActive={isActive}
+                      getNavLinkStyle={getNavLinkStyle}
+                      navHoverHandlers={navHoverHandlers}
+                      isAdmin={isAdmin}
+                    />
                   </>
                 )}
                 {isAdmin && (

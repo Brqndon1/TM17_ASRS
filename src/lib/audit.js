@@ -1,31 +1,58 @@
-import { db } from '@/lib/db';
+/**
+ * ============================================================================
+ * AUDIT LOG HELPER — Insert audit trail entries from any API route.
+ * ============================================================================
+ *
+ * Usage (inside an API handler):
+ *
+ *   import { logAudit } from '@/lib/audit';
+ *
+ *   logAudit(db, {
+ *     event:       'goal.created',
+ *     userEmail:   auth.user.email,
+ *     targetType:  'goal',
+ *     targetId:    String(newGoal.goal_id),
+ *     payload:     { goal_name, initiative_id, target_value },
+ *   });
+ *
+ * The `payload` object is stored as a JSON string so the front-end can render
+ * a human-readable diff / summary later.
+ *
+ * Event naming convention:  <entity>.<action>
+ *   e.g.  goal.created, goal.updated, goal.deleted,
+ *         initiative.created, report.generated, survey.published,
+ *         performance.updated, user.role_changed
+ * ============================================================================
+ */
 
-export const PREDEFINED_REASONS = [
-  'Data correction',
-  'Duplicate',
-  'User request',
-  'Security',
-  'Other',
-];
-
-export function validateReason(reasonType, reasonText) {
-  if (!reasonType) return { valid: false, error: 'reasonType is required' };
-  if (!PREDEFINED_REASONS.includes(reasonType)) return { valid: false, error: 'Invalid reasonType' };
-  if (reasonType === 'Other' && (!reasonText || String(reasonText).trim() === '')) {
-    return { valid: false, error: 'reasonText is required when reasonType is Other' };
-  }
-  return { valid: true };
-}
-
-export function recordAudit(event, userEmail, targetType, targetId, reasonType, reasonText, payload) {
+/**
+ * @param {import('better-sqlite3').Database} db
+ * @param {{
+ *   event:       string,
+ *   userEmail:   string,
+ *   targetType?: string,
+ *   targetId?:   string,
+ *   reasonType?: string,
+ *   reasonText?: string,
+ *   payload?:    Record<string, unknown>,
+ * }} entry
+ */
+export function logAudit(db, entry) {
   try {
-    const stmt = db.prepare(`
+    db.prepare(`
       INSERT INTO audit_log (event, user_email, target_type, target_id, reason_type, reason_text, payload)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(event, userEmail || null, targetType || null, targetId == null ? null : String(targetId), reasonType || null, reasonText || null, payload ? JSON.stringify(payload) : null);
+    `).run(
+      entry.event,
+      entry.userEmail ?? null,
+      entry.targetType ?? null,
+      entry.targetId != null ? String(entry.targetId) : null,
+      entry.reasonType ?? null,
+      entry.reasonText ?? null,
+      entry.payload ? JSON.stringify(entry.payload) : null,
+    );
   } catch (err) {
-    // Don't throw - auditing should not block normal flow; log and continue
-    console.error('[audit] failed to record audit entry:', err);
+    // Audit logging should never break the primary operation.
+    console.error('[audit] Failed to write audit log entry:', err.message);
   }
 }

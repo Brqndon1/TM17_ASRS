@@ -1,5 +1,6 @@
 import db from '../../../../lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 export async function GET() {
   // Query all forms (survey templates)
@@ -146,6 +147,15 @@ export async function POST(request) {
 
     // Execute the transaction
     const newSurvey = createSurvey();
+
+    logAudit(db, {
+      event: 'survey.created',
+      userEmail: auth.user.email,
+      targetType: 'survey',
+      targetId: String(newSurvey.id),
+      payload: { title, questionCount: questions.length },
+    });
+
     return new Response(JSON.stringify(newSurvey), { status: 201, headers: { "Content-Type": "application/json" } });
   } catch (err) {
     console.error('[surveys/templates POST] Error:', err);
@@ -167,6 +177,9 @@ export async function DELETE(request) {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Get template name before deleting for audit log
+    const existing = db.prepare('SELECT form_name FROM form WHERE form_id = ?').get(templateId);
 
     const tableExists = (tableName) =>
       !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(tableName);
@@ -198,6 +211,14 @@ export async function DELETE(request) {
     });
 
     deleteTx(templateId);
+
+    logAudit(db, {
+      event: 'survey.deleted',
+      userEmail: auth.user.email,
+      targetType: 'survey',
+      targetId: String(templateId),
+      payload: { title: existing?.form_name },
+    });
 
     return new Response(
       JSON.stringify({ success: true, templateId }),

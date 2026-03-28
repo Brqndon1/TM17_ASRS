@@ -32,6 +32,7 @@
 
 import db from '@/lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(request, context) {
   try {
@@ -146,6 +147,9 @@ export async function DELETE(request, context) {
       );
     }
 
+    // Get template name before deleting for audit log
+    const existing = db.prepare('SELECT form_name FROM form WHERE form_id = ?').get(templateId);
+
     const deleteTx = db.transaction((id) => {
       const affectedSurveyIds = db.prepare(`
         SELECT id FROM surveys
@@ -164,6 +168,14 @@ export async function DELETE(request, context) {
     });
 
     deleteTx(templateId);
+
+    logAudit(db, {
+      event: 'survey.deleted',
+      userEmail: auth.user.email,
+      targetType: 'survey',
+      targetId: String(templateId),
+      payload: { title: existing?.form_name },
+    });
 
     return new Response(
       JSON.stringify({ success: true, templateId }),

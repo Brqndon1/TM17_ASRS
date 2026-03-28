@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
 import { requireAccess } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 // Compute individual score for a goal based on its scoring method
 function computeGoalScore(goal) {
@@ -186,6 +187,22 @@ export async function POST(request) {
       parseFloat(computeGoalScore(newGoal).toFixed(2))
     );
 
+    // ── Audit log ──
+    logAudit(db, {
+      event: 'goal.created',
+      userEmail: auth.user.email,
+      targetType: 'goal',
+      targetId: String(newGoal.goal_id),
+      payload: {
+        initiative_id,
+        goal_name: goal_name.trim(),
+        target_metric: target_metric.trim(),
+        target_value,
+        scoring_method,
+        deadline: deadline || null,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       goal: {
@@ -283,6 +300,27 @@ export async function PUT(request) {
       );
     }
 
+    // ── Audit log ──
+    // Build a before/after diff of only the changed fields
+    const changes = {};
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined && updates[field] !== existing[field]) {
+        changes[field] = { from: existing[field], to: updates[field] };
+      }
+    }
+
+    logAudit(db, {
+      event: 'goal.updated',
+      userEmail: auth.user.email,
+      targetType: 'goal',
+      targetId: String(goal_id),
+      payload: {
+        goal_name: updatedGoal.goal_name,
+        initiative_id: updatedGoal.initiative_id,
+        changes,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       goal: {
@@ -326,6 +364,20 @@ export async function DELETE(request) {
     }
 
     db.prepare('DELETE FROM initiative_goal WHERE goal_id = ?').run(goalId);
+
+    // ── Audit log ──
+    logAudit(db, {
+      event: 'goal.deleted',
+      userEmail: auth.user.email,
+      targetType: 'goal',
+      targetId: String(goalId),
+      payload: {
+        goal_name: existing.goal_name,
+        initiative_id: existing.initiative_id,
+        target_metric: existing.target_metric,
+        target_value: existing.target_value,
+      },
+    });
 
     return NextResponse.json({
       success: true,

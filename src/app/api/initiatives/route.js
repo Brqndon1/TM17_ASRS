@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { validateReason, recordAudit } from '@/lib/audit';
+import { logAudit } from '@/lib/audit';
 import { toInitiativeCreateInput, toInitiativeDto } from '@/lib/adapters/initiative-adapter';
 import { requireAccess } from '@/lib/auth/server-auth';
 
@@ -48,12 +48,6 @@ export async function POST(request) {
     const body = await request.json();
     const input = toInitiativeCreateInput(body);
 
-    // Require reason for initiative creation
-    const reasonValidation = validateReason(body.reasonType, body.reasonText);
-    if (!reasonValidation.valid) {
-      return NextResponse.json({ error: reasonValidation.error }, { status: 400 });
-    }
-
     if (!input.name) {
       return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
@@ -86,7 +80,13 @@ export async function POST(request) {
 
     const row = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(result.lastInsertRowid));
 
-    recordAudit('initiative.created', auth.user.email, 'initiative', Number(result.lastInsertRowid), body.reasonType, body.reasonText, { name: input.name });
+    logAudit(db, {
+      event: 'initiative.created',
+      userEmail: auth.user.email,
+      targetType: 'initiative',
+      targetId: String(result.lastInsertRowid),
+      payload: { name: input.name, description: input.description },
+    });
 
     return NextResponse.json({
       success: true,
