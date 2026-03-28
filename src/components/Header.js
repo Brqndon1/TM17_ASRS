@@ -371,9 +371,14 @@ export default function Header() {
                   </>
                 )}
                 {isAdmin && (
-                  <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
-                    User Management
-                  </Link>
+                  <>
+                    <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
+                      User Management
+                    </Link>
+                    <Link href="/admin/audit" style={getNavLinkStyle('/admin/audit')} {...navHoverHandlers('/admin/audit')}>
+                      Audit Logs
+                    </Link>
+                  </>
                 )}
               </>
             ) : (

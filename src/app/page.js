@@ -66,6 +66,14 @@ function IconUsers() {
   );
 }
 
+function IconAudit() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
 const ICON_MAP = {
   '/survey': IconSurvey,
   '/initiative-creation': IconInitiative,
@@ -76,6 +84,7 @@ const ICON_MAP = {
   '/survey-distribution': IconDistribute,
   '/performance-dashboard': IconPerformance,
   '/admin/users': IconUsers,
+  '/admin/audit': IconAudit,
 };
 
 /* -----------------------------------------------------------------------
@@ -141,6 +150,14 @@ const routes = [
     href: '/admin/users',
     label: 'User Management',
     description: 'Manage staff accounts, roles, and permissions.',
+    section: 'admin',
+    requiresAuth: true,
+    adminOnly: true,
+  },
+  {
+    href: '/admin/audit',
+    label: 'Audit Logs',
+    description: 'View system audit trails and export change history.',
     section: 'admin',
     requiresAuth: true,
     adminOnly: true,
