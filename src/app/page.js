@@ -179,6 +179,14 @@ const routes = [
     requiresAuth: true,
     adminOnly: true,
   },
+  {
+    href: '/admin/budgets',
+    label: 'Budget Reporting',
+    description: 'Create and review initiative budgets by fiscal year.',
+    section: 'admin',
+    requiresAuth: true,
+    adminOnly: true,
+  },
 ];
 
 /* -----------------------------------------------------------------------

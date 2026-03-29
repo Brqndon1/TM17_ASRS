@@ -506,6 +506,37 @@ function initializeDatabase() {
       added_at TEXT DEFAULT (datetime('now')),
       UNIQUE(initiative_id, category_id)
     );
+
+    CREATE TABLE IF NOT EXISTS initiative_budget (
+      budget_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      fiscal_year INTEGER NOT NULL,
+      department TEXT NOT NULL DEFAULT 'General',
+      personnel REAL NOT NULL DEFAULT 0 CHECK (personnel >= 0),
+      equipment REAL NOT NULL DEFAULT 0 CHECK (equipment >= 0),
+      operations REAL NOT NULL DEFAULT 0 CHECK (operations >= 0),
+      travel REAL NOT NULL DEFAULT 0 CHECK (travel >= 0),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(initiative_id, fiscal_year)
+    );
+
+    CREATE TABLE IF NOT EXISTS initiative_budget_history (
+      history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      budget_id INTEGER NOT NULL REFERENCES initiative_budget(budget_id) ON DELETE CASCADE,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      fiscal_year INTEGER NOT NULL,
+      department TEXT NOT NULL,
+      personnel REAL NOT NULL DEFAULT 0 CHECK (personnel >= 0),
+      equipment REAL NOT NULL DEFAULT 0 CHECK (equipment >= 0),
+      operations REAL NOT NULL DEFAULT 0 CHECK (operations >= 0),
+      travel REAL NOT NULL DEFAULT 0 CHECK (travel >= 0),
+      changed_by_user_id INTEGER REFERENCES user(user_id),
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_initiative_budget_history_budget ON initiative_budget_history(budget_id);
+    CREATE INDEX IF NOT EXISTS idx_initiative_budget_history_initiative ON initiative_budget_history(initiative_id);
+
     CREATE TABLE IF NOT EXISTS goal_progress_history (
       history_id INTEGER PRIMARY KEY AUTOINCREMENT,
       goal_id INTEGER NOT NULL REFERENCES initiative_goal(goal_id) ON DELETE CASCADE,
