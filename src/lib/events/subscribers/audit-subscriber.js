@@ -12,6 +12,7 @@ export function registerAuditSubscriber(eventBus) {
   subscribe('user.invited');
   subscribe('user.verified');
   subscribe('qr.scanned');
+  subscribe('goal.edit.conflict');
 
   return () => {
     unsubscribeFns.forEach((fn) => fn());

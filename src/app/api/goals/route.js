@@ -2,25 +2,16 @@ import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
+import { getServiceContainer } from '@/lib/container/service-container';
+import EVENTS from '@/lib/events/event-types';
+import {
+  performGoalUpdate,
+  ALLOWED_FIELDS,
+  computeGoalScore,
+} from '@/lib/goals/perform-goal-update';
 
-// Compute individual score for a goal based on its scoring method
-function computeGoalScore(goal) {
-  const { current_value, target_value, scoring_method } = goal;
-
-  switch (scoring_method) {
-    case 'linear':
-      if (target_value === 0) return 0;
-      return Math.min((current_value / target_value) * 100, 100);
-
-    case 'threshold':
-      return current_value >= target_value ? 100 : 0;
-
-    case 'binary':
-      return current_value > 0 ? 100 : 0;
-
-    default:
-      return 0;
-  }
+function sameUpdatedAt(clientVal, serverVal) {
+  return String(clientVal ?? '').trim() === String(serverVal ?? '').trim();
 }
 
 // Compute overall weighted score across all goals
@@ -228,7 +219,7 @@ export async function PUT(request) {
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { goal_id, ...updates } = body;
+    const { goal_id, expected_updated_at, ...updates } = body;
 
     if (!goal_id) {
       return NextResponse.json(
@@ -246,81 +237,91 @@ export async function PUT(request) {
       );
     }
 
-    // Validate scoring_method if provided
-    if (updates.scoring_method && !['linear', 'threshold', 'binary'].includes(updates.scoring_method)) {
-      return NextResponse.json(
-        { error: 'Invalid scoring_method. Must be: linear, threshold, or binary' },
-        { status: 400 }
-      );
+    const proposedPatch = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (updates[field] !== undefined) proposedPatch[field] = updates[field];
     }
 
-    // Build dynamic update
-    const allowedFields = ['goal_name', 'description', 'target_metric', 'target_value', 'current_value', 'weight', 'scoring_method', 'deadline'];
-    const setClauses = [];
-    const values = [];
-
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        setClauses.push(`${field} = ?`);
-        values.push(updates[field]);
-      }
-    }
-
-    if (setClauses.length === 0) {
+    if (Object.keys(proposedPatch).length === 0) {
       return NextResponse.json(
         { error: 'No valid fields to update' },
         { status: 400 }
       );
     }
 
-    // Always update the updated_at timestamp
-    setClauses.push("updated_at = datetime('now')");
-    values.push(goal_id);
+    const hasVersion = expected_updated_at != null && String(expected_updated_at).trim() !== '';
+    if (hasVersion && !sameUpdatedAt(expected_updated_at, existing.updated_at)) {
+      const serverSnapshot = {};
+      for (const field of ALLOWED_FIELDS) {
+        serverSnapshot[field] = existing[field];
+      }
+      serverSnapshot.updated_at = existing.updated_at;
 
-    db.prepare(`
-      UPDATE initiative_goal
-      SET ${setClauses.join(', ')}
-      WHERE goal_id = ?
-    `).run(...values);
+      const ins = db
+        .prepare(`
+        INSERT INTO goal_edit_conflict (
+          goal_id, initiative_id, status,
+          expected_updated_at, detected_server_updated_at,
+          proposed_patch, server_snapshot, submitter_email
+        ) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)
+      `)
+        .run(
+          goal_id,
+          existing.initiative_id,
+          String(expected_updated_at).trim(),
+          String(existing.updated_at).trim(),
+          JSON.stringify(proposedPatch),
+          JSON.stringify(serverSnapshot),
+          auth.user.email
+        );
 
-    const updatedGoal = db.prepare('SELECT * FROM initiative_goal WHERE goal_id = ?').get(goal_id);
-    
+      const conflictId = Number(ins.lastInsertRowid);
+      const { eventBus } = getServiceContainer();
+      eventBus.publish(EVENTS.GOAL_EDIT_CONFLICT, {
+        conflictId,
+        goalId: Number(goal_id),
+        initiativeId: existing.initiative_id,
+        submitterEmail: auth.user.email,
+        goalName: existing.goal_name,
+        notifiedAt: new Date().toISOString(),
+      });
 
-    // After the UPDATE runs and updatedGoal is fetched:
-    if (updates.current_value !== undefined) {
-      db.prepare(`
-        INSERT INTO goal_progress_history (goal_id, initiative_id, recorded_value, target_value, score)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        goal_id,
-        updatedGoal.initiative_id,
-        updatedGoal.current_value,
-        updatedGoal.target_value,
-        computeGoalScore(updatedGoal)
+      logAudit(db, {
+        event: 'goal.conflict_detected',
+        userEmail: auth.user.email,
+        targetType: 'goal',
+        targetId: String(goal_id),
+        payload: {
+          conflict_id: conflictId,
+          initiative_id: existing.initiative_id,
+          expected_updated_at,
+          server_updated_at: existing.updated_at,
+          proposed_fields: Object.keys(proposedPatch),
+        },
+      });
+
+      const serverGoal = db.prepare('SELECT * FROM initiative_goal WHERE goal_id = ?').get(goal_id);
+      return NextResponse.json(
+        {
+          error: 'This goal was modified by someone else. Your changes were not saved. An administrator has been notified to review the conflict.',
+          conflict: true,
+          conflict_id: conflictId,
+          goal: {
+            ...serverGoal,
+            score: parseFloat(computeGoalScore(serverGoal).toFixed(2)),
+            daysUntilDeadline: getDaysUntilDeadline(serverGoal.deadline),
+          },
+        },
+        { status: 409 }
       );
     }
 
-    // ── Audit log ──
-    // Build a before/after diff of only the changed fields
-    const changes = {};
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined && updates[field] !== existing[field]) {
-        changes[field] = { from: existing[field], to: updates[field] };
-      }
+    const result = performGoalUpdate(db, existing, proposedPatch, { userEmail: auth.user.email });
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    logAudit(db, {
-      event: 'goal.updated',
-      userEmail: auth.user.email,
-      targetType: 'goal',
-      targetId: String(goal_id),
-      payload: {
-        goal_name: updatedGoal.goal_name,
-        initiative_id: updatedGoal.initiative_id,
-        changes,
-      },
-    });
-
+    const updatedGoal = result.goal;
     return NextResponse.json({
       success: true,
       goal: {

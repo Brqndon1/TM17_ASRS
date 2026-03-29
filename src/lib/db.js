@@ -631,6 +631,48 @@ function initializeDatabase() {
   // Add deadline column to goals if it doesn't exist
   addColumnIfNotExists('initiative_goal', 'deadline TEXT');
 
+  // Goal edit conflicts (US-035: concurrent edit detection & admin resolution)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS goal_edit_conflict (
+      conflict_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      goal_id INTEGER NOT NULL REFERENCES initiative_goal(goal_id) ON DELETE CASCADE,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
+      resolution TEXT CHECK (resolution IS NULL OR resolution IN ('applied_proposal','rejected_proposal')),
+      expected_updated_at TEXT NOT NULL,
+      detected_server_updated_at TEXT NOT NULL,
+      proposed_patch TEXT NOT NULL,
+      server_snapshot TEXT NOT NULL,
+      submitter_email TEXT NOT NULL,
+      resolved_by_email TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      resolved_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_goal_edit_conflict_pending ON goal_edit_conflict(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_goal_edit_conflict_goal ON goal_edit_conflict(goal_id);
+  `);
+
+  // Goal edit conflicts (US-035: concurrent edit detection & admin resolution)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS goal_edit_conflict (
+      conflict_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      goal_id INTEGER NOT NULL REFERENCES initiative_goal(goal_id) ON DELETE CASCADE,
+      initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
+      resolution TEXT CHECK (resolution IN ('applied_proposal','rejected_proposal')),
+      expected_updated_at TEXT NOT NULL,
+      detected_server_updated_at TEXT NOT NULL,
+      proposed_patch TEXT NOT NULL,
+      server_snapshot TEXT NOT NULL,
+      submitter_email TEXT NOT NULL,
+      resolved_by_email TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      resolved_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_goal_edit_conflict_pending ON goal_edit_conflict(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_goal_edit_conflict_goal ON goal_edit_conflict(goal_id);
+  `);
+
   // Add display_order column to reports if it doesn't exist (US-022)
   addColumnIfNotExists('reports', 'display_order INTEGER NOT NULL DEFAULT 0');
 

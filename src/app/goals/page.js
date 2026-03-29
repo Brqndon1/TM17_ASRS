@@ -31,8 +31,9 @@ export default function GoalsPage() {
     deadline: '',
   });
 
-  // Edit form state
+  // Edit form state (expected_updated_at = version when edit started; US-035 concurrency)
   const [editGoal, setEditGoal] = useState({});
+  const [editBaselineUpdatedAt, setEditBaselineUpdatedAt] = useState('');
 
   // Check staff or admin access
   useEffect(() => {
@@ -144,6 +145,7 @@ export default function GoalsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           goal_id: goalId,
+          expected_updated_at: editBaselineUpdatedAt,
           goal_name: editGoal.goal_name,
           description: editGoal.description,
           target_metric: editGoal.target_metric,
@@ -156,6 +158,15 @@ export default function GoalsPage() {
       });
 
       const data = await res.json();
+      if (res.status === 409 && data.conflict) {
+        setMessage(
+          data.error ||
+            'Another user saved this goal first. Your edit was queued for an admin to review. The list below shows the current server copy—refresh after an admin resolves the conflict.'
+        );
+        setEditingGoalId(null);
+        fetchGoals(selectedInitiative);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || 'Failed to update goal');
 
       setMessage('Goal updated successfully!');
@@ -187,6 +198,7 @@ export default function GoalsPage() {
 
   function startEditing(goal) {
     setEditingGoalId(goal.goal_id);
+    setEditBaselineUpdatedAt(goal.updated_at != null ? String(goal.updated_at) : '');
     setEditGoal({
       goal_name: goal.goal_name,
       description: goal.description || '',

@@ -190,6 +190,7 @@ export default function Header() {
   const isHydrated = typeof window !== 'undefined';
   const headerRef = useRef(null);
   const [profilePic, setProfilePic] = useState(null);
+  const [pendingGoalConflicts, setPendingGoalConflicts] = useState(0);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -214,6 +215,29 @@ export default function Header() {
   const isAdmin = isLoggedIn && user.user_type === 'admin';
   const isStaffOrAdmin =
     isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setPendingGoalConflicts(0);
+      return undefined;
+    }
+    let cancelled = false;
+    async function pollPendingConflicts() {
+      try {
+        const r = await apiFetch('/api/admin/goal-conflicts?pendingCount=1');
+        const d = await r.json();
+        if (!cancelled && r.ok) setPendingGoalConflicts(Number(d.pendingCount) || 0);
+      } catch {
+        if (!cancelled) setPendingGoalConflicts(0);
+      }
+    }
+    pollPendingConflicts();
+    const id = setInterval(pollPendingConflicts, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [isAdmin]);
 
   async function handleLogout() {
     try {
@@ -374,6 +398,41 @@ export default function Header() {
                   <>
                     <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
                       User Management
+                    </Link>
+                    <Link
+                      href="/admin/conflicts"
+                      style={{
+                        ...getNavLinkStyle('/admin/conflicts'),
+                        position: 'relative',
+                        paddingRight: pendingGoalConflicts > 0 ? '1.35rem' : undefined,
+                      }}
+                      {...navHoverHandlers('/admin/conflicts')}
+                    >
+                      Data conflicts
+                      {pendingGoalConflicts > 0 && (
+                        <span
+                          title={`${pendingGoalConflicts} pending goal edit conflict(s)`}
+                          style={{
+                            position: 'absolute',
+                            top: '-4px',
+                            right: '2px',
+                            minWidth: '18px',
+                            height: '18px',
+                            padding: '0 5px',
+                            borderRadius: '999px',
+                            backgroundColor: '#e74c3c',
+                            color: 'white',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {pendingGoalConflicts > 99 ? '99+' : pendingGoalConflicts}
+                        </span>
+                      )}
                     </Link>
                     <Link href="/admin/audit" style={getNavLinkStyle('/admin/audit')} {...navHoverHandlers('/admin/audit')}>
                       Audit Logs

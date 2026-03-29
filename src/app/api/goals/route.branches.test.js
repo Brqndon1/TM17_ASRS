@@ -1,17 +1,25 @@
 const prepareMock = vi.hoisted(() => vi.fn());
+const publishMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/db', () => ({
   default: { prepare: prepareMock },
   db: { prepare: prepareMock },
   initializeDatabase: vi.fn(),
 }));
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { access_rank: 100 } }),
+  requireAccess: () => ({ user: { access_rank: 100, email: 'staff@test.com' } }),
 }));
+vi.mock('@/lib/container/service-container', () => ({
+  getServiceContainer: () => ({ eventBus: { publish: publishMock } }),
+}));
+vi.mock('@/lib/audit', () => ({ logAudit: vi.fn() }));
 
 import { GET, POST, PUT, DELETE } from '@/app/api/goals/route';
 
 describe('/api/goals branch coverage', () => {
-  beforeEach(() => prepareMock.mockReset());
+  beforeEach(() => {
+    prepareMock.mockReset();
+    publishMock.mockReset();
+  });
 
   test('GET success computes scores across methods', async () => {
     prepareMock.mockImplementation((sql) => {
@@ -84,6 +92,53 @@ describe('/api/goals branch coverage', () => {
     });
     expect((await PUT(mkReq({ goal_id: 1, goal_name: 'Renamed' }))).status).toBe(200);
 
+  });
+
+  test('PUT returns 409 when expected_updated_at does not match server (US-035)', async () => {
+    const mkReq = (body) =>
+      new Request('http://localhost:3000/api/goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const existing = {
+      goal_id: 1,
+      initiative_id: 2,
+      goal_name: 'G',
+      description: '',
+      target_metric: 'm',
+      target_value: 10,
+      current_value: 1,
+      weight: 1,
+      scoring_method: 'linear',
+      deadline: null,
+      updated_at: '2026-03-29 10:00:00',
+    };
+
+    prepareMock.mockImplementation((sql) => {
+      const query = String(sql || '');
+      if (query.includes('SELECT * FROM initiative_goal WHERE goal_id = ?')) {
+        return { get: () => existing };
+      }
+      if (query.includes('INSERT INTO goal_edit_conflict')) {
+        return { run: () => ({ lastInsertRowid: 99 }) };
+      }
+      return { get: vi.fn(), run: vi.fn() };
+    });
+
+    const res = await PUT(
+      mkReq({
+        goal_id: 1,
+        expected_updated_at: '2026-03-28 10:00:00',
+        goal_name: 'New',
+      })
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.conflict).toBe(true);
+    expect(body.conflict_id).toBe(99);
+    expect(publishMock).toHaveBeenCalled();
   });
 
   test('DELETE covers not found and success', async () => {
