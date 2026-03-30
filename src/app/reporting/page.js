@@ -8,6 +8,22 @@ import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
 
+const PDF_DISPLAY_OPTIONS = [
+  { value: 'charts', label: 'Charts only' },
+  { value: 'table', label: 'Data table only' },
+  { value: 'both', label: 'Both' },
+];
+
+const PDF_LAYOUT_OPTIONS = [
+  { value: 'side-by-side', label: 'Side-by-side' },
+  { value: 'sequential', label: 'Sequential' },
+];
+
+const SOCIAL_PLATFORMS = ['Website', 'Instagram', 'Facebook', 'LinkedIn'];
+const DOWNLOAD_FORMATS = ['csv', 'xlsx', 'html'];
+const LABEL_KEY_PRIORITY = ['label', 'name', 'category', 'platform', 'period', 'date', 'month', 'metric', 'type'];
+const CHART_POINT_LIMIT = 12;
+
 export default function ReportingPage() {
   const [selectedInitiative, setSelectedInitiative] = useState(null);
   const [initiatives, setInitiatives] = useState([]);
@@ -203,10 +219,31 @@ export default function ReportingPage() {
     return Number.isFinite(number) ? number : null;
   }
 
+  function sortByPriority(values, priority) {
+    return [...values].sort((a, b) => {
+      const aIndex = priority.indexOf(a);
+      const bIndex = priority.indexOf(b);
+      const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+
+      if (aRank !== bRank) return aRank - bRank;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
+  function sortPoints(points) {
+    return [...points].sort((a, b) => {
+      const aValue = Math.abs(a.value);
+      const bValue = Math.abs(b.value);
+      if (aValue !== bValue) return bValue - aValue;
+      return String(a.label).localeCompare(String(b.label));
+    });
+  }
+
   function getLabelKey(rows) {
     const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-    const preferredKeys = ['label', 'name', 'category', 'platform', 'period', 'date', 'month', 'metric', 'type'];
-    return preferredKeys.find((key) => keys.includes(key)) || keys.find((key) => rows.some((row) => typeof row[key] === 'string')) || keys[0];
+    const orderedKeys = sortByPriority(keys, LABEL_KEY_PRIORITY);
+    return orderedKeys.find((key) => rows.some((row) => typeof row[key] === 'string')) || orderedKeys[0];
   }
 
   function getSectionsFromArray(data, fallbackTitle) {
@@ -217,23 +254,23 @@ export default function ReportingPage() {
     const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
     const numericKeys = keys.filter((key) => key !== labelKey && rows.some((row) => toNumberOrNull(row[key]) !== null));
 
-    return numericKeys
-      .map((key) => {
-        const title = numericKeys.length === 1
-          ? (formatLabel(key) === 'Value' ? formatLabel(fallbackTitle) : formatLabel(key))
-          : `${formatLabel(fallbackTitle)} — ${formatLabel(key)}`;
+    return sortByPriority(numericKeys, []).map((key) => {
+      const title = numericKeys.length === 1
+        ? (formatLabel(key) === 'Value' ? formatLabel(fallbackTitle) : formatLabel(key))
+        : `${formatLabel(fallbackTitle)} — ${formatLabel(key)}`;
 
-        return {
-          title,
-          points: rows
+      return {
+        title,
+        points: sortPoints(
+          rows
             .map((row, index) => ({
               label: row[labelKey] ?? `Item ${index + 1}`,
               value: toNumberOrNull(row[key]),
             }))
-            .filter((point) => point.value !== null),
-        };
-      })
-      .filter((section) => section.points.length > 0);
+            .filter((point) => point.value !== null)
+        ),
+      };
+    }).filter((section) => section.points.length > 0);
   }
 
   function getSectionsFromObject(data, fallbackTitle) {
@@ -244,12 +281,14 @@ export default function ReportingPage() {
       return [
         {
           title: formatLabel(fallbackTitle),
-          points: entries
-            .map(([label, value]) => ({
-              label,
-              value: toNumberOrNull(value),
-            }))
-            .filter((point) => point.value !== null),
+          points: sortPoints(
+            entries
+              .map(([label, value]) => ({
+                label,
+                value: toNumberOrNull(value),
+              }))
+              .filter((point) => point.value !== null)
+          ),
         },
       ];
     }
@@ -267,17 +306,17 @@ export default function ReportingPage() {
         ),
       ];
 
-      return numericKeys
-        .map((key) => ({
-          title: `${formatLabel(fallbackTitle)} — ${formatLabel(key)}`,
-          points: entries
+      return sortByPriority(numericKeys, []).map((key) => ({
+        title: `${formatLabel(fallbackTitle)} — ${formatLabel(key)}`,
+        points: sortPoints(
+          entries
             .map(([label, value]) => ({
               label,
               value: toNumberOrNull(value[key]),
             }))
-            .filter((point) => point.value !== null),
-        }))
-        .filter((section) => section.points.length > 0);
+            .filter((point) => point.value !== null)
+        ),
+      })).filter((section) => section.points.length > 0);
     }
 
     return [];
@@ -303,7 +342,7 @@ export default function ReportingPage() {
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    });
+    }).sort((a, b) => a.title.localeCompare(b.title));
   }
 
   function buildChartsHtml() {
@@ -322,7 +361,7 @@ export default function ReportingPage() {
       <div class="card">
         <h2>Charts</h2>
         ${sections.map((section) => {
-          const visiblePoints = section.points.slice(0, 12);
+          const visiblePoints = section.points.slice(0, CHART_POINT_LIMIT);
           const maxValue = Math.max(...visiblePoints.map((point) => Math.abs(point.value)), 0);
           const hiddenCount = section.points.length - visiblePoints.length;
 
@@ -364,7 +403,10 @@ export default function ReportingPage() {
     const normalizedRows = rows.map((row) =>
       row && typeof row === 'object' && !Array.isArray(row) ? row : { value: row }
     );
-    const columns = [...new Set(normalizedRows.flatMap((row) => Object.keys(row)))];
+    const columns = sortByPriority(
+      [...new Set(normalizedRows.flatMap((row) => Object.keys(row)))],
+      LABEL_KEY_PRIORITY
+    );
 
     return `
       <div class="card">
@@ -767,9 +809,9 @@ export default function ReportingPage() {
                         backgroundColor: 'var(--color-bg-primary)'
                       }}
                     >
-                      <option value="charts">Charts only</option>
-                      <option value="table">Data table only</option>
-                      <option value="both">Both</option>
+                      {PDF_DISPLAY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -788,8 +830,9 @@ export default function ReportingPage() {
                         opacity: pdfDisplayMode === 'both' ? 1 : 0.6
                       }}
                     >
-                      <option value="side-by-side">Side-by-side</option>
-                      <option value="sequential">Sequential</option>
+                      {PDF_LAYOUT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -808,7 +851,7 @@ export default function ReportingPage() {
                     PDF
                   </button>
 
-                  {['csv', 'xlsx', 'html'].map((format) => (
+                  {DOWNLOAD_FORMATS.map((format) => (
                     <button
                       key={format}
                       onClick={() => handleDownload(format)}
@@ -877,7 +920,7 @@ export default function ReportingPage() {
                             Share to:
                           </div>
 
-                          {['Website', 'Instagram', 'Facebook', 'LinkedIn'].map((platform) => (
+                          {SOCIAL_PLATFORMS.map((platform) => (
                             <div key={platform} style={{ marginBottom: '0.4rem' }}>
                               <label style={{ fontSize: '0.8rem', cursor: 'pointer' }}>
                                 <input
