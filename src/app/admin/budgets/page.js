@@ -201,6 +201,33 @@ export default function AdminBudgetsPage() {
     }
   }
 
+  async function handleDelete(budgetId) {
+    if (!window.confirm('Delete this budget? This cannot be undone.')) {
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setSaving(true);
+    try {
+      const response = await apiFetch(`/api/admin/budgets?budget_id=${budgetId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || 'Failed to delete budget');
+      } else {
+        if (selectedBudgetId === budgetId) {
+          clearForm();
+        }
+        setSuccess('Budget deleted successfully.');
+        fetchBudgets();
+      }
+    } catch (err) {
+      setError('Unable to delete budget. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleEdit(budget) {
     setSelectedBudgetId(budget.budget_id);
     setForm({
@@ -297,7 +324,7 @@ export default function AdminBudgetsPage() {
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                Equipment
+                Equipment $
                 <input
                   type="number"
                   min="0.01"
@@ -308,7 +335,7 @@ export default function AdminBudgetsPage() {
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                Operations
+                Operations $
                 <input
                   type="number"
                   min="0.01"
@@ -319,7 +346,7 @@ export default function AdminBudgetsPage() {
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                Travel
+                Travel $
                 <input
                   type="number"
                   min="0.01"
@@ -425,6 +452,13 @@ export default function AdminBudgetsPage() {
                           style={{ padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white', cursor: 'pointer' }}
                         >
                           History
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(budget.budget_id)}
+                          style={{ padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid #f44336', background: '#ffebee', color: '#b00020', cursor: 'pointer' }}
+                        >
+                          Delete
                         </button>
                       </td>
                     </tr>

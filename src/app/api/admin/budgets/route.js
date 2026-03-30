@@ -243,3 +243,30 @@ export async function PUT(request) {
     return NextResponse.json({ error: 'Failed to update budget' }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
+    const url = new URL(request.url);
+    const budgetId = parsePositiveInteger(url.searchParams.get('budget_id'));
+    if (!budgetId) {
+      return NextResponse.json({ error: 'budget_id is required' }, { status: 400 });
+    }
+
+    const existing = db.prepare('SELECT budget_id FROM initiative_budget WHERE budget_id = ?').get(budgetId);
+    if (!existing) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 });
+    }
+
+    db.prepare('DELETE FROM initiative_budget_history WHERE budget_id = ?').run(budgetId);
+    db.prepare('DELETE FROM initiative_budget WHERE budget_id = ?').run(budgetId);
+
+    return NextResponse.json({ success: true, budgetId });
+  } catch (error) {
+    console.error('/api/admin/budgets DELETE error:', error);
+    return NextResponse.json({ error: 'Failed to delete budget' }, { status: 500 });
+  }
+}
