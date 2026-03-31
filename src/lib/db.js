@@ -297,7 +297,8 @@ function initializeDatabase() {
       scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
       initiative_id INTEGER REFERENCES initiative(initiative_id),
       is_filterable INTEGER NOT NULL DEFAULT 0,
-      is_required_default INTEGER NOT NULL DEFAULT 0
+      is_required_default INTEGER NOT NULL DEFAULT 0,
+      validation_rules TEXT
     );
 
     CREATE TABLE IF NOT EXISTS field_options (
@@ -326,7 +327,8 @@ function initializeDatabase() {
       display_order INTEGER NOT NULL DEFAULT 0,
       required INTEGER NOT NULL DEFAULT 0,
       is_hidden INTEGER NOT NULL DEFAULT 0,
-      help_text TEXT
+      help_text TEXT,
+      validation_rules TEXT
     );
 
     CREATE TABLE IF NOT EXISTS submission (
