@@ -69,7 +69,7 @@ describe('/api/surveys/templates integration', () => {
 
   test('POST validates payload and persists form/fields/options', async () => {
     process.env.NODE_ENV = 'development';
-    const tokens = createSessionForRank(state.db, { rank: 50 });
+    const tokens = createSessionForRank(state.db, { rank: 100 });
 
     const invalidReq = new Request('http://localhost:3000/api/surveys/templates', {
       method: 'POST',

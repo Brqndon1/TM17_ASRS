@@ -93,11 +93,12 @@ function migrationFixFieldTableConstraint() {
           scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
           initiative_id INTEGER REFERENCES initiative(initiative_id),
           is_filterable INTEGER NOT NULL DEFAULT 0,
-          is_required_default INTEGER NOT NULL DEFAULT 0
+          is_required_default INTEGER NOT NULL DEFAULT 0,
+          validation_rules TEXT
         );
 
-        INSERT INTO field (field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default)
-        SELECT field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default
+        INSERT INTO field (field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default, validation_rules)
+        SELECT field_id, field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default, NULL
         FROM field_backup;
 
         DROP TABLE field_backup;
@@ -160,10 +161,11 @@ function migrationRepairFieldBackupForeignKeys() {
           display_order INTEGER NOT NULL DEFAULT 0,
           required INTEGER NOT NULL DEFAULT 0,
           is_hidden INTEGER NOT NULL DEFAULT 0,
-          help_text TEXT
+          help_text TEXT,
+          validation_rules TEXT
         );
       `,
-      columns: 'form_field_id, form_id, field_id, display_order, required, is_hidden, help_text',
+      columns: 'form_field_id, form_id, field_id, display_order, required, is_hidden, help_text, validation_rules',
     },
     {
       name: 'submission_value',
@@ -297,7 +299,8 @@ function initializeDatabase() {
       scope TEXT NOT NULL DEFAULT 'common' CHECK (scope IN ('common','initiative_specific','staff_only')),
       initiative_id INTEGER REFERENCES initiative(initiative_id),
       is_filterable INTEGER NOT NULL DEFAULT 0,
-      is_required_default INTEGER NOT NULL DEFAULT 0
+      is_required_default INTEGER NOT NULL DEFAULT 0,
+      validation_rules TEXT
     );
 
     CREATE TABLE IF NOT EXISTS field_options (
@@ -326,7 +329,8 @@ function initializeDatabase() {
       display_order INTEGER NOT NULL DEFAULT 0,
       required INTEGER NOT NULL DEFAULT 0,
       is_hidden INTEGER NOT NULL DEFAULT 0,
-      help_text TEXT
+      help_text TEXT,
+      validation_rules TEXT
     );
 
     CREATE TABLE IF NOT EXISTS submission (

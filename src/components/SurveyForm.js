@@ -58,7 +58,7 @@ export default function SurveyForm() {
   const updateQuestion = (idx, field, value) => {
     const copy = [...questions];
     copy[idx][field] = value;
-    if (field === 'type' && value === 'choice' && (!copy[idx].options || copy[idx].options.length === 0)) {
+    if (field === 'type' && value === 'select' && (!copy[idx].options || copy[idx].options.length === 0)) {
       copy[idx].options = [""];
     }
     if (field === 'type' && value === 'multiselect' && (!copy[idx].options || copy[idx].options.length === 0)) {
@@ -116,7 +116,7 @@ export default function SurveyForm() {
     
     for (let i = 0; i < validQuestions.length; i++) {
       if (!validQuestions[i].question.trim()) return alert(`Please enter text for Question ${i + 1}`);
-      if (validQuestions[i].type === 'choice' || validQuestions[i].type === 'multiselect') {
+      if (validQuestions[i].type === 'select' || validQuestions[i].type === 'multiselect') {
         const validOptions = validQuestions[i].options.filter(opt => opt.trim());
         if (validOptions.length === 0) {
           return alert(`Question ${i + 1} needs at least one option.`);
@@ -136,11 +136,14 @@ export default function SurveyForm() {
         title,
         description,
         questions: validQuestions.map(q => ({
-          question: q.question,
-          type: q.type,
-          required: !!q.required,
-          options: (q.type === 'choice' || q.type === 'multiselect') ? q.options.filter(opt => opt.trim()) : undefined,
-          subQuestions: q.type === 'yesno' ? q.subQuestions.filter(s => s.trim()) : undefined,
+          text: {
+            question: q.question,
+            type: q.type,
+            required: !!q.required,
+            scope: 'common',
+            options: (q.type === 'select' || q.type === 'multiselect') ? q.options.filter(opt => opt.trim()) : undefined,
+            subQuestions: q.type === 'yesno' ? q.subQuestions.filter(s => s.trim()) : undefined,
+          }
         }))
       };
       
@@ -202,7 +205,10 @@ export default function SurveyForm() {
                   <select value={q.type} onChange={(e) => updateQuestion(i, 'type', e.target.value)} style={{ flex: '1 1 35%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem', cursor: 'pointer' }}>
                     <option value="text">Text Response</option>
                     <option value="number">Numeric</option>
-                    <option value="choice">Multiple Choice</option>
+                    <option value="date">Date</option>
+                    <option value="boolean">Yes / No</option>
+                    <option value="rating">Rating (1-5)</option>
+                    <option value="select">Multiple Choice</option>
                     <option value="multiselect">Multi-select (select all that apply)</option>
                     <option value="yesno">Yes / No Grid</option>
                   </select>
@@ -215,7 +221,7 @@ export default function SurveyForm() {
                   </label>
                 </div>
 
-                {(q.type === 'choice' || q.type === 'multiselect') && (
+                {(q.type === 'select' || q.type === 'multiselect') && (
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: 6, border: '1px dashed var(--color-bg-tertiary)' }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>Answer Options *</span>
                     {q.options && q.options.map((option, oIdx) => (
@@ -269,7 +275,24 @@ export default function SurveyForm() {
                   <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{q.question}{q.required ? ' *' : ''}</div>
                   {q.type === 'text' && <input disabled placeholder="Text response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
                   {q.type === 'number' && <input disabled type="number" placeholder="Numeric response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
-                  {q.type === 'choice' && q.options && (
+                  {q.type === 'date' && <input disabled type="date" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'boolean' && (
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      {['Yes', 'No'].map(opt => (
+                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <input type="radio" name={`preview-bool-${i}`} disabled />{opt}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {q.type === 'rating' && (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {[1,2,3,4,5].map(n => (
+                        <span key={n} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>{n}</span>
+                      ))}
+                    </div>
+                  )}
+                  {q.type === 'select' && q.options && (
                     <div>
                       {q.options.filter(o => o && o.trim()).map((opt, oIdx) => (
                         <label key={oIdx} style={{ display: 'block', marginBottom: '0.25rem' }}>

@@ -1,3 +1,5 @@
+import { validateFieldValue, resolveValidationRules } from './field-validation';
+
 // Lightweight survey payload validation and sanitization
 function isPlainObject(v) {
   return v && typeof v === 'object' && !Array.isArray(v);
@@ -54,4 +56,29 @@ export function validateAndCleanSurvey(body) {
   return cleaned;
 }
 
-export default { validateAndCleanSurvey };
+/**
+ * Validate template answers against field definitions.
+ * @param {object} answers - { [field_id]: value }
+ * @param {Array} fields - Array of { field_id, field_type, required, field_rules, form_field_rules }
+ * @returns {Array<{ field_id: number, error: string }>}
+ */
+export function validateTemplateAnswers(answers, fields) {
+  const errors = [];
+  for (const field of fields) {
+    const value = answers[field.field_id];
+    const isEmpty = value === undefined || value === null || (typeof value === 'string' && value === '');
+    if (field.required && isEmpty) {
+      errors.push({ field_id: field.field_id, error: 'This field is required' });
+      continue;
+    }
+    if (isEmpty) continue;
+    const rules = resolveValidationRules(field.field_rules, field.form_field_rules);
+    const error = validateFieldValue(value, field, rules);
+    if (error) {
+      errors.push({ field_id: field.field_id, error });
+    }
+  }
+  return errors;
+}
+
+export default { validateAndCleanSurvey, validateTemplateAnswers };

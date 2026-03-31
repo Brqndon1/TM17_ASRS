@@ -17,6 +17,9 @@ function normalizeQuestion(question, fallbackId) {
     options,
     subQuestions,
     helpText: text.help_text || '',
+    scope: text.scope || null,
+    initiative_id: text.initiative_id || null,
+    validation_rules: text.validation_rules || null,
   };
 }
 

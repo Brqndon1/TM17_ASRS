@@ -2,7 +2,7 @@ import db, { initializeDatabase } from '@/lib/db';
 import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
 import { requireAccess } from '@/lib/auth/server-auth';
-import { validateAndCleanSurvey } from '@/lib/survey-validation';
+import { validateAndCleanSurvey, validateTemplateAnswers } from '@/lib/survey-validation';
 import { alertDb } from '@/lib/db-alerts';
 
 function toLocalYyyyMmDd(date) {
@@ -31,6 +31,46 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Duplicate submission detected' }, { status: 409 });
     }
 
+    // Prefer an explicit templateId at top-level; fall back to responses.templateId
+    const effectiveTemplateId = cleaned.templateId || (cleaned.responses && cleaned.responses.templateId) || null;
+
+    // Validate template answers BEFORE persisting anything.
+    {
+      const templateCandidate = effectiveTemplateId || (cleaned.responses && cleaned.responses.templateId);
+      if (templateCandidate) {
+        const formRow = db.prepare(`SELECT form_id, initiative_id FROM form WHERE form_id = ? LIMIT 1`).get(Number(templateCandidate));
+        if (formRow && formRow.form_id) {
+          const answersToValidate = cleaned.responses && cleaned.responses.templateAnswers ? cleaned.responses.templateAnswers : null;
+          if (answersToValidate && Object.keys(answersToValidate).length > 0) {
+            // Load field definitions + options for this form
+            const formFields = db.prepare(`
+              SELECT f.field_id, f.field_type, ff.required,
+                     f.validation_rules AS field_rules,
+                     ff.validation_rules AS form_field_rules
+              FROM form_field ff
+              JOIN field f ON ff.field_id = f.field_id
+              WHERE ff.form_id = ?
+            `).all(formRow.form_id);
+
+            const getOptions = db.prepare(`SELECT option_value FROM field_options WHERE field_id = ? ORDER BY display_order`);
+            for (const ff of formFields) {
+              if (['select', 'choice', 'multiselect'].includes(ff.field_type)) {
+                ff.options = getOptions.all(ff.field_id).map(o => o.option_value);
+              }
+            }
+
+            const validationErrors = validateTemplateAnswers(answersToValidate, formFields);
+            if (validationErrors.length > 0) {
+              return NextResponse.json({
+                error: 'Validation failed',
+                field_errors: validationErrors,
+              }, { status: 400 });
+            }
+          }
+        }
+      }
+    }
+
     // Use a transaction so survey + report + distribution update are atomic
     const insertSurveyAndReport = db.transaction((name, email, responsesJSONInner, reportJSON, templateId) => {
       const surveyInfo = db.prepare(`INSERT INTO surveys (name, email, responses) VALUES (?, ?, ?)`).run(name, email, responsesJSONInner);
@@ -57,9 +97,6 @@ export async function POST(request) {
 
       return surveyId;
     });
-
-    // Prefer an explicit templateId at top-level; fall back to responses.templateId
-    const effectiveTemplateId = cleaned.templateId || (cleaned.responses && cleaned.responses.templateId) || null;
 
     const surveyId = insertSurveyAndReport(
       cleaned.name,

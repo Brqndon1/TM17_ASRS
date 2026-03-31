@@ -87,7 +87,8 @@ export function createTestDb() {
       scope TEXT NOT NULL DEFAULT 'common',
       initiative_id INTEGER,
       is_filterable INTEGER NOT NULL DEFAULT 0,
-      is_required_default INTEGER NOT NULL DEFAULT 0
+      is_required_default INTEGER NOT NULL DEFAULT 0,
+      validation_rules TEXT
     );
 
     CREATE TABLE form_field (
@@ -98,6 +99,7 @@ export function createTestDb() {
       required INTEGER NOT NULL DEFAULT 0,
       is_hidden INTEGER NOT NULL DEFAULT 0,
       help_text TEXT,
+      validation_rules TEXT,
       FOREIGN KEY (form_id) REFERENCES form(form_id) ON DELETE CASCADE,
       FOREIGN KEY (field_id) REFERENCES field(field_id) ON DELETE CASCADE
     );
