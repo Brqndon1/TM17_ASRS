@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { toSurveyTemplateViewModel } from '@/lib/adapters/survey-template-adapter';
+import { validateFieldValue } from '@/lib/field-validation';
 
 export default function SurveyPage() {
   const router = useRouter();
@@ -258,6 +259,35 @@ export default function SurveyPage() {
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 50);
       return;
+    }
+
+    // Validate against field rules
+    if (surveyTemplate && surveyTemplate.questions) {
+      const fieldErrors = {};
+      for (const q of surveyTemplate.questions) {
+        const qId = q.id;
+        const value = templateResponses[qId];
+        const questionType = q.type || q.text?.type || 'text';
+        const isRequired = q.required ?? q.text?.required ?? true;
+        const rules = q.validation_rules || q.text?.validation_rules || null;
+
+        if (isRequired && (value === undefined || value === null || value === '')) {
+          fieldErrors[`question_${qId}`] = true;
+          continue;
+        }
+
+        if (value !== undefined && value !== null && value !== '' && rules) {
+          const error = validateFieldValue(value, { field_type: questionType }, rules);
+          if (error) {
+            fieldErrors[`question_${qId}`] = true;
+          }
+        }
+      }
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setInvalidFields(prev => ({ ...prev, ...fieldErrors }));
+        return; // Stop submission
+      }
     }
 
     setInvalidFields({});
