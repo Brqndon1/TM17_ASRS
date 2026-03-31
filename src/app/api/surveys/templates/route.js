@@ -2,17 +2,27 @@ import db from '../../../../lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
+function resolveRules(fieldRulesJson, formFieldRulesJson) {
+  const base = fieldRulesJson ? JSON.parse(fieldRulesJson) : null;
+  const override = formFieldRulesJson ? JSON.parse(formFieldRulesJson) : null;
+  if (!base && !override) return undefined;
+  return { ...base, ...override };
+}
+
 export async function GET() {
   // Query all forms (survey templates)
   const forms = db.prepare(`
-    SELECT form_id AS id, form_name AS title, description, created_at, is_published AS published
+    SELECT form_id AS id, form_name AS title, description, created_at,
+           is_published AS published, initiative_id
     FROM form
     WHERE is_published = 1
   `).all();
 
   // For each form, get questions
   const getQuestions = db.prepare(`
-    SELECT ff.form_field_id, f.field_id, f.field_label, f.field_type, ff.required, ff.help_text
+    SELECT ff.form_field_id, f.field_id, f.field_label, f.field_type,
+           ff.required, ff.help_text, f.scope, f.initiative_id,
+           f.validation_rules AS field_rules, ff.validation_rules AS form_field_rules
     FROM form_field ff
     JOIN field f ON ff.field_id = f.field_id
     WHERE ff.form_id = ?
@@ -34,9 +44,12 @@ export async function GET() {
           question: q.field_label,
           type: q.field_type,
           required: !!q.required,
+          scope: q.scope,
+          initiative_id: q.initiative_id,
+          validation_rules: resolveRules(q.field_rules, q.form_field_rules),
           ...(isOptionType && rawOptions ? { options: rawOptions } : {}),
           ...(isYesNo && rawOptions ? { subQuestions: rawOptions } : {}),
-          ...(q.help_text ? { help_text: q.help_text } : {})
+          ...(q.help_text ? { help_text: q.help_text } : {}),
         }
       };
     });
@@ -44,6 +57,7 @@ export async function GET() {
       id: form.id,
       title: form.title,
       description: form.description,
+      initiative_id: form.initiative_id,
       questions,
       createdAt: form.created_at,
       published: !!form.published
@@ -54,11 +68,12 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
     if (auth.error) return auth.error;
 
     const body = await request.json();
-    const { title, description, questions } = body || {};
+    const { title, description, questions, initiative_id } = body || {};
+    const effectiveInitiativeId = initiative_id || 1;
     if (!title || !Array.isArray(questions)) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
@@ -70,12 +85,12 @@ export async function POST(request) {
       VALUES (?, ?, ?, ?, ?, NULL, 1)
     `);
     const insertField = db.prepare(`
-      INSERT INTO field (field_key, field_label, field_type, scope, is_filterable, is_required_default)
-      VALUES (?, ?, ?, 'common', 0, 0)
+      INSERT INTO field (field_key, field_label, field_type, scope, initiative_id, is_filterable, is_required_default, validation_rules)
+      VALUES (?, ?, ?, ?, ?, 0, 0, ?)
     `);
     const insertFormField = db.prepare(`
-      INSERT INTO form_field (form_id, field_id, display_order, required, is_hidden, help_text)
-      VALUES (?, ?, ?, ?, 0, ?)
+      INSERT INTO form_field (form_id, field_id, display_order, required, is_hidden, help_text, validation_rules)
+      VALUES (?, ?, ?, ?, 0, ?, ?)
     `);
     const insertOption = db.prepare(`
       INSERT INTO field_options (field_id, option_value, display_label, display_order)
@@ -85,7 +100,7 @@ export async function POST(request) {
     // Use transaction to ensure atomicity
     const createSurvey = db.transaction(() => {
       // Insert new form (survey template)
-      const result = insertForm.run(1, title, description || '', now, now);
+      const result = insertForm.run(effectiveInitiativeId, title, description || '', now, now);
       const formId = result.lastInsertRowid;
 
       let displayOrder = 0;
@@ -99,27 +114,38 @@ export async function POST(request) {
         const fieldType = textObj.type || 'text';
         const required = textObj.required ? 1 : 0;
         const helpText = textObj.help_text || null;
+        const scope = textObj.scope || 'common';
+        const fieldInitiativeId = scope === 'initiative_specific' ? effectiveInitiativeId : null;
+        const rulesJson = textObj.validation_rules ? JSON.stringify(textObj.validation_rules) : null;
+        const formFieldRulesJson = textObj.form_validation_rules ? JSON.stringify(textObj.form_validation_rules) : null;
 
-        // Insert field
-        const fieldResult = insertField.run(fieldKey, fieldLabel, fieldType);
-        const fieldId = fieldResult.lastInsertRowid;
+        let fieldId;
+        if (textObj.field_id) {
+          const existingField = db.prepare('SELECT field_id FROM field WHERE field_id = ?').get(textObj.field_id);
+          if (existingField) fieldId = existingField.field_id;
+        }
+        if (!fieldId) {
+          // Insert field
+          const fieldResult = insertField.run(fieldKey, fieldLabel, fieldType, scope, fieldInitiativeId, rulesJson);
+          fieldId = fieldResult.lastInsertRowid;
+
+          // Insert options for select/choice/multiselect types
+          if ((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
+            textObj.options.forEach((opt, idx) => {
+              insertOption.run(fieldId, opt, opt, idx);
+            });
+          }
+
+          // Insert sub-questions for yesno type (stored as field_options)
+          if (fieldType === 'yesno' && Array.isArray(textObj.subQuestions)) {
+            textObj.subQuestions.forEach((sub, idx) => {
+              insertOption.run(fieldId, sub, sub, idx);
+            });
+          }
+        }
 
         // Insert form_field
-        insertFormField.run(formId, fieldId, displayOrder, required, helpText);
-
-        // Insert options for select/choice/multiselect types
-        if ((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
-          textObj.options.forEach((opt, idx) => {
-            insertOption.run(fieldId, opt, opt, idx);
-          });
-        }
-
-        // Insert sub-questions for yesno type (stored as field_options)
-        if (fieldType === 'yesno' && Array.isArray(textObj.subQuestions)) {
-          textObj.subQuestions.forEach((sub, idx) => {
-            insertOption.run(fieldId, sub, sub, idx);
-          });
-        }
+        insertFormField.run(formId, fieldId, displayOrder, required, helpText, formFieldRulesJson);
 
         questionObjs.push({
           id: fieldId,
@@ -139,6 +165,7 @@ export async function POST(request) {
         id: formId,
         title,
         description: description || '',
+        initiative_id: effectiveInitiativeId,
         questions: questionObjs,
         createdAt: now,
         published: true
