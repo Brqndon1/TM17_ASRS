@@ -1,23 +1,14 @@
 'use client';
 
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
-import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-
-// ─── Category config ──────────────────────────────────────────────────────────
-
-const CATEGORIES = [
-  { key: 'personnel',  label: 'Personnel',  color: '#3498DB' },
-  { key: 'equipment',  label: 'Equipment',  color: '#9B59B6' },
-  { key: 'operations', label: 'Operations', color: '#E67E22' },
-  { key: 'travel',     label: 'Travel',     color: '#1ABC9C' },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,45 +19,36 @@ function fmt(n) {
   return `$${Number(n).toFixed(2)}`;
 }
 
-// Proportional colour-segment bar showing category breakdown
-function CategoryBar({ row }) {
-  if (!row.total) return <span style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>No budget</span>;
-  return (
-    <div style={{ display: 'flex', width: '100%', minWidth: '120px', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-      {CATEGORIES.map((c) => {
-        const w = (row[c.key] / row.total) * 100;
-        if (!w) return null;
-        return (
-          <div
-            key={c.key}
-            title={`${c.label}: ${fmt(row[c.key])} (${Math.round(w)}%)`}
-            style={{ width: `${w}%`, height: '100%', backgroundColor: c.color }}
-          />
-        );
-      })}
-    </div>
-  );
+function pct(spent, total) {
+  if (!total) return 0;
+  return Math.round((spent / total) * 100);
 }
+
+function getStatus(utilization) {
+  if (utilization > 100) return { label: 'Over Budget', color: '#C0392B', bg: '#C0392B18' };
+  if (utilization >= 80)  return { label: 'At Risk',    color: '#F39C12', bg: '#F39C1218' };
+  return                         { label: 'On Track',   color: '#27AE60', bg: '#27AE6018' };
+}
+
+const CATEGORIES = [
+  { key: 'personnel',  spentKey: 'personnel_spent',  label: 'Personnel',  color: '#3498DB' },
+  { key: 'equipment',  spentKey: 'equipment_spent',  label: 'Equipment',  color: '#9B59B6' },
+  { key: 'operations', spentKey: 'operations_spent', label: 'Operations', color: '#E67E22' },
+  { key: 'travel',     spentKey: 'travel_spent',     label: 'Travel',     color: '#1ABC9C' },
+];
 
 // ─── Custom chart tooltip ─────────────────────────────────────────────────────
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
-  const total = payload.reduce((s, p) => s + (p.value || 0), 0);
   return (
-    <div style={{
-      backgroundColor: 'white', border: '1px solid var(--color-bg-tertiary)',
-      borderRadius: '8px', padding: '0.75rem 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    }}>
+    <div style={{ backgroundColor: 'white', border: '1px solid var(--color-bg-tertiary)', borderRadius: '8px', padding: '0.75rem 1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
       <p style={{ margin: '0 0 0.5rem 0', fontWeight: '700', color: 'var(--color-text-primary)', fontSize: '0.85rem' }}>{label}</p>
       {payload.map((entry, i) => (
         <p key={i} style={{ margin: '0.2rem 0', fontSize: '0.85rem', color: entry.color, fontWeight: '600' }}>
           {entry.name}: {fmt(entry.value)}
         </p>
       ))}
-      <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-text-primary)', borderTop: '1px solid var(--color-bg-tertiary)', paddingTop: '0.4rem' }}>
-        Total: {fmt(total)}
-      </p>
     </div>
   );
 }
@@ -81,33 +63,21 @@ function DrillDownRow({ initiative, colCount }) {
   useEffect(() => {
     async function load() {
       try {
-        setLoading(true);
         const res = await apiFetch(`/api/performance/budget?initiativeId=${initiative.initiative_id}`);
         if (!res.ok) throw new Error();
         setDetail(await res.json());
-      } catch {
-        setError('Failed to load details.');
-      } finally {
-        setLoading(false);
-      }
+      } catch { setError('Failed to load details.'); }
+      finally  { setLoading(false); }
     }
     load();
   }, [initiative.initiative_id]);
 
-  const thStyle = {
-    padding: '0.5rem 0.75rem',
-    fontWeight: '700',
-    color: 'var(--color-text-secondary)',
-    fontSize: '0.78rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  };
+  const thStyle = { padding: '0.5rem 0.75rem', fontWeight: '700', color: 'var(--color-text-secondary)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' };
 
   return (
     <tr>
       <td colSpan={colCount} style={{ padding: 0, backgroundColor: 'var(--color-bg-secondary)' }}>
         <div style={{ padding: '1.25rem 1.5rem', borderTop: '2px solid var(--color-bg-tertiary)', borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-
           <p style={{ fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
             Budget Breakdown — {initiative.initiative_name}
           </p>
@@ -117,48 +87,55 @@ function DrillDownRow({ initiative, colCount }) {
 
           {!loading && !error && detail && (
             <>
-              {/* Per-fiscal-year table */}
               {detail.budgets.length === 0 ? (
-                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: detail.history.length ? '1rem' : 0 }}>
-                  No budget entries found for this initiative.
-                </p>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>No budget entries found.</p>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', marginBottom: detail.history.length ? '1.25rem' : 0 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-                      {['Fiscal Year', 'Department', 'Personnel', 'Equipment', 'Operations', 'Travel', 'Total', 'Mix'].map((h, i) => (
+                      {['Fiscal Year', 'Category', 'Budget', 'Spent', 'Remaining', 'Utilization', 'Status'].map((h, i) => (
                         <th key={h} style={{ ...thStyle, textAlign: i < 2 ? 'left' : 'center' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {detail.budgets.map((b) => (
-                      <tr key={b.budget_id} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-                        <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>{b.fiscal_year}</td>
-                        <td style={{ padding: '0.6rem 0.75rem', color: 'var(--color-text-secondary)' }}>{b.department}</td>
-                        {CATEGORIES.map((c) => (
-                          <td key={c.key} style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: b[c.key] ? c.color : 'var(--color-text-light)', fontWeight: '600' }}>
-                            {b.total ? fmt(b[c.key]) : '—'}
-                          </td>
-                        ))}
-                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                          {fmt(b.total)}
-                        </td>
-                        <td style={{ padding: '0.6rem 0.75rem' }}>
-                          <CategoryBar row={b} />
-                        </td>
-                      </tr>
-                    ))}
+                    {detail.budgets.flatMap((b) =>
+                      CATEGORIES.map((c, ci) => {
+                        const budget    = b[c.key]      || 0;
+                        const spent     = b[c.spentKey] || 0;
+                        const remaining = budget - spent;
+                        const util      = pct(spent, budget);
+                        const status    = getStatus(util);
+                        return (
+                          <tr key={`${b.budget_id}-${c.key}`} style={{ borderBottom: '1px solid var(--color-bg-tertiary)', backgroundColor: ci === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: ci === 0 ? '700' : '400', color: 'var(--color-text-primary)' }}>
+                              {ci === 0 ? b.fiscal_year : ''}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: '600', color: c.color }}>{c.label}</td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: 'var(--color-text-primary)' }}>{fmt(budget)}</td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: status.color, fontWeight: '600' }}>{fmt(spent)}</td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', color: remaining < 0 ? '#C0392B' : 'var(--color-text-primary)' }}>{fmt(remaining)}</td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: '700', color: budget ? status.color : 'var(--color-text-light)' }}>
+                              {budget ? `${util}%` : '—'}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                              {budget ? (
+                                <span style={{ padding: '0.2rem 0.55rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700', backgroundColor: status.bg, color: status.color }}>
+                                  {status.label}
+                                </span>
+                              ) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               )}
 
-              {/* Change history */}
               {detail.history.length > 0 && (
                 <>
-                  <p style={{ fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
-                    Change History
-                  </p>
+                  <p style={{ fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Change History</p>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
@@ -170,21 +147,13 @@ function DrillDownRow({ initiative, colCount }) {
                     <tbody>
                       {detail.history.map((h) => (
                         <tr key={h.history_id} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-                          <td style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                            {new Date(h.created_at).toLocaleDateString()}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-primary)', fontWeight: '600' }}>{h.fiscal_year}</td>
+                          <td style={{ padding: '0.5rem 0.75rem', color: 'var(--color-text-secondary)' }}>{new Date(h.created_at).toLocaleDateString()}</td>
+                          <td style={{ padding: '0.5rem 0.75rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>{h.fiscal_year}</td>
                           {CATEGORIES.map((c) => (
-                            <td key={c.key} style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: 'var(--color-text-primary)' }}>
-                              {fmt(h[c.key])}
-                            </td>
+                            <td key={c.key} style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: 'var(--color-text-primary)' }}>{fmt(h[c.key])}</td>
                           ))}
-                          <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                            {fmt(h.total)}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                            {h.changed_by_name || '—'}
-                          </td>
+                          <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', fontWeight: '700', color: 'var(--color-text-primary)' }}>{fmt(h.total)}</td>
+                          <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>{h.changed_by_name || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -203,19 +172,18 @@ function DrillDownRow({ initiative, colCount }) {
 
 export default function PerformanceBudget() {
   const router = useRouter();
-  const [user, setUser]     = useState(null);
-  const [data, setData]     = useState({ fiscalYears: [], departments: [], initiatives: [] });
+  const [user, setUser]           = useState(null);
+  const [data, setData]           = useState({ fiscalYears: [], departments: [], initiatives: [] });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]   = useState(null);
+  const [error, setError]         = useState(null);
 
-  // Filters — fiscal year + department re-fetch; initiative name is client-side only
-  const [filterFiscalYear,  setFilterFiscalYear]  = useState('');
-  const [filterDept,        setFilterDept]        = useState('');
-  const [filterInitiative,  setFilterInitiative]  = useState('');
+  const [filterFiscalYear, setFilterFiscalYear] = useState('');
+  const [filterDept,       setFilterDept]       = useState('');
+  const [filterInitiative, setFilterInitiative] = useState('');
+  const [filterStatus,     setFilterStatus]     = useState('');
 
-  // Table
-  const [sortField,   setSortField]   = useState('total-desc');
-  const [expandedId,  setExpandedId]  = useState(null);
+  const [sortField,  setSortField]  = useState('utilization-desc');
+  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -225,7 +193,6 @@ export default function PerformanceBudget() {
     setUser(parsed);
   }, [router]);
 
-  // Re-fetch whenever server-side filters change
   useEffect(() => { if (user) fetchData(); }, [user, filterFiscalYear, filterDept]);
 
   async function fetchData() {
@@ -246,58 +213,64 @@ export default function PerformanceBudget() {
     }
   }
 
-  // Client-side initiative name filter
   const filtered = useMemo(() => {
-    if (!filterInitiative) return data.initiatives;
-    const q = filterInitiative.toLowerCase();
-    return data.initiatives.filter(i => i.initiative_name.toLowerCase().includes(q));
-  }, [data.initiatives, filterInitiative]);
+    return data.initiatives.filter((i) => {
+      if (filterInitiative && !i.initiative_name.toLowerCase().includes(filterInitiative.toLowerCase())) return false;
+      if (filterStatus) {
+        const util   = pct(i.total_spent, i.total);
+        const status = getStatus(util);
+        if (status.label !== filterStatus) return false;
+      }
+      return true;
+    });
+  }, [data.initiatives, filterInitiative, filterStatus]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      if (sortField === 'total-desc')      return b.total      - a.total;
-      if (sortField === 'total-asc')       return a.total      - b.total;
-      if (sortField === 'name-asc')        return a.initiative_name.localeCompare(b.initiative_name);
-      if (sortField === 'name-desc')       return b.initiative_name.localeCompare(a.initiative_name);
-      if (sortField === 'personnel-desc')  return b.personnel  - a.personnel;
-      if (sortField === 'operations-desc') return b.operations - a.operations;
+      const aUtil = pct(a.total_spent, a.total);
+      const bUtil = pct(b.total_spent, b.total);
+      if (sortField === 'utilization-desc') return bUtil  - aUtil;
+      if (sortField === 'utilization-asc')  return aUtil  - bUtil;
+      if (sortField === 'budget-desc')      return b.total - a.total;
+      if (sortField === 'budget-asc')       return a.total - b.total;
+      if (sortField === 'spent-desc')       return b.total_spent - a.total_spent;
+      if (sortField === 'name-asc')         return a.initiative_name.localeCompare(b.initiative_name);
       return 0;
     });
   }, [filtered, sortField]);
 
-  const SORT_CYCLE = ['total-desc', 'total-asc', 'name-asc', 'name-desc', 'personnel-desc', 'operations-desc'];
-  const SORT_LABELS = {
-    'total-desc':      '↓ Total (high→low)',
-    'total-asc':       '↑ Total (low→high)',
-    'name-asc':        'A→Z Name',
-    'name-desc':       'Z→A Name',
-    'personnel-desc':  '↓ Personnel',
-    'operations-desc': '↓ Operations',
+  const SORT_CYCLE   = ['utilization-desc', 'utilization-asc', 'budget-desc', 'budget-asc', 'spent-desc', 'name-asc'];
+  const SORT_LABELS  = {
+    'utilization-desc': '↓ Utilization (high→low)',
+    'utilization-asc':  '↑ Utilization (low→high)',
+    'budget-desc':      '↓ Budget (high→low)',
+    'budget-asc':       '↑ Budget (low→high)',
+    'spent-desc':       '↓ Spent (high→low)',
+    'name-asc':         'A→Z Name',
   };
   function cycleSortField() {
     setSortField(prev => SORT_CYCLE[(SORT_CYCLE.indexOf(prev) + 1) % SORT_CYCLE.length]);
   }
 
-  // Summary stats — always across full (unfiltered-by-name) dataset
-  const allInits     = data.initiatives;
-  const grandTotal   = allInits.reduce((s, i) => s + i.total, 0);
-  const noBudget     = allInits.filter(i => !i.total).length;
-  const catTotals    = CATEGORIES.map(c => ({ ...c, total: allInits.reduce((s, i) => s + (i[c.key] || 0), 0) }));
-  const topCategory  = [...catTotals].sort((a, b) => b.total - a.total)[0];
-  const personnelPct = grandTotal ? Math.round((catTotals[0].total / grandTotal) * 100) : 0;
+  // Summary stats over full unfiltered dataset
+  const allInits   = data.initiatives;
+  const grandBudget  = allInits.reduce((s, i) => s + i.total,       0);
+  const grandSpent   = allInits.reduce((s, i) => s + i.total_spent, 0);
+  const overBudget   = allInits.filter((i) => pct(i.total_spent, i.total) > 100).length;
+  const avgUtil      = allInits.length
+    ? Math.round(allInits.reduce((s, i) => s + pct(i.total_spent, i.total), 0) / allInits.length)
+    : 0;
 
-  // Stacked bar chart data (only initiatives that have a budget)
+  // Grouped bar chart data (budget vs spent per initiative)
   const chartData = sorted
-    .filter(i => i.total > 0)
+    .filter(i => i.total > 0 || i.total_spent > 0)
     .map(i => ({
-      name: i.initiative_name.length > 16 ? i.initiative_name.slice(0, 16) + '…' : i.initiative_name,
-      Personnel:  i.personnel,
-      Equipment:  i.equipment,
-      Operations: i.operations,
-      Travel:     i.travel,
+      name:   i.initiative_name.length > 16 ? i.initiative_name.slice(0, 16) + '…' : i.initiative_name,
+      Budget: i.total,
+      Spent:  i.total_spent,
     }));
 
-  const TABLE_COLS = 7; // Initiative + 4 categories + Total + Breakdown
+  const TABLE_COLS = 7;
 
   if (!user) return null;
 
@@ -308,13 +281,12 @@ export default function PerformanceBudget() {
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <BackButton />
 
-        {/* ── Page title ── */}
         <div className="asrs-card" style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
             Performance — Budget
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 0 }}>
-            Track budget allocation across initiatives by fiscal year and category.
+            Track budget allocation vs. actual spending across all initiatives.
           </p>
         </div>
 
@@ -332,46 +304,33 @@ export default function PerformanceBudget() {
 
         {!isLoading && (
           <>
-            {/* ── Summary stats ── */}
+            {/* ── (1) Summary stats ── */}
             {allInits.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                <div className="asrs-card" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>Total Allocated</div>
-                  <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>{fmt(grandTotal)}</div>
-                </div>
-                <div className="asrs-card" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>Top Category</div>
-                  <div style={{ fontSize: '2rem', fontWeight: '800', color: topCategory?.color || 'var(--color-text-primary)' }}>
-                    {topCategory?.label || '—'}
+                {[
+                  { label: 'Total Budget',     value: fmt(grandBudget), color: 'var(--color-text-primary)' },
+                  { label: 'Total Spent',       value: fmt(grandSpent),  color: getStatus(pct(grandSpent, grandBudget)).color },
+                  { label: 'Avg. Utilization',  value: `${avgUtil}%`,    color: getStatus(avgUtil).color },
+                  { label: 'Over-Budget Items', value: overBudget,       color: overBudget > 0 ? '#C0392B' : '#27AE60' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="asrs-card" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{label}</div>
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color }}>{value}</div>
                   </div>
-                </div>
-                <div className="asrs-card" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>With Budget Set</div>
-                  <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-text-primary)' }}>
-                    {allInits.length - noBudget} / {allInits.length}
-                  </div>
-                </div>
-                <div className="asrs-card" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>Personnel Share</div>
-                  <div style={{ fontSize: '2rem', fontWeight: '800', color: '#3498DB' }}>
-                    {grandTotal ? `${personnelPct}%` : '—'}
-                  </div>
-                </div>
+                ))}
               </div>
             )}
 
-            {/* ── Filters ── */}
+            {/* ── (2) Filters ── */}
             {allInits.length > 0 && (
               <div className="asrs-card" style={{ marginBottom: '2rem' }}>
-                <p style={{ fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.75rem', fontSize: '0.95rem' }}>Filter</p>
+                <p style={{ fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.75rem', fontSize: '0.95rem' }}>Filters</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 220px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Initiative</label>
                     <input
-                      type="text"
-                      placeholder="Search by name…"
-                      value={filterInitiative}
+                      type="text" placeholder="Search by name…" value={filterInitiative}
                       onChange={(e) => setFilterInitiative(e.target.value)}
                       style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none' }}
                     />
@@ -380,11 +339,8 @@ export default function PerformanceBudget() {
                   {data.fiscalYears.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 160px' }}>
                       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Fiscal Year</label>
-                      <select
-                        value={filterFiscalYear}
-                        onChange={(e) => setFilterFiscalYear(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}
-                      >
+                      <select value={filterFiscalYear} onChange={(e) => setFilterFiscalYear(e.target.value)}
+                        style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}>
                         <option value="">All Years</option>
                         {data.fiscalYears.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
@@ -394,22 +350,28 @@ export default function PerformanceBudget() {
                   {data.departments.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 180px' }}>
                       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Department</label>
-                      <select
-                        value={filterDept}
-                        onChange={(e) => setFilterDept(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}
-                      >
+                      <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}
+                        style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}>
                         <option value="">All Departments</option>
                         {data.departments.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
                   )}
 
-                  {(filterFiscalYear || filterDept || filterInitiative) && (
-                    <button
-                      onClick={() => { setFilterFiscalYear(''); setFilterDept(''); setFilterInitiative(''); }}
-                      style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-secondary)', fontSize: '0.9rem', cursor: 'pointer', alignSelf: 'flex-end' }}
-                    >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 160px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Status</label>
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                      style={{ padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}>
+                      <option value="">All Statuses</option>
+                      <option value="On Track">On Track</option>
+                      <option value="At Risk">At Risk</option>
+                      <option value="Over Budget">Over Budget</option>
+                    </select>
+                  </div>
+
+                  {(filterFiscalYear || filterDept || filterInitiative || filterStatus) && (
+                    <button onClick={() => { setFilterFiscalYear(''); setFilterDept(''); setFilterInitiative(''); setFilterStatus(''); }}
+                      style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white', color: 'var(--color-text-secondary)', fontSize: '0.9rem', cursor: 'pointer', alignSelf: 'flex-end' }}>
                       Clear filters
                     </button>
                   )}
@@ -417,31 +379,24 @@ export default function PerformanceBudget() {
               </div>
             )}
 
-            {/* ── Stacked bar chart ── */}
+            {/* ── (1) Grouped bar chart: Budget vs Spent ── */}
             {chartData.length > 0 && (
               <div className="asrs-card" style={{ marginBottom: '2rem' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.25rem 0' }}>
-                  Budget Allocation by Initiative
+                  Budget vs. Actual Spend
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: '0 0 1.25rem 0' }}>
-                  Stacked by personnel, equipment, operations, and travel.
+                  Green = allocated budget · Red = actual spend
                 </p>
                 <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }} barCategoryGap="30%">
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-bg-tertiary)" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} tickLine={false} axisLine={{ stroke: 'var(--color-bg-tertiary)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} tickLine={false} axisLine={{ stroke: 'var(--color-bg-tertiary)' }} tickFormatter={(v) => fmt(v)} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: '0.85rem', paddingTop: '0.5rem' }} />
-                    {CATEGORIES.map((c, idx) => (
-                      <Bar
-                        key={c.key}
-                        dataKey={c.label}
-                        stackId="a"
-                        fill={c.color}
-                        radius={idx === CATEGORIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
+                    <Bar dataKey="Budget" fill="#27AE60" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Spent"  fill="#C0392B" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -457,7 +412,7 @@ export default function PerformanceBudget() {
               </button>
             </div>
 
-            {/* ── Table ── */}
+            {/* ── (1 + 3 + 4) Table ── */}
             {allInits.length === 0 ? (
               <div className="asrs-card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '2rem' }}>
                 No budget data found. Add budgets to initiatives to see data here.
@@ -471,7 +426,7 @@ export default function PerformanceBudget() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
                   <thead>
                     <tr style={{ backgroundColor: 'var(--color-bg-secondary)', borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                      {['Initiative', 'Personnel', 'Equipment', 'Operations', 'Travel', 'Total', 'Breakdown'].map((h, i) => (
+                      {['Initiative', 'Total Budget', 'Total Spent', 'Remaining', 'Utilization', 'Status', 'Progress'].map((h, i) => (
                         <th key={h} style={{ padding: '1rem', textAlign: i === 0 ? 'left' : 'center', fontWeight: '700', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
                           {h}
                         </th>
@@ -480,7 +435,11 @@ export default function PerformanceBudget() {
                   </thead>
                   <tbody>
                     {sorted.map((initiative, index) => {
+                      const util      = pct(initiative.total_spent, initiative.total);
+                      const status    = getStatus(util);
+                      const remaining = initiative.total - initiative.total_spent;
                       const isExpanded = expandedId === initiative.initiative_id;
+
                       return (
                         <React.Fragment key={initiative.initiative_id}>
                           <tr
@@ -494,7 +453,7 @@ export default function PerformanceBudget() {
                             onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
                             onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)'; }}
                           >
-                            {/* Name + chevron */}
+                            {/* Initiative name + chevron */}
                             <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <svg width="14" height="14" viewBox="0 0 12 12" fill="none"
@@ -505,33 +464,47 @@ export default function PerformanceBudget() {
                               </div>
                             </td>
 
-                            {/* Category columns */}
-                            {CATEGORIES.map((c) => (
-                              <td key={c.key} style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: initiative[c.key] ? c.color : 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                                {initiative.total ? fmt(initiative[c.key]) : '—'}
-                              </td>
-                            ))}
-
-                            {/* Total */}
-                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '800', color: 'var(--color-text-primary)', fontSize: '1rem' }}>
-                              {initiative.total
-                                ? fmt(initiative.total)
-                                : <span style={{ color: 'var(--color-text-light)', fontWeight: '400', fontSize: '0.9rem' }}>No budget</span>
-                              }
+                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
+                              {initiative.total ? fmt(initiative.total) : <span style={{ color: 'var(--color-text-light)' }}>No budget</span>}
                             </td>
 
-                            {/* Proportional breakdown bar */}
+                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: status.color, fontSize: '0.9rem' }}>
+                              {fmt(initiative.total_spent)}
+                            </td>
+
+                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: remaining < 0 ? '#C0392B' : 'var(--color-text-primary)', fontSize: '0.9rem' }}>
+                              {initiative.total ? fmt(remaining) : '—'}
+                            </td>
+
+                            {/* (3) Utilization badge */}
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-block', minWidth: '72px', padding: '0.4rem 0.65rem', borderRadius: '8px', backgroundColor: status.bg, fontSize: '1rem', fontWeight: '800', color: status.color }}>
+                                {initiative.total ? `${util}%` : '—'}
+                              </div>
+                            </td>
+
+                            {/* (3) Status badge */}
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              {initiative.total ? (
+                                <span style={{ padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '700', backgroundColor: status.bg, color: status.color, whiteSpace: 'nowrap' }}>
+                                  {status.label}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>No budget set</span>
+                              )}
+                            </td>
+
+                            {/* Progress bar */}
                             <td style={{ padding: '1rem' }}>
-                              <CategoryBar row={initiative} />
+                              <div style={{ width: '100%', minWidth: '120px', height: '8px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(util, 100)}%`, height: '100%', backgroundColor: status.color, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                              </div>
                             </td>
                           </tr>
 
+                          {/* (4) Drill-down */}
                           {isExpanded && (
-                            <DrillDownRow
-                              key={`drill-${initiative.initiative_id}`}
-                              initiative={initiative}
-                              colCount={TABLE_COLS}
-                            />
+                            <DrillDownRow initiative={initiative} colCount={TABLE_COLS} />
                           )}
                         </React.Fragment>
                       );
