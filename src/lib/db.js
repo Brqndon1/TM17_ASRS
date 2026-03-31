@@ -759,6 +759,37 @@ function initializeDatabase() {
     }
   }
 
+  
+  // Seed initiative budgets 
+  const insertBudget = db.prepare(`
+    INSERT OR IGNORE INTO initiative_budget
+      (initiative_id, fiscal_year, department, personnel, equipment, operations, travel)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const getInitiativeId = db.prepare(
+    'SELECT initiative_id FROM initiative WHERE initiative_name = ?'
+  );
+  const budgetSeeds = [
+    ['Amazon Product Reimagining',  2024, 'General',    120000, 30000, 45000,  8000],
+    ['Amazon Product Reimagining',  2025, 'General',    135000, 25000, 50000, 10000],
+    ['Bags2School Initiative',      2024, 'Operations',  90000, 60000, 20000,  5000],
+    ['Bags2School Initiative',      2025, 'Operations',  95000, 55000, 22000,  6000],
+    ['Drive Safe Robotics',         2024, 'HR',          80000, 10000, 30000, 12000],
+    ['Drive Safe Robotics',         2025, 'HR',          85000, 12000, 32000, 13000],
+    ['E-Gaming and Careers',        2024, 'IT',         150000, 90000, 35000,  7000],
+    ['E-Gaming and Careers',        2025, 'IT',         160000, 95000, 38000,  8000],
+    ['ELA Achievement & Attendance',2024, 'General',    200000, 40000, 60000, 15000],
+    ['ELA Achievement & Attendance',2025, 'General',    210000, 42000, 65000, 16000],
+    ['Organization Proposals',      2024, 'Finance',     70000, 15000, 25000,  4000],
+    ['PSLA Modified Track Team',    2024, 'Operations',  50000,  8000, 18000,  6000],
+    ['PSLA Modified Track Team',    2025, 'Operations',  55000,  9000, 20000,  7000],
+  ];
+  for (const [name, year, dept, personnel, equipment, operations, travel] of budgetSeeds) {
+    const init = getInitiativeId.get(name);
+    if (!init) continue;
+    insertBudget.run(init.initiative_id, year, dept, personnel, equipment, operations, travel);
+  }
+
   // ── Seed fields (unique field definitions) ──────────────
   const insertField = db.prepare(
     'INSERT OR IGNORE INTO field (field_key, field_label, field_type, scope, is_filterable) VALUES (?,?,?,?,?)'
