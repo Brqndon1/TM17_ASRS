@@ -66,7 +66,7 @@ export function validateTemplateAnswers(answers, fields) {
   const errors = [];
   for (const field of fields) {
     const value = answers[field.field_id];
-    const isEmpty = value === undefined || value === null || value === '';
+    const isEmpty = value === undefined || value === null || (typeof value === 'string' && value === '');
     if (field.required && isEmpty) {
       errors.push({ field_id: field.field_id, error: 'This field is required' });
       continue;

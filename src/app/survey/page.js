@@ -235,8 +235,12 @@ export default function SurveyPage() {
           if (!templateResponses[qId] || templateResponses[qId].length === 0) {
             newInvalidFields[`question_${qId}`] = true;
           }
+        } else if (questionType === 'boolean') {
+          if (templateResponses[qId] === undefined || templateResponses[qId] === null) {
+            newInvalidFields[`question_${qId}`] = true;
+          }
         } else {
-          if (!templateResponses[qId] || !String(templateResponses[qId]).trim()) {
+          if (templateResponses[qId] === undefined || templateResponses[qId] === null || !String(templateResponses[qId]).trim()) {
             newInvalidFields[`question_${qId}`] = true;
           }
         }
@@ -271,13 +275,17 @@ export default function SurveyPage() {
         const isRequired = q.required ?? q.text?.required ?? true;
         const rules = q.validation_rules || q.text?.validation_rules || null;
 
-        if (isRequired && (value === undefined || value === null || value === '')) {
+        const isEmpty = value === undefined || value === null || (typeof value === 'string' && value === '');
+        if (isRequired && isEmpty) {
           fieldErrors[`question_${qId}`] = true;
           continue;
         }
 
-        if (value !== undefined && value !== null && value !== '' && rules) {
-          const error = validateFieldValue(value, { field_type: questionType }, rules);
+        if (!isEmpty && rules) {
+          const fieldMeta = { field_type: questionType };
+          const qOptions = q.options || q.text?.options;
+          if (Array.isArray(qOptions)) fieldMeta.options = qOptions;
+          const error = validateFieldValue(value, fieldMeta, rules);
           if (error) {
             fieldErrors[`question_${qId}`] = true;
           }

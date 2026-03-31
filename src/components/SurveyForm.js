@@ -136,11 +136,14 @@ export default function SurveyForm() {
         title,
         description,
         questions: validQuestions.map(q => ({
-          question: q.question,
-          type: q.type,
-          required: !!q.required,
-          options: (q.type === 'select' || q.type === 'multiselect') ? q.options.filter(opt => opt.trim()) : undefined,
-          subQuestions: q.type === 'yesno' ? q.subQuestions.filter(s => s.trim()) : undefined,
+          text: {
+            question: q.question,
+            type: q.type,
+            required: !!q.required,
+            scope: 'common',
+            options: (q.type === 'select' || q.type === 'multiselect') ? q.options.filter(opt => opt.trim()) : undefined,
+            subQuestions: q.type === 'yesno' ? q.subQuestions.filter(s => s.trim()) : undefined,
+          }
         }))
       };
       
@@ -272,6 +275,23 @@ export default function SurveyForm() {
                   <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{q.question}{q.required ? ' *' : ''}</div>
                   {q.type === 'text' && <input disabled placeholder="Text response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
                   {q.type === 'number' && <input disabled type="number" placeholder="Numeric response" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'date' && <input disabled type="date" style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)' }} />}
+                  {q.type === 'boolean' && (
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      {['Yes', 'No'].map(opt => (
+                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <input type="radio" name={`preview-bool-${i}`} disabled />{opt}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {q.type === 'rating' && (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {[1,2,3,4,5].map(n => (
+                        <span key={n} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>{n}</span>
+                      ))}
+                    </div>
+                  )}
                   {q.type === 'select' && q.options && (
                     <div>
                       {q.options.filter(o => o && o.trim()).map((opt, oIdx) => (

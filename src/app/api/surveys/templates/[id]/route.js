@@ -34,6 +34,13 @@ import db from '@/lib/db.js';
 import { requireAccess } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
+function resolveRules(fieldRulesJson, formFieldRulesJson) {
+  const base = fieldRulesJson ? JSON.parse(fieldRulesJson) : null;
+  const override = formFieldRulesJson ? JSON.parse(formFieldRulesJson) : null;
+  if (!base && !override) return undefined;
+  return { ...base, ...override };
+}
+
 export async function GET(request, context) {
   try {
     // Access params using context.params (Next.js 15+ requirement)
@@ -52,7 +59,8 @@ export async function GET(request, context) {
 
     // Query form by form_id
     const form = db.prepare(`
-      SELECT form_id AS id, form_name AS title, description, created_at, is_published AS published
+      SELECT form_id AS id, form_name AS title, description, created_at,
+             is_published AS published, initiative_id
       FROM form
       WHERE form_id = ?
     `).get(templateId);
@@ -72,7 +80,9 @@ export async function GET(request, context) {
 
     // Get questions
     const getQuestions = db.prepare(`
-      SELECT ff.form_field_id, f.field_id, f.field_label, f.field_type, ff.required, ff.help_text
+      SELECT ff.form_field_id, f.field_id, f.field_label, f.field_type,
+             ff.required, ff.help_text, f.scope, f.initiative_id,
+             f.validation_rules AS field_rules, ff.validation_rules AS form_field_rules
       FROM form_field ff
       JOIN field f ON ff.field_id = f.field_id
       WHERE ff.form_id = ?
@@ -93,6 +103,9 @@ export async function GET(request, context) {
           question: q.field_label,
           type: q.field_type,
           required: !!q.required,
+          scope: q.scope,
+          initiative_id: q.initiative_id,
+          validation_rules: resolveRules(q.field_rules, q.form_field_rules),
           ...(isOptionType && rawOptions ? { options: rawOptions } : {}),
           ...(isYesNo && rawOptions ? { subQuestions: rawOptions } : {}),
           ...(q.help_text ? { help_text: q.help_text } : {})
@@ -104,6 +117,7 @@ export async function GET(request, context) {
       id: form.id,
       title: form.title,
       description: form.description,
+      initiative_id: form.initiative_id,
       questions,
       createdAt: form.created_at,
       published: !!form.published
