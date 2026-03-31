@@ -669,7 +669,7 @@ export default function SurveyPage() {
                             </>
                           )}
 
-                          {questionType === 'choice' && questionOptions.length > 0 && (
+                          {(questionType === 'choice' || questionType === 'select') && questionOptions.length > 0 && (
                             <>
                             <div style={{
                               display: 'flex',

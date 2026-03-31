@@ -107,8 +107,8 @@ export async function POST(request) {
         // Insert form_field
         insertFormField.run(formId, fieldId, displayOrder, required, helpText);
 
-        // Insert options for choice/multiselect types
-        if ((fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
+        // Insert options for select/choice/multiselect types
+        if ((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
           textObj.options.forEach((opt, idx) => {
             insertOption.run(fieldId, opt, opt, idx);
           });
@@ -127,7 +127,7 @@ export async function POST(request) {
             question: fieldLabel,
             type: fieldType,
             required: !!required,
-            ...(( fieldType === 'choice' || fieldType === 'multiselect') && textObj.options ? { options: textObj.options } : {}),
+            ...((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && textObj.options ? { options: textObj.options } : {}),
             ...(fieldType === 'yesno' && textObj.subQuestions ? { subQuestions: textObj.subQuestions } : {}),
             ...(helpText ? { help_text: helpText } : {})
           }
