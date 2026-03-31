@@ -202,6 +202,9 @@ export default function SurveyForm() {
                   <select value={q.type} onChange={(e) => updateQuestion(i, 'type', e.target.value)} style={{ flex: '1 1 35%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem', cursor: 'pointer' }}>
                     <option value="text">Text Response</option>
                     <option value="number">Numeric</option>
+                    <option value="date">Date</option>
+                    <option value="boolean">Yes / No</option>
+                    <option value="rating">Rating (1-5)</option>
                     <option value="select">Multiple Choice</option>
                     <option value="multiselect">Multi-select (select all that apply)</option>
                     <option value="yesno">Yes / No Grid</option>

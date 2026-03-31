@@ -669,6 +669,74 @@ export default function SurveyPage() {
                             </>
                           )}
 
+                          {questionType === 'date' && (
+                            <>
+                            <input
+                              type="date"
+                              value={templateResponses[qId] || ''}
+                              onChange={(e) => {
+                                setTemplateResponses({ ...templateResponses, [qId]: e.target.value });
+                                if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                              }}
+                              style={isInvalid ? invalidInputStyle : inputStyle}
+                            />
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>This field is required.</span>}
+                            </>
+                          )}
+
+                          {questionType === 'boolean' && (
+                            <>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                              {['Yes', 'No'].map((opt) => (
+                                <label key={opt} style={{
+                                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                  padding: '0.6rem 1rem', borderRadius: '8px', cursor: 'pointer',
+                                  border: templateResponses[qId] === (opt === 'Yes')
+                                    ? '2px solid var(--color-asrs-orange)' : '1px solid var(--color-bg-tertiary)',
+                                  backgroundColor: templateResponses[qId] === (opt === 'Yes')
+                                    ? '#fdf4e8' : 'var(--color-bg-primary)',
+                                }}>
+                                  <input type="radio" name={`question_${qId}`} value={opt}
+                                    checked={templateResponses[qId] === (opt === 'Yes')}
+                                    onChange={() => {
+                                      setTemplateResponses({ ...templateResponses, [qId]: opt === 'Yes' });
+                                      if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                    }}
+                                    style={{ accentColor: 'var(--color-asrs-orange)' }}
+                                  />
+                                  <span>{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>This field is required.</span>}
+                            </>
+                          )}
+
+                          {questionType === 'rating' && (
+                            <>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <button key={n} type="button" onClick={() => {
+                                  setTemplateResponses({ ...templateResponses, [qId]: n });
+                                  if (isInvalid) setInvalidFields((p) => ({ ...p, [`question_${qId}`]: false }));
+                                }} style={{
+                                  width: '48px', height: '48px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 600,
+                                  cursor: 'pointer', transition: 'all 0.15s ease',
+                                  border: templateResponses[qId] === n
+                                    ? '2px solid var(--color-asrs-orange)' : '1px solid var(--color-bg-tertiary)',
+                                  backgroundColor: templateResponses[qId] === n
+                                    ? '#fdf4e8' : 'var(--color-bg-primary)',
+                                  color: templateResponses[qId] === n
+                                    ? 'var(--color-asrs-orange)' : 'var(--color-text-secondary)',
+                                }}>
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                            {isInvalid && <span style={{ color: '#ef4444', fontSize: '0.8rem' }}>Please select a rating.</span>}
+                            </>
+                          )}
+
                           {(questionType === 'choice' || questionType === 'select') && questionOptions.length > 0 && (
                             <>
                             <div style={{
