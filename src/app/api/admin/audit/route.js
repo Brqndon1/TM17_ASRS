@@ -55,16 +55,15 @@ export async function GET(request) {
     const countRow = db.prepare(`SELECT COUNT(*) as count FROM audit_log ${whereSql}`).get(...binds);
     const total = countRow ? countRow.count : 0;
 
-    // List rows (ordered by created_at desc)
-    const rows = db.prepare(`
-      SELECT audit_id, event, user_email, target_type, target_id, reason_type, reason_text, payload, created_at
-      FROM audit_log
-      ${whereSql}
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(...binds, limit, offset);
-
     if (exportCsv) {
+      // Export ALL matching rows (no pagination) so admins get the full dataset
+      const allRows = db.prepare(`
+        SELECT audit_id, event, user_email, target_type, target_id, reason_type, reason_text, payload, created_at
+        FROM audit_log
+        ${whereSql}
+        ORDER BY created_at DESC
+      `).all(...binds);
+
       // Build CSV
       const header = ['audit_id', 'created_at', 'event', 'user_email', 'target_type', 'target_id', 'reason_type', 'reason_text', 'payload'];
       const escapeCell = (v) => {
@@ -76,7 +75,7 @@ export async function GET(request) {
         return s;
       };
       const lines = [header.join(',')];
-      for (const r of rows) {
+      for (const r of allRows) {
         lines.push([
           escapeCell(r.audit_id),
           escapeCell(r.created_at),
@@ -98,6 +97,15 @@ export async function GET(request) {
         },
       });
     }
+
+    // List rows (ordered by created_at desc) with pagination
+    const rows = db.prepare(`
+      SELECT audit_id, event, user_email, target_type, target_id, reason_type, reason_text, payload, created_at
+      FROM audit_log
+      ${whereSql}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...binds, limit, offset);
 
     return NextResponse.json({ success: true, total, rows });
   } catch (error) {

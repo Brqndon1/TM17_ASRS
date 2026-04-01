@@ -148,10 +148,13 @@ export default function AdminBudgetsPage() {
 
     if (!initiativeId || !Number.isFinite(initiativeId)) return 'Choose an initiative.';
     if (!fiscalYear || !Number.isFinite(fiscalYear) || fiscalYear <= 0) return 'Enter a valid fiscal year.';
-    if (personnel <= 0 || equipment <= 0 || operations <= 0 || travel <= 0) {
-      return 'Personnel, equipment, operations, and travel must all be positive numbers.';
+    if ([form.personnel, form.equipment, form.operations, form.travel].some((v) => v === '')) {
+      return 'All budget category fields are required.';
     }
     if ([personnel, equipment, operations, travel].some((value) => Number.isNaN(value))) return 'Budget values must be valid numbers.';
+    if (personnel < 0 || equipment < 0 || operations < 0 || travel < 0) {
+      return 'Budget values cannot be negative.';
+    }
     return null;
   }
 
