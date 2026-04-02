@@ -36,24 +36,33 @@ export default function ChartDisplay({ chartData }) {
         <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>
           Grade Distribution
         </h3>
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={250}>
           <PieChart>
             <Pie
               data={chartData.gradeDistribution}
               cx="50%"
               cy="50%"
-              outerRadius={100}
+              outerRadius={90}
               dataKey="value"
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-              labelLine={true}
             >
               {chartData.gradeDistribution.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip formatter={(value, name) => [value, name]} />
           </PieChart>
         </ResponsiveContainer>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem 1rem', marginTop: '0.5rem' }}>
+          {(() => {
+            const total = chartData.gradeDistribution.reduce((sum, d) => sum + d.value, 0);
+            return chartData.gradeDistribution.map((entry, index) => (
+              <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: COLORS[index % COLORS.length], flexShrink: 0 }} />
+                {entry.name} ({total > 0 ? Math.round((entry.value / total) * 100) : 0}%)
+              </div>
+            ));
+          })()}
+        </div>
       </div>
 
       {/* ---- BAR CHART: Monthly Participation ---- */}

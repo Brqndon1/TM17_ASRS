@@ -419,11 +419,7 @@ export default function ReportingPage() {
               </tr>
             </thead>
             <tbody>
-              ${normalizedRows.map((row) => `
-                <tr>
-                  ${columns.map((column) => `<td>${escapeHtml(row[column])}</td>`).join('')}
-                </tr>
-              `).join('')}
+              ${normalizedRows.map((row) => `<tr>${columns.map((column) => `<td>${escapeHtml(row[column])}</td>`).join('')}</tr>`).join('\n')}
             </tbody>
           </table>
         </div>
@@ -543,10 +539,7 @@ export default function ReportingPage() {
             }
 
             .content.split {
-              display: grid;
-              grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-              gap: 1rem;
-              align-items: start;
+              display: block;
             }
 
             .content.stack {
@@ -597,27 +590,29 @@ export default function ReportingPage() {
 
             .table-wrap {
               width: 100%;
-              overflow: hidden;
+              overflow-x: auto;
             }
 
             table {
               width: 100%;
               border-collapse: collapse;
-              font-size: 0.82rem;
+              font-size: 0.75rem;
+              table-layout: auto;
             }
 
             th,
             td {
               border: 1px solid #d1d5db;
-              padding: 0.55rem 0.6rem;
+              padding: 0.4rem 0.5rem;
               text-align: left;
               vertical-align: top;
-              word-break: break-word;
+              white-space: nowrap;
             }
 
             th {
               background: #f3f4f6;
               font-weight: 700;
+              white-space: nowrap;
             }
 
             tr {
@@ -660,7 +655,13 @@ export default function ReportingPage() {
 
             <section class="card">
               <h2>Summary</h2>
-              <p>${escapeHtml(reportData?.summary || 'No summary available.')}</p>
+              ${reportData?.summary && typeof reportData.summary === 'object' ? `
+                <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+                  <div><strong>Total Participants:</strong> ${escapeHtml(reportData.summary.totalParticipants)}</div>
+                  <div><strong>Average Rating:</strong> ${escapeHtml(reportData.summary.averageRating)}/5</div>
+                  <div><strong>Completion Rate:</strong> ${escapeHtml(reportData.summary.completionRate)}%</div>
+                </div>
+              ` : `<p>${escapeHtml(reportData?.summary || 'No summary available.')}</p>`}
             </section>
 
             ${reportData?.explainability ? `
@@ -717,15 +718,61 @@ export default function ReportingPage() {
     }
 
     if (format === 'html') {
-      const htmlContent = `
-        <html>
-          <head><title>${fileName}</title></head>
-          <body>
-            <h1>${selectedInitiative.name} Report</h1>
-            <pre>${JSON.stringify(reportData, null, 2)}</pre>
-          </body>
-        </html>
-      `;
+      const rows = Array.isArray(reportData.tableData) ? reportData.tableData : [];
+      const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+      const tableHtml = rows.length > 0 ? `
+        <table>
+          <thead>
+            <tr>${columns.map((c) => `<th>${escapeHtml(formatLabel(c))}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `<tr>${columns.map((c) => `<td>${escapeHtml(row[c])}</td>`).join('')}</tr>`).join('\n            ')}
+          </tbody>
+        </table>` : '<p>No table data available.</p>';
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(fileName)}</title>
+    <style>
+      body { font-family: Arial, Helvetica, sans-serif; margin: 2rem; color: #111827; }
+      h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+      .meta { font-size: 0.85rem; color: #6b7280; margin-bottom: 1.5rem; }
+      .summary { display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+      .summary-card { border: 1px solid #d1d5db; border-radius: 10px; padding: 1rem 1.5rem; text-align: center; min-width: 150px; }
+      .summary-card .label { font-size: 0.75rem; text-transform: uppercase; color: #6b7280; margin: 0 0 0.25rem; }
+      .summary-card .value { font-size: 1.6rem; font-weight: 700; margin: 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 1rem; }
+      th, td { border: 1px solid #d1d5db; padding: 0.5rem 0.65rem; text-align: left; }
+      th { background: #f3f4f6; font-weight: 600; }
+      h2 { font-size: 1.15rem; margin-top: 2rem; margin-bottom: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(selectedInitiative?.name || 'Report')}</h1>
+    <p class="meta">Generated: ${escapeHtml(reportData.generatedDate || 'N/A')} &middot; Report ID: ${escapeHtml(reportData.reportId || '')}</p>
+
+    <div class="summary">
+      <div class="summary-card">
+        <p class="label">Total Participants</p>
+        <p class="value">${escapeHtml(reportData.summary?.totalParticipants)}</p>
+      </div>
+      <div class="summary-card">
+        <p class="label">Average Rating</p>
+        <p class="value">${escapeHtml(reportData.summary?.averageRating)}/5</p>
+      </div>
+      <div class="summary-card">
+        <p class="label">Completion Rate</p>
+        <p class="value">${escapeHtml(reportData.summary?.completionRate)}%</p>
+      </div>
+    </div>
+
+    <h2>Data Table</h2>
+    ${tableHtml}
+  </body>
+</html>`;
       const blob = new Blob([htmlContent], { type: 'text/html' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);

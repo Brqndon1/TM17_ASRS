@@ -81,6 +81,50 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
     return data;
   }, [reportData, activeFilters, activeSorts]);
 
+  /**
+   * Recompute chart data from the filtered table rows so charts
+   * update when the user applies filters (Bug 2 fix).
+   */
+  const processedChartData = useMemo(() => {
+    if (!reportData?.chartData) return null;
+
+    const hasActiveFilters = Object.values(activeFilters).some(v => v && v !== 'All');
+    if (!hasActiveFilters) return reportData.chartData;
+
+    const filtered = processedTableData;
+
+    // Recompute gradeDistribution from filtered rows
+    const gradeCounts = {};
+    filtered.forEach(row => {
+      const grade = row.grade;
+      if (grade != null) {
+        const label = String(grade).includes('Grade') ? String(grade) : `${grade} Grade`;
+        gradeCounts[label] = (gradeCounts[label] || 0) + 1;
+      }
+    });
+    const gradeDistribution = Object.entries(gradeCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    // Recompute interestLevels from filtered rows
+    const interestCounts = {};
+    filtered.forEach(row => {
+      const interest = row.interestLevel;
+      if (interest != null) {
+        interestCounts[String(interest)] = (interestCounts[String(interest)] || 0) + 1;
+      }
+    });
+    const interestLevels = Object.entries(interestCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    return {
+      gradeDistribution: gradeDistribution.length > 0 ? gradeDistribution : reportData.chartData.gradeDistribution,
+      monthlyParticipation: reportData.chartData.monthlyParticipation,
+      interestLevels: interestLevels.length > 0 ? interestLevels : reportData.chartData.interestLevels,
+    };
+  }, [reportData, processedTableData, activeFilters]);
+
   // If no report data exists, show a message
   if (!reportData) {
     return (
@@ -209,7 +253,7 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
       {/* ---- CHARTS ---- */}
       {/* Displayed for Public (website view) per REP016 — graphical displays */}
       {(activeView === 'charts' || activeView === 'both') && (
-        <ChartDisplay chartData={reportData.chartData} />
+        <ChartDisplay chartData={processedChartData} />
       )}
 
       {/* ---- DATA TABLE ---- */}
