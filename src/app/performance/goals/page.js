@@ -1,7 +1,7 @@
 'use client';
 
 // Moved from src/app/performance-dashboard/page.js
-// Content is identical — only the canonical URL has changed to /performance/goals.
+// Content is identical
 
 import Header from '@/components/Header';
 import BackButton from '@/components/BackButton';
@@ -19,6 +19,38 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+// ─── Weighted score helpers ───────────────────────────────────────────────────
+
+/** Accept weight stored as a fraction (≤1) or a percentage (>1, e.g. 50 → 0.5). */
+function toDecimalWeight(w) {
+  if (w == null || isNaN(w)) return 0;
+  return w > 1 ? w / 100 : w;
+}
+
+/**
+ * Performance % = Σ ( (current_i / target_i) × weight_i )
+ * Weights must sum to exactly 1.0 (100 %). Returns { score, totalWeight, weightError, breakdown }.
+ */
+function calcWeightedScore(goals) {
+  if (!goals?.length) return { score: 0, totalWeight: 0, weightError: false, breakdown: [] };
+
+  const breakdown = goals.map((g) => {
+    const w = toDecimalWeight(g.weight ?? 0);
+    const progress = g.target > 0 ? Math.min((g.current ?? 0) / g.target, 1) : 0;
+    return { ...g, decimalWeight: w, displayWeight: Math.round(w * 100), contribution: progress * w };
+  });
+
+  const totalWeight = breakdown.reduce((s, b) => s + b.decimalWeight, 0);
+  const weightError = Math.abs(totalWeight - 1) > 0.001; // must equal 1.0 (100 %)
+  const score = weightError
+    ? 0
+    : parseFloat((breakdown.reduce((s, b) => s + b.contribution, 0) * 100).toFixed(2));
+
+  return { score, totalWeight: parseFloat((totalWeight * 100).toFixed(2)), weightError, breakdown };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function PerformanceGoals() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -26,6 +58,7 @@ export default function PerformanceGoals() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sortOrder, setSortOrder] = useState('descending');
+  const [expandedId, setExpandedId] = useState(null);
 
   // Chart state
   const [selectedInitiativeId, setSelectedInitiativeId] = useState(null);
@@ -73,6 +106,9 @@ export default function PerformanceGoals() {
               const goalsData = await goalsRes.json();
               const goals = goalsData.goals || [];
 
+              // ── weighted score (replaces goalsData.overallScore) ──
+              const { score, totalWeight, weightError, breakdown } = calcWeightedScore(goals);
+
               const today = new Date();
               today.setHours(0, 0, 0, 0);
 
@@ -93,16 +129,37 @@ export default function PerformanceGoals() {
 
               return {
                 ...init,
-                overallScore: goalsData.overallScore || 0,
+                overallScore: score,
                 goalsCount: goals.length,
+                totalWeight,
+                weightError,
+                breakdown,
                 nearestDeadline,
                 daysUntilNearest,
               };
             }
-            return { ...init, overallScore: 0, goalsCount: 0, nearestDeadline: null, daysUntilNearest: null };
+            return {
+              ...init,
+              overallScore: 0,
+              goalsCount: 0,
+              totalWeight: 0,
+              weightError: false,
+              breakdown: [],
+              nearestDeadline: null,
+              daysUntilNearest: null,
+            };
           } catch (err) {
             console.error(`Error fetching goals for initiative ${init.initiative_id}:`, err);
-            return { ...init, overallScore: 0, goalsCount: 0, nearestDeadline: null, daysUntilNearest: null };
+            return {
+              ...init,
+              overallScore: 0,
+              goalsCount: 0,
+              totalWeight: 0,
+              weightError: false,
+              breakdown: [],
+              nearestDeadline: null,
+              daysUntilNearest: null,
+            };
           }
         })
       );
@@ -171,6 +228,12 @@ export default function PerformanceGoals() {
     );
   }
 
+  function handleRowClick(initiative) {
+    const sid = String(initiative.initiative_id);
+    setSelectedInitiativeId(sid);
+    setExpandedId((prev) => (prev === sid ? null : sid));
+  }
+
   function CustomTooltip({ active, payload, label }) {
     if (!active || !payload?.length) return null;
     return (
@@ -193,6 +256,141 @@ export default function PerformanceGoals() {
     );
   }
 
+  /** Expandable per-goal weight breakdown, rendered as an extra <tr> below the initiative row. */
+  function WeightBreakdownPanel({ breakdown, totalWeight, weightError }) {
+    if (!breakdown?.length) return null;
+
+    return (
+      <tr>
+        <td colSpan={6} style={{ padding: '0', borderBottom: '1px solid var(--color-bg-tertiary)' }}>
+          <div style={{ padding: '1rem 1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
+
+            {/* Weight-error banner */}
+            {weightError && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.75rem',
+                padding: '0.6rem 0.9rem',
+                backgroundColor: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                color: '#856404',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+              }}>
+                <span>⚠️</span>
+                <span>
+                  Goal weights sum to <strong>{totalWeight}%</strong> — they must total exactly <strong>100%</strong>.
+                  Performance score cannot be calculated until weights are corrected.
+                </span>
+              </div>
+            )}
+
+            {/* Formula legend */}
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem 0', fontStyle: 'italic' }}>
+              Performance % = Σ (Current ÷ Target) × Weight &nbsp;|&nbsp; Weights must sum to 100%
+            </p>
+
+            {/* Goals breakdown table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ color: 'var(--color-text-secondary)', fontWeight: '700' }}>
+                  {['Goal', 'Current', 'Target', 'Weight', 'Progress', 'Contribution'].map((h, i) => (
+                    <th key={h} style={{
+                      padding: '0.4rem 0.6rem',
+                      textAlign: i >= 1 ? 'center' : 'left',
+                      borderBottom: '1px solid var(--color-bg-tertiary)',
+                    }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {breakdown.map((g, idx) => {
+                  const pct = g.target > 0 ? Math.min((g.current ?? 0) / g.target, 1) * 100 : 0;
+                  const contrib = (g.contribution * 100).toFixed(2);
+                  return (
+                    <tr key={g.goal_id ?? idx} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
+                      <td style={{ padding: '0.5rem 0.6rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                        {g.goal_name ?? g.name ?? `Goal ${idx + 1}`}
+                      </td>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.current ?? 0}</td>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.target ?? 0}</td>
+
+                      {/* Weight — displayed as %, stored/calculated as decimal */}
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          backgroundColor: weightError ? '#fff3cd' : '#e8f5e9',
+                          color: weightError ? '#856404' : '#2e7d32',
+                          fontWeight: '700',
+                        }}>
+                          {g.displayWeight}%
+                        </span>
+                      </td>
+
+                      {/* Progress bar */}
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', minWidth: '120px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <div style={{ flex: 1, height: '6px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: getScoreColor(pct), borderRadius: '3px' }} />
+                          </div>
+                          <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)', minWidth: '36px' }}>
+                            {pct.toFixed(0)}%
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Weighted contribution */}
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: '700', color: weightError ? 'var(--color-text-secondary)' : getScoreColor(parseFloat(contrib)) }}>
+                        {weightError ? '—' : `${contrib}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+              {/* Weight total footer */}
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--color-bg-tertiary)', fontWeight: '700' }}>
+                  <td style={{ padding: '0.5rem 0.6rem', color: 'var(--color-text-secondary)' }} colSpan={3}>Totals</td>
+                  <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      backgroundColor: weightError ? '#ffebee' : '#e8f5e9',
+                      color: weightError ? '#c62828' : '#2e7d32',
+                      fontWeight: '800',
+                    }}>
+                      {totalWeight}%
+                    </span>
+                  </td>
+                  <td />
+                  <td style={{
+                    padding: '0.5rem 0.6rem',
+                    textAlign: 'center',
+                    fontSize: '1rem',
+                    color: weightError ? '#c62828' : getScoreColor(breakdown.reduce((s, b) => s + b.contribution, 0) * 100),
+                  }}>
+                    {weightError
+                      ? '⚠️ Invalid'
+                      : `${(breakdown.reduce((s, b) => s + b.contribution, 0) * 100).toFixed(2)}%`}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   if (!user) return null;
 
   const sortedInitiatives = getSortedInitiatives();
@@ -209,7 +407,7 @@ export default function PerformanceGoals() {
             Performance — Goals
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 0 }}>
-            View overall initiative scores and track performance across all initiatives.
+            Weighted initiative scores. Click any row to expand individual goal weights and contributions.
           </p>
         </div>
 
@@ -236,7 +434,7 @@ export default function PerformanceGoals() {
                       Goal Progress Over Time
                     </h2>
                     <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-                      Select an initiative to view its performance history against its goal target.
+                      Select an initiative to view its weighted performance history against its goal target.
                     </p>
                   </div>
 
@@ -253,7 +451,7 @@ export default function PerformanceGoals() {
                     <option value="">Choose an initiative...</option>
                     {initiatives.map((init) => (
                       <option key={init.initiative_id} value={init.initiative_id}>
-                        {init.initiative_name} ({init.overallScore}%)
+                        {init.initiative_name} ({init.weightError ? '⚠️ weight error' : `${init.overallScore}%`})
                       </option>
                     ))}
                   </select>
@@ -321,7 +519,7 @@ export default function PerformanceGoals() {
                     <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <div style={{ width: '24px', height: '3px', backgroundColor: '#C0392B', borderRadius: '2px' }} />
-                        <span>Actual weighted score across all goals</span>
+                        <span>Weighted score across all goals</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <div style={{ width: '24px', height: '3px', backgroundColor: '#27AE60', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, #27AE60 0px, #27AE60 6px, transparent 6px, transparent 10px)' }} />
@@ -357,6 +555,11 @@ export default function PerformanceGoals() {
                     value: initiatives.reduce((s, i) => s + i.goalsCount, 0),
                     color: 'var(--color-text-primary)',
                   },
+                  {
+                    label: 'Weight Errors',
+                    value: initiatives.filter((i) => i.weightError).length,
+                    color: initiatives.filter((i) => i.weightError).length ? '#C0392B' : '#27AE60',
+                  },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="asrs-card" style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{label}</div>
@@ -370,6 +573,9 @@ export default function PerformanceGoals() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)' }}>
                 Total Initiatives: <strong>{initiatives.length}</strong>
+                <span style={{ marginLeft: '1rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                  Click a row to expand goal weights
+                </span>
               </div>
               <button onClick={toggleSortOrder} className="asrs-btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 Sort: {sortOrder === 'ascending' ? '↑ Ascending Score' : sortOrder === 'descending' ? '↓ Descending Score' : '⏰ Upcoming Deadline'}
@@ -394,52 +600,76 @@ export default function PerformanceGoals() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedInitiatives.map((initiative, index) => (
-                      <tr
-                        key={initiative.initiative_id}
-                        style={{ borderBottom: '1px solid var(--color-bg-tertiary)', backgroundColor: index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)', transition: 'background-color 0.2s ease', cursor: 'pointer' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)')}
-                        onClick={() => setSelectedInitiativeId(String(initiative.initiative_id))}
-                      >
-                        <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
-                          {initiative.initiative_name}
-                          {String(initiative.initiative_id) === selectedInitiativeId && (
-                            <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                              viewing chart
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '1rem', color: 'var(--color-text-secondary)', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {initiative.description || '—'}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600' }}>
-                          {initiative.goalsCount}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-block', minWidth: '80px', padding: '0.5rem 0.75rem', borderRadius: '8px', backgroundColor: getScoreColor(initiative.overallScore) + '18', fontSize: '1.1rem', fontWeight: '800', color: getScoreColor(initiative.overallScore) }}>
-                            {initiative.overallScore}%
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
-                          {initiative.nearestDeadline ? (
-                            <div>
-                              <div style={{ fontWeight: '600' }}>{new Date(initiative.nearestDeadline).toLocaleDateString()}</div>
-                              <div style={{ fontSize: '0.8rem', color: initiative.daysUntilNearest <= 7 ? '#C0392B' : initiative.daysUntilNearest <= 30 ? '#F39C12' : '#27AE60' }}>
-                                {initiative.daysUntilNearest <= 0 ? 'Overdue' : initiative.daysUntilNearest === 1 ? 'Tomorrow' : `${initiative.daysUntilNearest} days`}
+                    {sortedInitiatives.map((initiative, index) => {
+                      const sid = String(initiative.initiative_id);
+                      const isExpanded = expandedId === sid;
+
+                      return (
+                        <>
+                          <tr
+                            key={initiative.initiative_id}
+                            style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--color-bg-tertiary)', backgroundColor: index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)', transition: 'background-color 0.2s ease', cursor: 'pointer' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)')}
+                            onClick={() => handleRowClick(initiative)}
+                          >
+                            <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
+                              <span style={{ marginRight: '0.4rem', fontSize: '0.7rem', display: 'inline-block', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                              {initiative.initiative_name}
+                              {String(initiative.initiative_id) === selectedInitiativeId && (
+                                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                  viewing chart
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem', color: 'var(--color-text-secondary)', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {initiative.description || '—'}
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600' }}>
+                              {initiative.goalsCount}
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              {initiative.weightError ? (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.75rem', borderRadius: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', fontSize: '0.85rem', fontWeight: '700', color: '#856404' }}>
+                                  <span>⚠️</span>
+                                  <span>Weight Error<br /><span style={{ fontSize: '0.75rem', fontWeight: '600' }}>{initiative.totalWeight}% ≠ 100%</span></span>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'inline-block', minWidth: '80px', padding: '0.5rem 0.75rem', borderRadius: '8px', backgroundColor: getScoreColor(initiative.overallScore) + '18', fontSize: '1.1rem', fontWeight: '800', color: getScoreColor(initiative.overallScore) }}>
+                                  {initiative.overallScore}%
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
+                              {initiative.nearestDeadline ? (
+                                <div>
+                                  <div style={{ fontWeight: '600' }}>{new Date(initiative.nearestDeadline).toLocaleDateString()}</div>
+                                  <div style={{ fontSize: '0.8rem', color: initiative.daysUntilNearest <= 7 ? '#C0392B' : initiative.daysUntilNearest <= 30 ? '#F39C12' : '#27AE60' }}>
+                                    {initiative.daysUntilNearest <= 0 ? 'Overdue' : initiative.daysUntilNearest === 1 ? 'Tomorrow' : `${initiative.daysUntilNearest} days`}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--color-text-light)' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                              <div style={{ width: '100%', minWidth: '150px', height: '8px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(initiative.overallScore, 100)}%`, height: '100%', backgroundColor: initiative.weightError ? '#ffc107' : getScoreColor(initiative.overallScore), borderRadius: '4px', transition: 'width 0.5s ease' }} />
                               </div>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-light)' }}>—</span>
+                            </td>
+                          </tr>
+
+                          {/* Expanded weight breakdown panel */}
+                          {isExpanded && (
+                            <WeightBreakdownPanel
+                              breakdown={initiative.breakdown}
+                              totalWeight={initiative.totalWeight}
+                              weightError={initiative.weightError}
+                            />
                           )}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <div style={{ width: '100%', minWidth: '150px', height: '8px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.min(initiative.overallScore, 100)}%`, height: '100%', backgroundColor: getScoreColor(initiative.overallScore), borderRadius: '4px', transition: 'width 0.5s ease' }} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                        </>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
