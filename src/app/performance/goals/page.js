@@ -21,32 +21,25 @@ import {
 
 // ─── Weighted score helpers ───────────────────────────────────────────────────
 
-/** Accept weight stored as a fraction (≤1) or a percentage (>1, e.g. 50 → 0.5). */
-function toDecimalWeight(w) {
-  if (w == null || isNaN(w)) return 0;
-  return w > 1 ? w / 100 : w;
-}
-
 /**
- * Performance % = Σ ( (current_i / target_i) × weight_i )
- * Weights must sum to exactly 1.0 (100 %). Returns { score, totalWeight, weightError, breakdown }.
+ * Normalizes raw weights against their sum, matching the server's computeOverallScore.
+ * e.g. weights [2, 1] → 66.7% and 33.3%.
+ * Returns { totalWeight, weightError, breakdown }.
  */
 function calcWeightedScore(goals) {
-  if (!goals?.length) return { score: 0, totalWeight: 0, weightError: false, breakdown: [] };
+  if (!goals?.length) return { totalWeight: 100, weightError: false, breakdown: [] };
+
+  const totalWeightRaw = goals.reduce((s, g) => s + (g.weight ?? 0), 0);
+  const weightError = totalWeightRaw === 0;
 
   const breakdown = goals.map((g) => {
-    const w = toDecimalWeight(g.weight ?? 0);
-    const progress = g.target > 0 ? Math.min((g.current ?? 0) / g.target, 1) : 0;
-    return { ...g, decimalWeight: w, displayWeight: Math.round(w * 100), contribution: progress * w };
+    const w = g.weight ?? 0;
+    const normalizedWeight = totalWeightRaw > 0 ? w / totalWeightRaw : 0;
+    const progress = (g.score ?? 0) / 100;
+    return { ...g, decimalWeight: normalizedWeight, displayWeight: parseFloat((normalizedWeight * 100).toFixed(1)), contribution: progress * normalizedWeight };
   });
 
-  const totalWeight = breakdown.reduce((s, b) => s + b.decimalWeight, 0);
-  const weightError = Math.abs(totalWeight - 1) > 0.001; // must equal 1.0 (100 %)
-  const score = weightError
-    ? 0
-    : parseFloat((breakdown.reduce((s, b) => s + b.contribution, 0) * 100).toFixed(2));
-
-  return { score, totalWeight: parseFloat((totalWeight * 100).toFixed(2)), weightError, breakdown };
+  return { totalWeight: 100, weightError, breakdown };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,8 +99,9 @@ export default function PerformanceGoals() {
               const goalsData = await goalsRes.json();
               const goals = goalsData.goals || [];
 
-              // ── weighted score (replaces goalsData.overallScore) ──
-              const { score, totalWeight, weightError, breakdown } = calcWeightedScore(goals);
+              // ── use server-computed score; calcWeightedScore is for breakdown display only ──
+              const { totalWeight, weightError, breakdown } = calcWeightedScore(goals);
+              const score = goalsData.overallScore ?? 0;
 
               const today = new Date();
               today.setHours(0, 0, 0, 0);
@@ -310,15 +304,15 @@ export default function PerformanceGoals() {
               </thead>
               <tbody>
                 {breakdown.map((g, idx) => {
-                  const pct = g.target > 0 ? Math.min((g.current ?? 0) / g.target, 1) * 100 : 0;
+                  const pct = g.score ?? 0; // server-computed score, already 0-100
                   const contrib = (g.contribution * 100).toFixed(2);
                   return (
                     <tr key={g.goal_id ?? idx} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
                       <td style={{ padding: '0.5rem 0.6rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                        {g.goal_name ?? g.name ?? `Goal ${idx + 1}`}
+                        {g.goal_name ?? `Goal ${idx + 1}`}
                       </td>
-                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.current ?? 0}</td>
-                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.target ?? 0}</td>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.current_value ?? 0}</td>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.target_value ?? 0}</td>
 
                       {/* Weight — displayed as %, stored/calculated as decimal */}
                       <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
@@ -599,15 +593,13 @@ export default function PerformanceGoals() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
                     {sortedInitiatives.map((initiative, index) => {
                       const sid = String(initiative.initiative_id);
                       const isExpanded = expandedId === sid;
 
                       return (
-                        <>
+                        <tbody key={initiative.initiative_id}>
                           <tr
-                            key={initiative.initiative_id}
                             style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--color-bg-tertiary)', backgroundColor: index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)', transition: 'background-color 0.2s ease', cursor: 'pointer' }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)')}
@@ -667,10 +659,9 @@ export default function PerformanceGoals() {
                               weightError={initiative.weightError}
                             />
                           )}
-                        </>
+                        </tbody>
                       );
                     })}
-                  </tbody>
                 </table>
               </div>
             )}
