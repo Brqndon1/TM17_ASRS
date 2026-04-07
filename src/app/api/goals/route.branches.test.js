@@ -42,12 +42,14 @@ describe('/api/goals branch coverage', () => {
     expect(payload.goals).toHaveLength(4);
   });
 
-  test('POST covers weight<=0, initiative missing, and success', async () => {
+  test('POST covers invalid weight bounds, initiative missing, and success', async () => {
     const mkReq = (body) => new Request('http://localhost:3000/api/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-    const base = { initiative_id: 1, goal_name: 'G', target_metric: 'M', target_value: 10, weight: 1, scoring_method: 'linear' };
+    const base = { initiative_id: 1, goal_name: 'G', target_metric: 'M', target_value: 10, weight: 2, scoring_method: 'linear' };
 
     expect((await POST(mkReq({ ...base, weight: 0 }))).status).toBe(400);
+    expect((await POST(mkReq({ ...base, weight: 1 }))).status).toBe(400);
+    expect((await POST(mkReq({ ...base, weight: 100 }))).status).toBe(400);
 
     prepareMock.mockImplementation((sql) => {
       const query = String(sql || '');

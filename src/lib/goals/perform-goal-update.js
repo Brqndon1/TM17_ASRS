@@ -11,6 +11,11 @@ const ALLOWED_FIELDS = [
   'deadline',
 ];
 
+function isValidWeight(weight) {
+  const numericWeight = Number(weight);
+  return Number.isFinite(numericWeight) && numericWeight > 1 && numericWeight < 100;
+}
+
 function computeGoalScore(goal) {
   const { current_value, target_value, scoring_method } = goal;
   switch (scoring_method) {
@@ -38,6 +43,9 @@ export function performGoalUpdate(db, existing, updates, { userEmail }) {
 
   if (updates.scoring_method && !['linear', 'threshold', 'binary'].includes(updates.scoring_method)) {
     return { error: 'Invalid scoring_method. Must be: linear, threshold, or binary' };
+  }
+  if (updates.weight !== undefined && !isValidWeight(updates.weight)) {
+    return { error: 'Weight must be greater than 1 and less than 100' };
   }
 
   const setClauses = [];

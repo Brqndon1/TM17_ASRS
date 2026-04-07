@@ -51,7 +51,7 @@ describe('Goals route audit logging', () => {
       goal_name: 'NewGoal',
       target_metric: 'count',
       target_value: 100,
-      weight: 1,
+      weight: 2,
       scoring_method: 'linear',
     }));
 
@@ -88,7 +88,7 @@ describe('Goals route audit logging', () => {
       goal_name: 'X',
       target_metric: 'M',
       target_value: 10,
-      weight: 1,
+      weight: 2,
       scoring_method: 'linear',
     }));
 
@@ -225,7 +225,7 @@ describe('Goals route audit logging', () => {
       goal_name: 'G',
       target_metric: 'M',
       target_value: 100,
-      weight: 1,
+      weight: 2,
       scoring_method: 'linear',
     }));
 

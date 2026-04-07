@@ -14,6 +14,11 @@ function sameUpdatedAt(clientVal, serverVal) {
   return String(clientVal ?? '').trim() === String(serverVal ?? '').trim();
 }
 
+function isValidWeight(weight) {
+  const numericWeight = Number(weight);
+  return Number.isFinite(numericWeight) && numericWeight > 1 && numericWeight < 100;
+}
+
 // Compute overall weighted score across all goals
 function computeOverallScore(goals) {
   if (goals.length === 0) return 0;
@@ -129,10 +134,10 @@ export async function POST(request) {
       );
     }
 
-    // Validate weight is positive
-    if (weight <= 0) {
+    // Weight must be strictly between 1 and 100
+    if (!isValidWeight(weight)) {
       return NextResponse.json(
-        { error: 'Weight must be a positive number' },
+        { error: 'Weight must be greater than 1 and less than 100' },
         { status: 400 }
       );
     }

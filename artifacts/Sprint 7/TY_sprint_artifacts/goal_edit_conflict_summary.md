@@ -126,4 +126,3 @@ This sprint implements optimistic concurrency control for initiative goals so th
   - Conflict lifecycle is captured in the `audit_log` table via:
     - `goal.conflict_detected` when a conflict is first created.
     - `goal.conflict_resolved` when an admin applies or rejects the proposal (recording resolution type, who resolved it, and which fields were applied when relevant).
-

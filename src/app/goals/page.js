@@ -26,7 +26,7 @@ export default function GoalsPage() {
     target_metric: '',
     target_value: '',
     current_value: '0',
-    weight: '1',
+    weight: '2',
     scoring_method: 'linear',
     deadline: '',
   });
@@ -126,7 +126,7 @@ export default function GoalsPage() {
         target_metric: '',
         target_value: '',
         current_value: '0',
-        weight: '1',
+        weight: '2',
         scoring_method: 'linear',
         deadline: '',
       });
@@ -453,10 +453,11 @@ export default function GoalsPage() {
                       <input
                         type="number"
                         step="any"
-                        min="0.1"
+                        min="1.01"
+                        max="99.99"
                         value={newGoal.weight}
                         onChange={(e) => setNewGoal({ ...newGoal, weight: e.target.value })}
-                        placeholder="1"
+                        placeholder="2"
                         required
                         style={inputStyle}
                       />
@@ -566,7 +567,8 @@ export default function GoalsPage() {
                           <input
                             type="number"
                             step="any"
-                            min="0.1"
+                            min="1.01"
+                            max="99.99"
                             value={editGoal.weight}
                             onChange={(e) => setEditGoal({ ...editGoal, weight: e.target.value })}
                             style={inputStyle}
