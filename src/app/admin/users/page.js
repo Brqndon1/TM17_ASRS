@@ -222,7 +222,7 @@ export default function AdminUsersPage() {
               User Management
             </h1>
             <p style={{ color: 'var(--color-text-secondary)', marginTop: '0.25rem', fontSize: '0.95rem' }}>
-              View and manage staff and admin user profiles.
+              View and manage admin, staff, and public user profiles.
             </p>
           </div>
           <button
@@ -303,7 +303,7 @@ export default function AdminUsersPage() {
         ) : filteredUsers.length === 0 ? (
           <div className="asrs-card" style={{ padding: '3rem', textAlign: 'center' }}>
             <p style={{ color: 'var(--color-text-secondary)' }}>
-              {searchTerm || filterRole !== 'all' ? 'No users match your filters.' : 'No staff or admin users found.'}
+              {searchTerm || filterRole !== 'all' ? 'No users match your filters.' : 'No users found.'}
             </p>
           </div>
         ) : (
@@ -452,7 +452,7 @@ export default function AdminUsersPage() {
                 {deleteTarget.user_type}
               </span>
             </div>
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setDeleteTarget(null)}
                 style={{
@@ -565,6 +565,7 @@ export default function AdminUsersPage() {
                   disabled={addLoading}
                   style={selectStyle}
                 >
+                  <option value="public">Public</option>
                   <option value="staff">Staff</option>
                   <option value="admin">Admin</option>
                 </select>

@@ -23,7 +23,7 @@ export async function GET(request) {
         ut.access_rank
       FROM user u
       JOIN user_type ut ON u.user_type_id = ut.user_type_id
-      WHERE ut.type IN ('staff', 'admin')
+      WHERE ut.type IN ('public', 'staff', 'admin')
       ORDER BY ut.access_rank DESC, u.last_name ASC, u.first_name ASC
     `).all();
 
@@ -46,6 +46,7 @@ export async function POST(request) {
     const normalizedFirstName = String(first_name || '').trim();
     const normalizedLastName = String(last_name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPhone = phone_number ? phone_number.replace(/\D/g, '') : null;
 
     if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !user_type) {
       return NextResponse.json(
@@ -54,9 +55,9 @@ export async function POST(request) {
       );
     }
 
-    if (!['staff', 'admin'].includes(user_type)) {
+    if (!['public', 'staff', 'admin'].includes(user_type)) {
       return NextResponse.json(
-        { error: 'user_type must be "staff" or "admin"' },
+        { error: 'user_type must be "public", "staff", or "admin"' },
         { status: 400 }
       );
     }
@@ -107,7 +108,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
     }
 
-    if (phone_number && !/^\d{10}$/.test(phone_number.replace(/\D/g, ''))) {
+    if (normalizedPhone && !/^\d{10}$/.test(normalizedPhone)) {
       return NextResponse.json({ error: 'Phone number must be 10 digits' }, { status: 400 });
     }
 
@@ -122,7 +123,15 @@ export async function POST(request) {
     const result = db.prepare(`
       INSERT INTO user (first_name, last_name, phone_number, email, password, user_type_id, verified, verification_token, token_expires_at)
       VALUES (?, ?, ?, ?, '', ?, 0, ?, ?)
-    `).run(normalizedFirstName, normalizedLastName, phone_number || null, normalizedEmail, typeRow.user_type_id, token, expiresAt);
+    `).run(
+      normalizedFirstName,
+      normalizedLastName,
+      normalizedPhone || null,
+      normalizedEmail,
+      typeRow.user_type_id,
+      token,
+      expiresAt
+    );
 
     let emailSent = true;
     try {
@@ -188,7 +197,7 @@ export async function PUT(request) {
 
     if (!['public', 'staff', 'admin'].includes(new_role)) {
       return NextResponse.json(
-        { error: 'new_role must be "staff" or "admin"' },
+        { error: 'new_role must be "public", "staff", or "admin"' },
         { status: 400 }
       );
     }
@@ -202,12 +211,15 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'You cannot demote your own account' }, { status: 400 });
     }
 
-    // Get old role for audit diff
     const oldTypeRow = db.prepare(`
       SELECT ut.type FROM user u JOIN user_type ut ON u.user_type_id = ut.user_type_id WHERE u.user_id = ?
     `).get(user_id);
 
     const typeRow = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(new_role);
+    if (!typeRow) {
+      return NextResponse.json({ error: 'Invalid user type' }, { status: 400 });
+    }
+
     db.prepare('UPDATE user SET user_type_id = ? WHERE user_id = ?').run(typeRow.user_type_id, user_id);
 
     logAudit(db, {
