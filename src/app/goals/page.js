@@ -459,7 +459,7 @@ export default function GoalsPage() {
                       />
                     </div>
                     <div>
-                      <label style={labelStyle}>Weight *</label>
+                      <label style={labelStyle}>Weight (%) *</label>
                       <input
                         type="number"
                         step="any"
@@ -573,7 +573,7 @@ export default function GoalsPage() {
                           />
                         </div>
                         <div>
-                          <label style={labelStyle}>Weight</label>
+                          <label style={labelStyle}>Weight (%)</label>
                           <input
                             type="number"
                             step="any"
@@ -665,7 +665,7 @@ export default function GoalsPage() {
                           </div>
                         </div>
                         <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Weight</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Weight (%)</div>
                           <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>{goal.weight}</div>
                         </div>
                         <div>
