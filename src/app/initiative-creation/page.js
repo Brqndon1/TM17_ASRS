@@ -463,6 +463,8 @@ export default function InitiativeCreationPage() {
               </button>
 
             </form>
+            {/* Reason modal for creating initiatives */}
+            <ReasonModal open={showReasonModal} onClose={() => setShowReasonModal(false)} onSubmit={handleReasonSubmit} />
               
           </>
         ) : (

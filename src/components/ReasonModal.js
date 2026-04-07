@@ -1,64 +1,46 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export default function ReasonModal({ visible, onClose, onSubmit, reasons }) {
-  const PREDEFINED = reasons || [
-    'Data correction',
-    'Duplicate',
-    'User request',
-    'Security',
-    'Other',
-  ];
-
-  const [reasonType, setReasonType] = useState(PREDEFINED[0]);
+export default function ReasonModal({ open, onClose, onSubmit }) {
+  const [reasonType, setReasonType] = useState('manual');
   const [reasonText, setReasonText] = useState('');
-  const [error, setError] = useState('');
 
-  if (!visible) return null;
+  useEffect(() => {
+    if (open) {
+      setReasonText('');
+      setReasonType('manual');
+    }
+  }, [open]);
 
-  function handleSubmit() {
-    setError('');
-    if (!reasonType) {
-      setError('Please select a reason');
-      return;
-    }
-    if (reasonType === 'Other' && String(reasonText || '').trim() === '') {
-      setError('Please provide details for "Other"');
-      return;
-    }
-    onSubmit({ reasonType, reasonText: String(reasonText || '').trim() });
-  }
+  if (!open) return null;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ backgroundColor: 'white', borderRadius: 12, padding: 20, width: '95%', maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Reason for change</h3>
-        <p style={{ marginTop: 6, marginBottom: 12, color: '#666' }}>Please choose a predefined reason or select Other&quot; to provide details. This is required.</p>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Reason</label>
-          <select value={reasonType} onChange={(e) => setReasonType(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid #ddd' }}>
-            {PREDEFINED.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+      <div style={{ position: 'relative', width: 'min(640px, 95%)', background: 'white', borderRadius: 8, padding: '1rem', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Why are you creating this initiative?</h3>
+        <p style={{ marginTop: 0, color: '#666', marginBottom: '0.75rem' }}>Provide a reason or context for auditing purposes.</p>
+
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Type</label>
+          <select value={reasonType} onChange={(e) => setReasonType(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: 6 }}>
+            <option value="manual">Manual</option>
+            <option value="import">Import</option>
+            <option value="migration">Migration</option>
+            <option value="other">Other</option>
           </select>
         </div>
 
-        {reasonType === 'Other' && (
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Details</label>
-            <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} rows={4} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #ddd' }} />
-          </div>
-        )}
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Details (optional)</label>
+          <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} rows={4} style={{ width: '100%', padding: '0.5rem', borderRadius: 6 }} placeholder="Optional details about why this initiative is being created." />
+        </div>
 
-        {error && (
-          <div style={{ marginBottom: 12, color: '#b00020' }}>{error}</div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '0.5rem 1rem', borderRadius: 8, border: '1px solid #ddd', background: 'white' }}>Cancel</button>
-          <button onClick={handleSubmit} style={{ padding: '0.5rem 1rem', borderRadius: 8, border: 'none', background: '#1565c0', color: 'white' }}>Confirm</button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          <button type="button" onClick={onClose} style={{ padding: '0.5rem 0.75rem', borderRadius: 6, background: '#efefef', border: 'none', cursor: 'pointer' }}>Cancel</button>
+          <button type="button" onClick={() => onSubmit({ reasonType, reasonText })} style={{ padding: '0.5rem 0.75rem', borderRadius: 6, background: '#2b6cb0', color: 'white', border: 'none', cursor: 'pointer' }}>Confirm</button>
         </div>
       </div>
     </div>
