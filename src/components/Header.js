@@ -6,7 +6,7 @@
  * - The ASRS logo (loaded from /public/asrs-logo.png)
  * - The system title
  * - Navigation tabs (shown only when logged in) with active highlighting
- * - Distribute, Goals, Performance (staff and admin)
+ * - Distribute, Goals dropdown (Initiative Scoring + Data Conflicts), Performance (staff and admin)
  * - "History" dropdown with Reports + Audit Log (staff/admin; Audit Log admin-only)
  * - "User Management" tab (admin only)
  * - Login/Logout button
@@ -305,6 +305,179 @@ function PerformanceDropdown({ isActive, getNavLinkStyle, navHoverHandlers }) {
     </div>
   );
 }
+function GoalsDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin, pendingGoalConflicts }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const pathname = usePathname();
+
+  const isGoalsActive =
+    pathname.startsWith('/goals') || pathname.startsWith('/admin/conflicts');
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          ...getNavLinkStyle(isGoalsActive ? '/goals' : '__none__'),
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          backgroundColor: isGoalsActive
+            ? 'rgba(255,255,255,0.35)'
+            : 'rgba(255,255,255,0.15)',
+          fontWeight: isGoalsActive ? '700' : '600',
+          boxShadow: isGoalsActive ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+          position: 'relative',
+          paddingRight: pendingGoalConflicts > 0 ? '1.6rem' : undefined,
+        }}
+        onMouseEnter={(e) => {
+          if (!isGoalsActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isGoalsActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)';
+        }}
+      >
+        Goals
+        {pendingGoalConflicts > 0 && (
+          <span
+            title={`${pendingGoalConflicts} pending goal edit conflict(s)`}
+            style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '2px',
+              minWidth: '18px',
+              height: '18px',
+              padding: '0 5px',
+              borderRadius: '999px',
+              backgroundColor: '#e74c3c',
+              color: 'white',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >
+            {pendingGoalConflicts > 99 ? '99+' : pendingGoalConflicts}
+          </span>
+        )}
+        <svg
+          width="12" height="12" viewBox="0 0 12 12" fill="none"
+          style={{
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          }}
+        >
+          <path d="M3 4.5L6 7.5L9 4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            minWidth: '180px',
+            backgroundColor: '#3a3a3a',
+            borderRadius: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            overflow: 'hidden',
+            zIndex: 200,
+          }}
+        >
+          <Link
+            href="/goals"
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'block',
+              padding: '0.6rem 1rem',
+              color: 'white',
+              fontSize: '0.85rem',
+              fontWeight: pathname === '/goals' ? '700' : '500',
+              textDecoration: 'none',
+              backgroundColor: pathname === '/goals'
+                ? 'rgba(255,255,255,0.15)'
+                : 'transparent',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== '/goals') e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== '/goals') e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Initiative Scoring
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin/conflicts"
+              onClick={() => setOpen(false)}
+              style={{
+                display: 'block',
+                padding: '0.6rem 1rem',
+                color: 'white',
+                fontSize: '0.85rem',
+                fontWeight: pathname === '/admin/conflicts' ? '700' : '500',
+                textDecoration: 'none',
+                backgroundColor: pathname === '/admin/conflicts'
+                  ? 'rgba(255,255,255,0.15)'
+                  : 'transparent',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                transition: 'background-color 0.15s ease',
+                position: 'relative',
+              }}
+              onMouseEnter={(e) => {
+                if (pathname !== '/admin/conflicts') e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                if (pathname !== '/admin/conflicts') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Data Conflicts
+              {pendingGoalConflicts > 0 && (
+                <span
+                  style={{
+                    marginLeft: '0.5rem',
+                    minWidth: '18px',
+                    height: '18px',
+                    padding: '0 5px',
+                    borderRadius: '999px',
+                    backgroundColor: '#e74c3c',
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                  }}
+                >
+                  {pendingGoalConflicts > 99 ? '99+' : pendingGoalConflicts}
+                </span>
+              )}
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -379,12 +552,12 @@ export default function Header() {
 
   function getNavLinkStyle(href) {
     return {
-      padding: '0.4rem 1rem',
+      padding: '0.35rem 0.55rem',
       borderRadius: '6px',
       border: '1px solid rgba(255,255,255,0.3)',
       backgroundColor: isActive(href) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
       color: 'white',
-      fontSize: '0.85rem',
+      fontSize: '0.8rem',
       fontWeight: isActive(href) ? '700' : '600',
       textDecoration: 'none',
       cursor: 'pointer',
@@ -452,7 +625,7 @@ export default function Header() {
         </button>
 
         <div className={`header-nav-area${menuOpen ? ' open' : ''}`}>
-          <nav className="header-nav-links">
+          <nav className="header-nav-links" style={{ flexWrap: 'nowrap' }}>
           {isHydrated && (
           <>
           {/* Show all navigation tabs only when logged in */}
@@ -503,9 +676,13 @@ export default function Header() {
 
                 {isStaffOrAdmin && (
                   <>
-                    <Link href="/goals" style={getNavLinkStyle('/goals')} {...navHoverHandlers('/goals')}>
-                      Goals
-                    </Link>
+                    <GoalsDropdown
+                      isActive={isActive}
+                      getNavLinkStyle={getNavLinkStyle}
+                      navHoverHandlers={navHoverHandlers}
+                      isAdmin={isAdmin}
+                      pendingGoalConflicts={pendingGoalConflicts}
+                    />
                     <PerformanceDropdown
                       isActive={isActive}
                       getNavLinkStyle={getNavLinkStyle}
@@ -520,49 +697,9 @@ export default function Header() {
                   </>
                 )}
                 {isAdmin && (
-                  <>
                     <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
                       User Management
                     </Link>
-                    <Link
-                      href="/admin/conflicts"
-                      style={{
-                        ...getNavLinkStyle('/admin/conflicts'),
-                        position: 'relative',
-                        paddingRight: pendingGoalConflicts > 0 ? '1.35rem' : undefined,
-                      }}
-                      {...navHoverHandlers('/admin/conflicts')}
-                    >
-                      Data conflicts
-                      {pendingGoalConflicts > 0 && (
-                        <span
-                          title={`${pendingGoalConflicts} pending goal edit conflict(s)`}
-                          style={{
-                            position: 'absolute',
-                            top: '-4px',
-                            right: '2px',
-                            minWidth: '18px',
-                            height: '18px',
-                            padding: '0 5px',
-                            borderRadius: '999px',
-                            backgroundColor: '#e74c3c',
-                            color: 'white',
-                            fontSize: '0.65rem',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            lineHeight: 1,
-                          }}
-                        >
-                          {pendingGoalConflicts > 99 ? '99+' : pendingGoalConflicts}
-                        </span>
-                      )}
-                    </Link>
-                    <Link href="/admin/audit" style={getNavLinkStyle('/admin/audit')} {...navHoverHandlers('/admin/audit')}>
-                      Audit Logs
-                    </Link>
-                  </>
                 )}
               </>
             ) : (
