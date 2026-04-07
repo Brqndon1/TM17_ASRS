@@ -67,7 +67,12 @@ export default function GoalsPage() {
 
   async function fetchInitiatives() {
     try {
-      const res = await fetch('/api/goals/initiatives');
+      const res = await apiFetch('/api/goals/initiatives');
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
       if (!res.ok) throw new Error('Failed to fetch initiatives');
       const data = await res.json();
       setInitiatives(data.initiatives || []);
@@ -81,7 +86,12 @@ export default function GoalsPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch(`/api/goals?initiativeId=${initiativeId}`);
+      const res = await apiFetch(`/api/goals?initiativeId=${initiativeId}`);
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
       if (!res.ok) throw new Error('Failed to fetch goals');
       const data = await res.json();
       setGoals(data.goals || []);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
@@ -403,9 +403,9 @@ export default function Home() {
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 flex-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {grouped.map(({ key, title, subtitle, items }) => (
-            <>
+            <Fragment key={key}>
               {/* Section label — spans the full row */}
-              <div key={`label-${key}`} className="col-span-full flex items-center gap-2 mt-1 first:mt-0">
+              <div className="col-span-full flex items-center gap-2 mt-1 first:mt-0">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-asrs-orange)]">
                   {title}
                 </span>
@@ -427,7 +427,7 @@ export default function Home() {
                   router={router}
                 />
               ))}
-            </>
+            </Fragment>
           ))}
         </div>
       </main>
