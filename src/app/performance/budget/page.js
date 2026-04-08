@@ -252,17 +252,18 @@ export default function PerformanceBudget() {
     setSortField(prev => SORT_CYCLE[(SORT_CYCLE.indexOf(prev) + 1) % SORT_CYCLE.length]);
   }
 
-  // Summary stats over full unfiltered dataset
-  const allInits   = data.initiatives;
-  const grandBudget  = allInits.reduce((s, i) => s + i.total,       0);
-  const grandSpent   = allInits.reduce((s, i) => s + i.total_spent, 0);
-  const overBudget   = allInits.filter((i) => pct(i.total_spent, i.total) > 100).length;
-  const avgUtil      = allInits.length
-    ? Math.round(allInits.reduce((s, i) => s + pct(i.total_spent, i.total), 0) / allInits.length)
+  const allInits = data.initiatives;
+  const visibleInitiatives = sorted;
+
+  const grandBudget  = visibleInitiatives.reduce((s, i) => s + i.total,       0);
+  const grandSpent   = visibleInitiatives.reduce((s, i) => s + i.total_spent, 0);
+  const overBudget   = visibleInitiatives.filter((i) => pct(i.total_spent, i.total) > 100).length;
+  const avgUtil      = visibleInitiatives.length
+    ? Math.round(visibleInitiatives.reduce((s, i) => s + pct(i.total_spent, i.total), 0) / visibleInitiatives.length)
     : 0;
 
   // Grouped bar chart data (budget vs spent per initiative)
-  const chartData = sorted
+  const chartData = visibleInitiatives
     .filter(i => i.total > 0 || i.total_spent > 0)
     .map(i => ({
       name:   i.initiative_name.length > 16 ? i.initiative_name.slice(0, 16) + '…' : i.initiative_name,
