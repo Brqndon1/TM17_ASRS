@@ -5,6 +5,7 @@ import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
+import { getScoreColor } from '@/lib/score-utils';
 
 export default function GoalsPage() {
   const router = useRouter();
@@ -219,12 +220,6 @@ export default function GoalsPage() {
       scoring_method: goal.scoring_method,
       deadline: goal.deadline || '',
     });
-  }
-
-  function getScoreColor(score) {
-    if (score >= 80) return '#27AE60';
-    if (score >= 50) return '#F39C12';
-    return '#C0392B';
   }
 
   function getScoringLabel(method) {

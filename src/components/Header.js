@@ -697,9 +697,14 @@ export default function Header() {
                   </>
                 )}
                 {isAdmin && (
+                  <>
                     <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
                       User Management
                     </Link>
+                    <Link href="/admin/import" style={getNavLinkStyle('/admin/import')} {...navHoverHandlers('/admin/import')}>
+                      Data Import
+                    </Link>
+                  </>
                 )}
               </>
             ) : (

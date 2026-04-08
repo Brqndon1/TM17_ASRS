@@ -8,6 +8,7 @@ import BackButton from '@/components/BackButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
+import { getScoreColor } from '@/lib/score-utils';
 import {
   LineChart,
   Line,
@@ -197,12 +198,6 @@ export default function PerformanceGoals() {
     } finally {
       setChartLoading(false);
     }
-  }
-
-  function getScoreColor(score) {
-    if (score >= 80) return '#27AE60';
-    if (score >= 50) return '#F39C12';
-    return '#C0392B';
   }
 
   function getSortedInitiatives() {

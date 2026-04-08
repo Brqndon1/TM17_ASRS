@@ -13,7 +13,7 @@ const ALLOWED_FIELDS = [
 
 function isValidWeight(weight) {
   const numericWeight = Number(weight);
-  return Number.isFinite(numericWeight) && numericWeight > 1 && numericWeight < 100;
+  return Number.isFinite(numericWeight) && numericWeight >= 1 && numericWeight <= 100;
 }
 
 function computeGoalScore(goal) {
