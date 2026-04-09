@@ -483,10 +483,14 @@ export default function Header() {
   const pathname = usePathname();
   const { user, clearUser } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isHydrated = typeof window !== 'undefined';
+  const [isHydrated, setIsHydrated] = useState(false);
   const headerRef = useRef(null);
   const [profilePic, setProfilePic] = useState(null);
   const [pendingGoalConflicts, setPendingGoalConflicts] = useState(0);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
