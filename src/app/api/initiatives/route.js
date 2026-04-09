@@ -8,23 +8,21 @@ import { requireAccess } from '@/lib/auth/server-auth';
 
 const INITIATIVES_PATH = path.join(process.cwd(), 'src', 'data', 'initiatives.json');
 
-async function readInitiatives() {
+async function syncInitiativesToJson(db) {
   try {
-    const data = await fs.readFile(INITIATIVES_PATH, 'utf8');
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed.initiatives) ? parsed.initiatives : [];
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
+    const rows = db.prepare('SELECT * FROM initiative').all();
+    const initiatives = rows.map(r => ({
+      id: r.initiative_id,
+      name: r.initiative_name,
+      description: r.description || '',
+      attributes: JSON.parse(r.attributes || '[]'),
+      questions: JSON.parse(r.questions || '[]'),
+      settings: JSON.parse(r.settings || '{}'),
+    }));
+    await fs.writeFile(INITIATIVES_PATH, JSON.stringify({ initiatives }, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('[initiatives] Could not sync to JSON:', e.message);
   }
-}
-
-async function writeInitiatives(initiatives) {
-  await fs.writeFile(
-    INITIATIVES_PATH,
-    JSON.stringify({ initiatives }, null, 2),
-    'utf8'
-  );
 }
 
 export async function GET() {
@@ -62,23 +60,10 @@ export async function POST(request) {
       JSON.stringify(input.settings)
     );
 
-    const fileInitiatives = await readInitiatives();
-    const nextFileId = fileInitiatives.length > 0
-      ? Math.max(...fileInitiatives.map((item) => Number(item.id) || 0)) + 1
-      : 1;
-
-    fileInitiatives.push({
-      id: nextFileId,
-      name: input.name,
-      description: input.description,
-      attributes: input.attributes,
-      questions: input.questions,
-      ...(Object.keys(input.settings).length > 0 ? { settings: input.settings } : {}),
-    });
-
-    await writeInitiatives(fileInitiatives);
-
     const row = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(result.lastInsertRowid));
+
+    // Sync full initiative list back to JSON seed file
+    await syncInitiativesToJson(db);
 
     logAudit(db, {
       event: 'initiative.created',

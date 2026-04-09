@@ -571,6 +571,22 @@ function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_report_generation_log_created_at ON report_generation_log(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_report_generation_log_status ON report_generation_log(status);
 
+      -- Trend data table: stores initiative trend analysis
+      CREATE TABLE IF NOT EXISTS trend (
+        trend_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        initiative_id INTEGER NOT NULL REFERENCES initiative(initiative_id) ON DELETE CASCADE,
+        trend_key TEXT NOT NULL UNIQUE,
+        report_id TEXT,
+        attributes TEXT NOT NULL DEFAULT '[]',
+        direction TEXT NOT NULL CHECK (direction IN ('up','down','stable')),
+        magnitude REAL NOT NULL DEFAULT 0,
+        time_period TEXT,
+        enabled_display INTEGER NOT NULL DEFAULT 1,
+        enabled_calc INTEGER NOT NULL DEFAULT 1,
+        description TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_trend_initiative ON trend(initiative_id);
+
       -- Audit log table: records reasons for administrative changes
       CREATE TABLE IF NOT EXISTS audit_log (
       audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -590,48 +606,7 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_session_expires_at ON session(expires_at);
     `);
 
-  // ── Seed survey templates from surveys.json if no forms exist ─────────────
-  function seedSurveysFromJson() {
-    const formsCount = db.prepare('SELECT COUNT(*) as count FROM form').get().count;
-    if (formsCount > 0) return;
-    const surveysPath = path.join(process.cwd(), 'src', 'data', 'surveys.json');
-    if (!fs.existsSync(surveysPath)) return;
-    let surveys;
-    try {
-      surveys = JSON.parse(fs.readFileSync(surveysPath, 'utf-8'));
-    } catch (e) {
-      console.warn('[db] Could not parse surveys.json:', e.message);
-      return;
-    }
-    if (!Array.isArray(surveys)) return;
-    const insertFormSeed = db.prepare('INSERT INTO form (form_name, description, is_published) VALUES (?, ?, 1)');
-    const insertFieldSeed = db.prepare('INSERT INTO field (field_key, field_label, field_type, scope, is_filterable) VALUES (?, ?, ?, ?, 0)');
-    const insertFormFieldSeed = db.prepare('INSERT INTO form_field (form_id, field_id, display_order, required) VALUES (?, ?, ?, 1)');
-    const insertFieldOptionSeed = db.prepare('INSERT INTO field_options (field_id, option_value, display_label, display_order) VALUES (?, ?, ?, ?)');
-    for (const survey of surveys) {
-      const formInfo = insertFormSeed.run(survey.title || 'Untitled Survey', survey.description || '');
-      const formId = formInfo.lastInsertRowid;
-      let order = 0;
-      for (const q of survey.questions || []) {
-        const fieldKey = q.id || q.question || 'q' + order;
-        const fieldLabel = q.question || (q.text && q.text.question) || 'Question ' + (order + 1);
-        const fieldType = q.type || (q.text && q.text.type) || 'text';
-        const fieldInfo = insertFieldSeed.run(String(fieldKey), fieldLabel, fieldType, 'common');
-        const fieldId = fieldInfo.lastInsertRowid;
-        insertFormFieldSeed.run(formId, fieldId, order);
-        const opts = q.options || (q.text && q.text.options) || [];
-        if ((fieldType === 'choice' || fieldType === 'select') && opts.length > 0) {
-          let optOrder = 0;
-          for (const opt of opts) {
-            insertFieldOptionSeed.run(fieldId, opt, opt, optOrder++);
-          }
-        }
-        order++;
-      }
-    }
-    console.log('[db] Seeded survey templates from surveys.json');
-  }
-  //seedSurveysFromJson();
+  // Survey seeding removed — survey templates are managed via the DB directly.
 
   // ── Seed data ────────────────────────────────────────
 
@@ -753,9 +728,11 @@ function initializeDatabase() {
   const seedDataDir = path.join(process.cwd(), 'src', 'data');
   let initiativesJson = { initiatives: [] };
   let reportDataJson = { reports: {} };
+  let trendDataJson = { trends: {} };
   try {
     initiativesJson = JSON.parse(fs.readFileSync(path.join(seedDataDir, 'initiatives.json'), 'utf-8'));
     reportDataJson = JSON.parse(fs.readFileSync(path.join(seedDataDir, 'reportData.json'), 'utf-8'));
+    trendDataJson = JSON.parse(fs.readFileSync(path.join(seedDataDir, 'trendData.json'), 'utf-8'));
   } catch (e) {
     console.warn('[db] Could not load seed JSON files:', e.message);
   }
@@ -887,6 +864,21 @@ function initializeDatabase() {
         insertSubValue.run(nextSubId, fieldRow.field_id, String(value), numVal);
       }
       nextSubId++;
+    }
+  }
+
+  // ── Seed trend data from trendData.json ────────────────────────────────
+  const insertTrend = db.prepare(
+    'INSERT OR IGNORE INTO trend (trend_key, initiative_id, report_id, attributes, direction, magnitude, time_period, enabled_display, enabled_calc, description) VALUES (?,?,?,?,?,?,?,?,?,?)'
+  );
+  for (const [initId, trends] of Object.entries(trendDataJson.trends || {})) {
+    for (const t of trends) {
+      insertTrend.run(
+        t.trendId, Number(initId), t.reportId || null,
+        JSON.stringify(t.attributes), t.direction, t.magnitude,
+        t.timePeriod, t.enabledDisplay ? 1 : 0, t.enabledCalc ? 1 : 0,
+        t.description
+      );
     }
   }
 

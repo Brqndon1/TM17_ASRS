@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { getServiceContainer } from '@/lib/container/service-container';
 
 export async function GET(request, { params }) {
   try {
     const { id } = await params;
-    const filePath = path.join(process.cwd(), 'src', 'data', 'trendData.json');
-    const trendDataFile = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const { db } = getServiceContainer();
 
-    const allTrends = trendDataFile.trends[String(id)] || [];
-    const trends = allTrends.filter(t => t.enabledDisplay);
+    const rows = db.prepare(
+      'SELECT * FROM trend WHERE initiative_id = ? AND enabled_display = 1'
+    ).all(Number(id));
+
+    const trends = rows.map(row => ({
+      trendId: row.trend_key,
+      reportId: row.report_id,
+      attributes: JSON.parse(row.attributes),
+      direction: row.direction,
+      magnitude: row.magnitude,
+      timePeriod: row.time_period,
+      enabledDisplay: !!row.enabled_display,
+      enabledCalc: !!row.enabled_calc,
+      description: row.description,
+    }));
 
     return NextResponse.json({ trends });
   } catch (error) {
