@@ -9,7 +9,7 @@ import {
 import { toReportDetailDto, toReportListItemDto } from '@/lib/adapters/report-adapter';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { alertDb } from '@/lib/db-alerts';
 import { logAudit } from '@/lib/audit';
 import { generateReportInsights } from '@/lib/openai-report-insights';
@@ -68,7 +68,7 @@ function safeParseJson(value, fallback) {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reporting.view');
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
@@ -133,7 +133,7 @@ export async function POST(request) {
     const payload = payloadValidation.value;
     const container = getServiceContainer();
     const { db, reportEngine, eventBus, clock } = container;
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reports.create');
     if (auth.error) return auth.error;
     const initiativeId = Number(payload.initiativeId);
 
@@ -317,7 +317,7 @@ export async function PUT(request) {
     }
 
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reports.create');
     if (auth.error) return auth.error;
 
     const { id, name, description, status } = payloadValidation.value;
@@ -386,7 +386,7 @@ export async function DELETE(request) {
     }
 
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reports.create');
     if (auth.error) return auth.error;
 
     const { id } = deleteValidation;

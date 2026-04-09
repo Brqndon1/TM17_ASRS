@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 // ──────────────────────────────────────────────────────────────────────────
 // INITIALIZE DATABASE
@@ -108,7 +108,7 @@ function buildTargetUrl(qrType, targetId, qrCodeKey, baseUrl) {
 // ══════════════════════════════════════════════════════════════════════════
 export async function POST(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'surveys.distribute');
     if (auth.error) return auth.error;
 
     // ─────────────────────────────────────────────────────────────────────

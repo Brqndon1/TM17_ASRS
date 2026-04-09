@@ -1,6 +1,6 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 /**
  * GET /api/categories/[id]
@@ -9,7 +9,7 @@ import { requireAccess } from '@/lib/auth/server-auth';
 export async function GET(_request, { params }) {
   try {
     initializeDatabase();
-    const auth = requireAccess(_request, db, { minAccessRank: 50, requireCsrf: false });
+    const auth = requirePermission(_request, db, 'initiatives.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     // Next.js 15+ requires await on params
@@ -47,7 +47,7 @@ export async function GET(_request, { params }) {
 export async function PUT(request, { params }) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'initiatives.manage');
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -118,7 +118,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(_request, { params }) {
   try {
     initializeDatabase();
-    const auth = requireAccess(_request, db, { minAccessRank: 50 });
+    const auth = requirePermission(_request, db, 'initiatives.manage');
     if (auth.error) return auth.error;
 
     const { id } = await params;

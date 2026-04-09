@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'performance.view');
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

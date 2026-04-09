@@ -1,7 +1,7 @@
 import db, { initializeDatabase } from '@/lib/db';
 import { generateAIReport } from '@/lib/openai';
 import { NextResponse } from 'next/server';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { validateAndCleanSurvey, validateTemplateAnswers } from '@/lib/survey-validation';
 import { alertDb } from '@/lib/db-alerts';
 
@@ -216,7 +216,7 @@ export async function GET(request) {
   try {
     initializeDatabase();
     // PII-sensitive endpoint: only admins can retrieve raw survey submissions.
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'surveys.distribute', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
@@ -262,7 +262,7 @@ export async function GET(request) {
 export async function DELETE(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'surveys.distribute');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

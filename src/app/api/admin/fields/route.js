@@ -1,5 +1,5 @@
 import db from '../../../../lib/db.js';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
 const VALID_TYPES = ['text', 'number', 'date', 'boolean', 'select', 'multiselect', 'rating', 'json', 'yesno'];
@@ -7,7 +7,7 @@ const VALID_SCOPES = ['common', 'initiative_specific', 'staff_only'];
 
 export async function GET(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const fields = db.prepare(`
@@ -56,7 +56,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -169,7 +169,7 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
@@ -282,7 +282,7 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

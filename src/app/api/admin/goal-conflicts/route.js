@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 import { performGoalUpdate } from '@/lib/goals/perform-goal-update';
 
@@ -16,7 +16,7 @@ function parseJson(s, fallback) {
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'conflicts.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
@@ -73,7 +73,7 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'conflicts.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();

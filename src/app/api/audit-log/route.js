@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 /**
  * GET /api/audit-log
@@ -19,7 +19,7 @@ export async function GET(request) {
     initializeDatabase();
 
     // Admin-only: access_rank >= 100
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'audit.view', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

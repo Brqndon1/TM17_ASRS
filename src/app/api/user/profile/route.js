@@ -15,7 +15,7 @@
 
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requireAuth } from '@/lib/auth/server-auth';
 import { hashPassword, verifyPassword } from '@/lib/auth/passwords';
 
 // ─── Migration: add profile_picture column if it doesn't exist ───────────────
@@ -33,7 +33,7 @@ export async function GET(request) {
     const { db } = getServiceContainer();
     ensureProfilePictureColumn(db);
 
-    const auth = requireAccess(request, db, { minAccessRank: 10, requireCsrf: false });
+    const auth = requireAuth(request, db, { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const user = db.prepare(`
@@ -70,7 +70,7 @@ export async function PUT(request) {
     const { db } = getServiceContainer();
     ensureProfilePictureColumn(db);
 
-    const auth = requireAccess(request, db, { minAccessRank: 10, requireCsrf: true });
+    const auth = requireAuth(request, db, { requireCsrf: true });
     if (auth.error) return auth.error;
 
     const { first_name, last_name, email, phone_number, current_password, new_password, profile_picture } =
@@ -162,11 +162,11 @@ export async function DELETE(request) {
   try {
     const { db } = getServiceContainer();
 
-    const auth = requireAccess(request, db, { minAccessRank: 10, requireCsrf: true });
+    const auth = requireAuth(request, db, { requireCsrf: true });
     if (auth.error) return auth.error;
 
     // Prevent the only admin from deleting themselves
-    if (auth.user.user_type === 'admin') {
+    if (auth.user.permissions?.includes('users.manage')) {
       const adminCount = db.prepare(`
         SELECT COUNT(*) AS cnt
         FROM user u

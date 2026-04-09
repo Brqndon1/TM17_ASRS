@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { generateReportInsights } from '@/lib/openai-report-insights';
 
 function safeParseJson(value, fallback) {
@@ -26,7 +26,7 @@ function loadReport(db, reportId) {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    const auth = requirePermission(request, db, 'reports.create', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
@@ -54,7 +54,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reports.create');
     if (auth.error) return auth.error;
 
     const body = await request.json();

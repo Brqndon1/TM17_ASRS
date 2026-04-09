@@ -4,7 +4,7 @@ import path from 'path';
 import { getServiceContainer } from '@/lib/container/service-container';
 import { logAudit } from '@/lib/audit';
 import { toInitiativeCreateInput, toInitiativeDto } from '@/lib/adapters/initiative-adapter';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requireAuth, requirePermission } from '@/lib/auth/server-auth';
 
 const INITIATIVES_PATH = path.join(process.cwd(), 'src', 'data', 'initiatives.json');
 
@@ -28,7 +28,7 @@ async function syncInitiativesToJson(db) {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requireAuth(request, db);
     if (auth.error) return auth.error;
 
     const rows = db.prepare('SELECT * FROM initiative').all();
@@ -43,7 +43,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'initiatives.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();

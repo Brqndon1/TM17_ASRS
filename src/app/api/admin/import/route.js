@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import Papa from 'papaparse';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
 const MAX_ROWS = 500;
@@ -267,7 +267,7 @@ function insertRows(db, table, schema, validRows, conflictMode) {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'import.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const tables = Object.entries(TABLE_SCHEMAS).map(([key, schema]) => ({
@@ -291,7 +291,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'import.manage');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

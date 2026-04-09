@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 // PUT - Bulk-update display_order for reports
 // Body: { order: [{ id: 1, display_order: 0 }, { id: 5, display_order: 1 }, ...] }
 export async function PUT(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'reports.create');
     if (auth.error) return auth.error;
     const { order } = await request.json();
 

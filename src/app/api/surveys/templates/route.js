@@ -1,5 +1,5 @@
 import db from '../../../../lib/db.js';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
 function resolveRules(fieldRulesJson, formFieldRulesJson) {
@@ -68,7 +68,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'forms.create');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -192,7 +192,7 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'forms.create');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

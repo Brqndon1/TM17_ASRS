@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'audit.view', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db, initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 initializeDatabase();
 
@@ -12,7 +12,7 @@ function isExpired(expiresAt) {
 export async function GET(request) {
   try {
     // Require authenticated user with minimum access rank 50 (admin/staff)
-    const auth = await requireAccess(request, db, { minAccessRank: 50, requireCsrf: true });
+    const auth = await requirePermission(request, db, 'surveys.distribute', { requireCsrf: true });
     if (!auth || auth.error) {
       // Early return if user is not authenticated or not authorized
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

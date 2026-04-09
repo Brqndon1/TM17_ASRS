@@ -3,12 +3,12 @@ import { randomBytes } from 'crypto';
 import { getServiceContainer } from '@/lib/container/service-container';
 import { logAudit } from '@/lib/audit';
 import EVENTS from '@/lib/events/event-types';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'users.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const users = db.prepare(`
@@ -37,7 +37,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db, mailer, clock, eventBus } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -55,11 +55,9 @@ export async function POST(request) {
       );
     }
 
-    if (!['public', 'staff', 'admin'].includes(user_type)) {
-      return NextResponse.json(
-        { error: 'user_type must be "public", "staff", or "admin"' },
-        { status: 400 }
-      );
+    const validRole = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(user_type);
+    if (!validRole) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -185,7 +183,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -195,11 +193,9 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'user_id and new_role are required' }, { status: 400 });
     }
 
-    if (!['public', 'staff', 'admin'].includes(new_role)) {
-      return NextResponse.json(
-        { error: 'new_role must be "public", "staff", or "admin"' },
-        { status: 400 }
-      );
+    const validRole = db.prepare('SELECT user_type_id FROM user_type WHERE type = ?').get(new_role);
+    if (!validRole) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
     const targetUser = db.prepare('SELECT user_id, email FROM user WHERE user_id = ?').get(user_id);
@@ -246,7 +242,7 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

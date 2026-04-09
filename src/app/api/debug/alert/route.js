@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { alertDb } from '@/lib/db-alerts';
 import db from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 export async function POST(request) {
   try {
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'users.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json().catch(() => ({}));

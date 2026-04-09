@@ -1,6 +1,6 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 /**
  * GET /api/initiative-categories
@@ -10,7 +10,7 @@ import { requireAccess } from '@/lib/auth/server-auth';
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    const auth = requirePermission(request, db, 'initiatives.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);
@@ -55,7 +55,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'initiatives.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -122,7 +122,7 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'initiatives.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();

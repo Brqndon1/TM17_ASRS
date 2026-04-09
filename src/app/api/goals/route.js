@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import db, { initializeDatabase } from '@/lib/db';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
@@ -56,7 +56,7 @@ function getDaysUntilDeadline(deadline) {
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'goals.manage');
     if (auth.error) return auth.error;
     const { searchParams } = new URL(request.url);
     const initiativeId = searchParams.get('initiativeId');
@@ -102,7 +102,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'goals.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -220,7 +220,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'goals.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -348,7 +348,7 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     initializeDatabase();
-    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    const auth = requirePermission(request, db, 'goals.manage');
     if (auth.error) return auth.error;
 
     const { searchParams } = new URL(request.url);

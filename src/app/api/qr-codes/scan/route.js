@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
 import EVENTS from '@/lib/events/event-types';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 // ══════════════════════════════════════════════════════════════════════════
 // POST /api/qr-codes/scan
@@ -243,7 +243,7 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 50, requireCsrf: false });
+    const auth = requirePermission(request, db, 'surveys.distribute', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     // ─────────────────────────────────────────────────────────────────────

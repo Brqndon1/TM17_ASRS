@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requirePermission } from '@/lib/auth/server-auth';
 
 function parsePositiveNumber(value) {
   const parsed = Number(value);
@@ -38,7 +38,7 @@ function getBudgetSelectSql() {
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100, requireCsrf: false });
+    const auth = requirePermission(request, db, 'budgets.manage', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
@@ -104,7 +104,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'budgets.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -171,7 +171,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'budgets.manage');
     if (auth.error) return auth.error;
 
     const body = await request.json();
@@ -247,7 +247,7 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    const auth = requirePermission(request, db, 'budgets.manage');
     if (auth.error) return auth.error;
 
     const url = new URL(request.url);
