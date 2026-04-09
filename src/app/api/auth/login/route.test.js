@@ -9,11 +9,14 @@ vi.mock('@/lib/container/service-container', () => ({
 
 vi.mock('@/lib/auth/passwords', () => ({
   verifyPassword: verifyPasswordMock,
+  isPasswordHash: () => true,
+  hashPassword: (pw) => `hashed_${pw}`,
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
   createSession: createSessionMock,
   applySessionCookies: applySessionCookiesMock,
+  getUserPermissions: vi.fn(() => ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage']),
 }));
 
 import { POST } from '@/app/api/auth/login/route';

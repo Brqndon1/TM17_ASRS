@@ -11,7 +11,7 @@ export async function POST(request) {
     const { email, password } = await request.json();
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!normalizedEmail || !password) {
+    if (!normalizedEmail || !password || !String(password).trim()) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 

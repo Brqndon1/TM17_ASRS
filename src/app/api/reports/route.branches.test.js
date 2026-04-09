@@ -147,8 +147,7 @@ describe('/api/reports branch coverage', () => {
 
     prepareMock.mockImplementation((sql) => {
       const query = String(sql || '');
-      if (query.includes('SELECT id FROM reports WHERE id = ?')) return { get: () => ({ id: 2 }) };
-      if (query.includes('DELETE FROM reports WHERE id = ?')) return { run: vi.fn() };
+      if (query.includes('FROM reports WHERE id = ?')) return { get: () => ({ id: 2, name: 'R' }), run: vi.fn() };
       return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
     });
     expect((await DELETE(delReq('http://localhost:3000/api/reports?id=2'))).status).toBe(200);

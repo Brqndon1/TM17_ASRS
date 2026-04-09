@@ -132,10 +132,10 @@ describe('/api/surveys integration', () => {
     expect(payload.surveys[0].report.summary).toBe('great');
   });
 
-  test('GET denies staff access to PII endpoint', async () => {
+  test('GET denies public user access to PII endpoint', async () => {
     process.env.NODE_ENV = 'development';
 
-    const tokens = createSessionForRank(state.db, { rank: 50, verified: 1 });
+    const tokens = createSessionForRank(state.db, { rank: 10, verified: 1 });
     const res = await GET(new Request('http://localhost:3000/api/surveys', {
       headers: createAuthedRequestHeaders(tokens),
     }));

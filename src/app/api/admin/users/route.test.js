@@ -31,7 +31,7 @@ describe('/api/admin/users GET', () => {
     ]);
 
     prepareMock.mockImplementation((sql) => {
-      if (sql.includes("WHERE ut.type IN ('staff', 'admin')")) {
+      if (sql.includes("WHERE ut.type IN ('public', 'staff', 'admin')")) {
         return { all: listAll };
       }
       return { get: vi.fn(), all: vi.fn(() => []), run: vi.fn() };
@@ -50,7 +50,6 @@ describe('/api/admin/users GET', () => {
       .map(([query]) => query)
       .find((query) => query.includes('FROM user u') && query.includes('WHERE ut.type IN'));
 
-    expect(listQuery).toContain("WHERE ut.type IN ('staff', 'admin')");
-    expect(listQuery).not.toContain("'public'");
+    expect(listQuery).toContain("WHERE ut.type IN ('public', 'staff', 'admin')");
   });
 });

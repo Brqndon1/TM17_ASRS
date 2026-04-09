@@ -23,6 +23,7 @@ import { GET, POST, PUT, DELETE } from '@/app/api/admin/users/route';
 describe('/api/admin/users route branches', () => {
   beforeEach(() => {
     prepareMock.mockReset();
+    prepareMock.mockReturnValue({ get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) });
     sendAdminInviteEmailMock.mockReset();
     publishMock.mockReset();
     delete process.env.NODE_ENV;
@@ -47,12 +48,14 @@ describe('/api/admin/users route branches', () => {
     });
 
     prepareMock.mockImplementation((sql) => {
+      if (sql.includes('SELECT user_type_id FROM user_type WHERE type = ?')) return { get: () => ({ user_type_id: 2 }) };
       if (sql.includes('SELECT user_id, verified FROM user WHERE email = ?')) return { get: () => ({ user_id: 2, verified: 1 }) };
       return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
     });
     expect((await POST(makeReq())).status).toBe(409);
 
     prepareMock.mockImplementation((sql) => {
+      if (sql.includes('SELECT user_type_id FROM user_type WHERE type = ?')) return { get: () => ({ user_type_id: 2 }) };
       if (sql.includes('SELECT user_id, verified FROM user WHERE email = ?')) return { get: () => ({ user_id: 2, verified: 0 }) };
       if (sql.includes('UPDATE user SET verification_token')) return { run: vi.fn() };
       return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
@@ -101,12 +104,14 @@ describe('/api/admin/users route branches', () => {
     expect((await PUT(putBadRoleReq)).status).toBe(400);
 
     prepareMock.mockImplementation((sql) => {
+      if (sql.includes('SELECT user_type_id FROM user_type WHERE type = ?')) return { get: () => ({ user_type_id: 8 }) };
       if (sql.includes('SELECT user_id, email FROM user WHERE user_id = ?')) return { get: () => undefined };
       return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
     });
     expect((await PUT(new Request('http://localhost:3000/api/admin/users', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id:2, new_role:'staff' }) }))).status).toBe(404);
 
     prepareMock.mockImplementation((sql) => {
+      if (sql.includes('SELECT user_type_id FROM user_type WHERE type = ?')) return { get: () => ({ user_type_id: 8 }) };
       if (sql.includes('SELECT user_id, email FROM user WHERE user_id = ?')) return { get: () => ({ user_id:2, email:'admin@test.com' }) };
       return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
     });

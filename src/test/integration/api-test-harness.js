@@ -171,6 +171,49 @@ export function createTestDb() {
 
   db.prepare(`INSERT INTO user_type (type, access_rank) VALUES ('public', 10), ('staff', 50), ('admin', 100)`).run();
 
+  // Permission tables required by requirePermission / getUserPermissions
+  db.prepare(`CREATE TABLE permission (
+    permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL,
+    description TEXT
+  )`).run();
+
+  db.prepare(`CREATE TABLE role_permission (
+    role_permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_type_id INTEGER NOT NULL REFERENCES user_type(user_type_id) ON DELETE CASCADE,
+    permission_id INTEGER NOT NULL REFERENCES permission(permission_id) ON DELETE CASCADE,
+    UNIQUE(user_type_id, permission_id)
+  )`).run();
+
+  // Seed permissions
+  const allPermKeys = [
+    'surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create',
+    'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view',
+    'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage',
+  ];
+  const seedPerm = db.prepare('INSERT INTO permission (key, label) VALUES (?, ?)');
+  for (const key of allPermKeys) seedPerm.run(key, key);
+
+  // Admin gets all permissions
+  const seedRolePerm = db.prepare(`
+    INSERT INTO role_permission (user_type_id, permission_id)
+    SELECT ut.user_type_id, p.permission_id
+    FROM user_type ut, permission p
+    WHERE ut.type = ? AND p.key = ?
+  `);
+  for (const key of allPermKeys) seedRolePerm.run('admin', key);
+
+  // Staff gets a subset
+  const staffPermKeys = [
+    'surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create',
+    'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view',
+  ];
+  for (const key of staffPermKeys) seedRolePerm.run('staff', key);
+
+  // Public gets minimal permissions
+  seedRolePerm.run('public', 'surveys.take');
+
   return db;
 }
 
