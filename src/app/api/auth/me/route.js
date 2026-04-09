@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { requireAccess } from '@/lib/auth/server-auth';
+import { requireAuth } from '@/lib/auth/server-auth';
 
 export async function GET(request) {
   try {
     const { db } = getServiceContainer();
-    const auth = requireAccess(request, db, { minAccessRank: 10, requireCsrf: false });
+    const auth = requireAuth(request, db, { requireCsrf: false });
 
     if (auth.error) return auth.error;
 
@@ -16,6 +16,7 @@ export async function GET(request) {
         first_name: auth.user.first_name,
         last_name: auth.user.last_name,
         user_type: auth.user.user_type,
+        permissions: auth.user.permissions,
       },
     });
   } catch (error) {

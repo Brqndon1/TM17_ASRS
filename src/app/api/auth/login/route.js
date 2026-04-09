@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
-import { applySessionCookies, createSession } from '@/lib/auth/server-auth';
+import { applySessionCookies, createSession, getUserPermissions } from '@/lib/auth/server-auth';
 import { verifyPassword } from '@/lib/auth/passwords';
 import { isPasswordHash } from '@/lib/auth/passwords';
 import { hashPassword } from '@/lib/auth/passwords';
@@ -56,6 +56,7 @@ export async function POST(request) {
     }
 
     const { token, csrfToken } = createSession(db, user.user_id);
+    const permissions = getUserPermissions(db, user.user_id);
 
     const response = NextResponse.json({
       success: true,
@@ -65,6 +66,7 @@ export async function POST(request) {
         first_name: user.first_name,
         last_name: user.last_name,
         user_type: user.user_type,
+        permissions,
       },
     });
 
