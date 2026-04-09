@@ -18,6 +18,7 @@ export function useAuthStore() {
     user,
     setUser: (nextUser) => store.setUser(nextUser),
     clearUser: () => store.clearUser(),
+    hasPermission: (key) => store.hasPermission(key),
   };
 }
 

@@ -66,6 +66,10 @@ class AuthStore {
     this.setUser(null);
   }
 
+  hasPermission(key) {
+    return Array.isArray(this.user?.permissions) && this.user.permissions.includes(key);
+  }
+
   subscribe(listener) {
     this.listeners.add(listener);
     return () => {
