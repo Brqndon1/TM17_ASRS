@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
 import { toReportDetailDto } from '@/lib/adapters/report-adapter';
+import { requireAccess } from '@/lib/auth/server-auth';
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   try {
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     const { id } = await params;
 
     const row = db.prepare(

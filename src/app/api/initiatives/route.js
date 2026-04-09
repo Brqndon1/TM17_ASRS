@@ -25,9 +25,12 @@ async function syncInitiativesToJson(db) {
   }
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     const rows = db.prepare('SELECT * FROM initiative').all();
     const initiatives = rows.map(toInitiativeDto);
     return NextResponse.json({ initiatives });

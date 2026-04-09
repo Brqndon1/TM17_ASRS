@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServiceContainer } from '@/lib/container/service-container';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 export async function GET(request, { params }) {
   try {
-    const { id } = await params;
     const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
 
     const rows = db.prepare(
       'SELECT * FROM trend WHERE initiative_id = ? AND enabled_display = 1'

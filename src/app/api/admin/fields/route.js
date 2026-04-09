@@ -5,8 +5,11 @@ import { logAudit } from '@/lib/audit';
 const VALID_TYPES = ['text', 'number', 'date', 'boolean', 'select', 'multiselect', 'rating', 'json', 'yesno'];
 const VALID_SCOPES = ['common', 'initiative_specific', 'staff_only'];
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
     const fields = db.prepare(`
       SELECT f.field_id, f.field_key, f.field_label, f.field_type, f.scope,
              f.initiative_id, f.is_filterable, f.is_required_default, f.validation_rules,

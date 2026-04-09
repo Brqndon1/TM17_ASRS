@@ -67,6 +67,10 @@ function safeParseJson(value, fallback) {
 
 export async function GET(request) {
   try {
+    const { db } = getServiceContainer();
+    const auth = requireAccess(request, db, { minAccessRank: 50 });
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(request.url);
     const queryValidation = validateReportQueryParams(searchParams);
     if (!queryValidation.valid) {
@@ -74,7 +78,6 @@ export async function GET(request) {
     }
 
     const { initiativeId, startDate, endDate } = queryValidation;
-    const { db } = getServiceContainer();
 
     const conditions = [];
     const params = [];

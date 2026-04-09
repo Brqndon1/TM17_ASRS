@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { alertDb } from '@/lib/db-alerts';
+import db from '@/lib/db';
+import { requireAccess } from '@/lib/auth/server-auth';
 
 export async function POST(request) {
   try {
+    const auth = requireAccess(request, db, { minAccessRank: 100 });
+    if (auth.error) return auth.error;
+
     const body = await request.json().catch(() => ({}));
     const err = new Error(body.message || 'debug alert');
     // Fire-and-forget alert; return OK immediately
