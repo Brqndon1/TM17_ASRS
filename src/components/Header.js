@@ -58,7 +58,7 @@ function ProfileAvatar({ user, picture }) {
   );
 }
 
-function HistoryDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin }) {
+function HistoryDropdown({ isActive, getNavLinkStyle, navHoverHandlers, showAuditLog }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
   const pathname = usePathname();
@@ -149,7 +149,7 @@ function HistoryDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin 
             Reports
           </Link>
 
-          {isAdmin && (
+          {showAuditLog && (
             <Link
               href="/history/audit-log"
               onClick={() => setOpen(false)}
@@ -305,7 +305,7 @@ function PerformanceDropdown({ isActive, getNavLinkStyle, navHoverHandlers }) {
     </div>
   );
 }
-function GoalsDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin, pendingGoalConflicts }) {
+function GoalsDropdown({ isActive, getNavLinkStyle, navHoverHandlers, showConflicts, pendingGoalConflicts }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
   const pathname = usePathname();
@@ -423,7 +423,7 @@ function GoalsDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin, p
             Initiative Scoring
           </Link>
 
-          {isAdmin && (
+          {showConflicts && (
             <Link
               href="/admin/conflicts"
               onClick={() => setOpen(false)}
@@ -481,7 +481,7 @@ function GoalsDropdown({ isActive, getNavLinkStyle, navHoverHandlers, isAdmin, p
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, clearUser } = useAuthStore();
+  const { user, clearUser, hasPermission } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const headerRef = useRef(null);
@@ -512,12 +512,9 @@ export default function Header() {
   }, [user]);
 
   const isLoggedIn = Boolean(user);
-  const isAdmin = isLoggedIn && user.user_type === 'admin';
-  const isStaffOrAdmin =
-    isLoggedIn && (user.user_type === 'staff' || user.user_type === 'admin');
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!hasPermission('conflicts.manage')) {
       setPendingGoalConflicts(0);
       return undefined;
     }
@@ -537,7 +534,7 @@ export default function Header() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [isAdmin]);
+  }, [hasPermission]);
 
   async function handleLogout() {
     try {
@@ -651,9 +648,9 @@ export default function Header() {
               >
                 Survey
               </Link>
-              {isStaffOrAdmin && (
-                <Link 
-                  href="/survey-distribution" 
+              {hasPermission('surveys.distribute') && (
+                <Link
+                  href="/survey-distribution"
                   style={getNavLinkStyle('/survey-distribution')}
                   onMouseEnter={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                   onMouseLeave={(e) => !isActive('/survey-distribution') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
@@ -678,37 +675,39 @@ export default function Header() {
                 Initiatives
               </Link>
 
-                {isStaffOrAdmin && (
-                  <>
+                {hasPermission('goals.manage') && (
                     <GoalsDropdown
                       isActive={isActive}
                       getNavLinkStyle={getNavLinkStyle}
                       navHoverHandlers={navHoverHandlers}
-                      isAdmin={isAdmin}
+                      showConflicts={hasPermission('conflicts.manage')}
                       pendingGoalConflicts={pendingGoalConflicts}
                     />
+                )}
+                {hasPermission('performance.view') && (
                     <PerformanceDropdown
                       isActive={isActive}
                       getNavLinkStyle={getNavLinkStyle}
                       navHoverHandlers={navHoverHandlers}
                     />
+                )}
+                {hasPermission('reporting.view') && (
                     <HistoryDropdown
                       isActive={isActive}
                       getNavLinkStyle={getNavLinkStyle}
                       navHoverHandlers={navHoverHandlers}
-                      isAdmin={isAdmin}
+                      showAuditLog={hasPermission('audit.view')}
                     />
-                  </>
                 )}
-                {isAdmin && (
-                  <>
+                {hasPermission('users.manage') && (
                     <Link href="/admin/users" style={getNavLinkStyle('/admin/users')} {...navHoverHandlers('/admin/users')}>
                       User Management
                     </Link>
+                )}
+                {hasPermission('import.manage') && (
                     <Link href="/admin/import" style={getNavLinkStyle('/admin/import')} {...navHoverHandlers('/admin/import')}>
                       Data Import
                     </Link>
-                  </>
                 )}
               </>
             ) : (

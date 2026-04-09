@@ -35,7 +35,7 @@ export default function SurveyDistributionPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
-      if (parsed.user_type === 'admin' || parsed.user_type === 'staff') {
+      if (parsed.permissions && parsed.permissions.includes('surveys.distribute')) {
         setUser(parsed);
       }
     }

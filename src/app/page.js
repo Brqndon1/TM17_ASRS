@@ -105,6 +105,7 @@ const routes = [
     label: 'Take a Survey',
     description: 'Fill out and submit initiative surveys.',
     section: 'public',
+    permission: 'surveys.take',
   },
   {
     href: '/login',
@@ -118,74 +119,70 @@ const routes = [
     label: 'Initiatives',
     description: 'Create, configure, and manage ASRS initiatives.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'initiatives.manage',
   },
   {
     href: '/reporting',
     label: 'Reporting',
     description: 'View published reports and dashboards.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'reporting.view',
   },
   {
     href: '/historical-reports',
     label: 'Historical Reports',
     description: 'Browse, filter, and compare past reports.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'reporting.view',
   },
   {
     href: '/survey-distribution',
     label: 'Distribute Surveys',
     description: 'Send surveys to participants and track distribution.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'surveys.distribute',
   },
   {
     href: '/goals',
     label: 'Goals & Scoring',
     description: 'Set target metrics and scoring criteria for initiatives.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'goals.manage',
   },
   {
     href: '/performance-dashboard',
     label: 'Performance',
     description: 'Monitor initiative outcomes and key performance indicators.',
     section: 'staff',
-    requiresAuth: true,
+    permission: 'performance.view',
   },
   {
     href: '/admin/users',
     label: 'User Management',
     description: 'Manage staff accounts, roles, and permissions.',
     section: 'admin',
-    requiresAuth: true,
-    adminOnly: true,
+    permission: 'users.manage',
   },
   {
     href: '/admin/conflicts',
     label: 'Data conflicts',
     description: 'Review concurrent goal edits and approve or reject proposed changes.',
     section: 'admin',
-    requiresAuth: true,
-    adminOnly: true,
+    permission: 'conflicts.manage',
   },
   {
     href: '/admin/audit',
     label: 'Audit Logs',
     description: 'View system audit trails and export change history.',
     section: 'admin',
-    requiresAuth: true,
-    adminOnly: true,
+    permission: 'audit.view',
   },
   {
     href: '/admin/budgets',
     label: 'Budget Reporting',
     description: 'Create and review initiative budgets by fiscal year.',
     section: 'admin',
-    requiresAuth: true,
-    adminOnly: true,
+    permission: 'budgets.manage',
   },
 ];
 
@@ -305,7 +302,7 @@ function NavigationCard({ href, label, description, isSurvey, initiatives, selec
  * Home Page
  * ----------------------------------------------------------------------- */
 export default function Home() {
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
   const router = useRouter();
 
   const [initiatives, setInitiatives] = useState([]);
@@ -317,10 +314,6 @@ export default function Home() {
   }, []);
 
   const isLoggedIn = Boolean(user);
-  const isAdmin = isLoggedIn && user?.user_type === 'admin';
-  const isStaff =
-    isLoggedIn &&
-    (user?.user_type === 'staff' || user?.user_type === 'admin');
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -337,12 +330,10 @@ export default function Home() {
 
   if (!isHydrated) return null;
 
-  /* Filter routes by auth/role */
+  /* Filter routes by auth/permission */
   const visibleRoutes = routes.filter((route) => {
     if (route.showOnlyWhenLoggedOut) return !isLoggedIn;
-    if (route.adminOnly) return isLoggedIn && isAdmin;
-    if (route.staffOnly) return isLoggedIn && isStaff;
-    if (route.requiresAuth) return isLoggedIn;
+    if (route.permission) return isLoggedIn && hasPermission(route.permission);
     return true;
   });
 
@@ -393,7 +384,7 @@ export default function Home() {
               px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase
               bg-white/10 text-white/70 border border-white/15 flex-shrink-0
             ">
-              {user?.user_type === 'admin' ? 'Administrator' : 'Staff Member'}
+              {user?.user_type?.charAt(0).toUpperCase() + user?.user_type?.slice(1).replace(/_/g, ' ')}
             </span>
           )}
         </div>
