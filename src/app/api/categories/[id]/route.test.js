@@ -7,7 +7,8 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { user_id: 1, access_rank: 100 } }),
+  requirePermission: () => ({ user: { user_id: 1, permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { user_id: 1, permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
 }));
 
 import { GET, PUT, DELETE } from '@/app/api/categories/[id]/route';

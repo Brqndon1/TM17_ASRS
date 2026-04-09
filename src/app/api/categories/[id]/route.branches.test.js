@@ -1,6 +1,9 @@
 const prepareMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/db', () => ({ db: { prepare: prepareMock }, initializeDatabase: vi.fn() }));
-vi.mock('@/lib/auth/server-auth', () => ({ requireAccess: () => ({ user: { access_rank: 100 } }) }));
+vi.mock('@/lib/auth/server-auth', () => ({
+  requirePermission: () => ({ user: { permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+}));
 import { GET, PUT, DELETE } from '@/app/api/categories/[id]/route';
 
 describe('/api/categories/:id extra branches', () => {

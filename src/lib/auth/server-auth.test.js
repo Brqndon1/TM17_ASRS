@@ -4,6 +4,8 @@ import {
   createSession,
   getSessionTokenFromRequest,
   requireAccess,
+  requireAuth,
+  requirePermission,
   revokeSessionByToken,
   SESSION_COOKIE_NAME,
   CSRF_COOKIE_NAME,
@@ -161,5 +163,68 @@ describe('server-auth helper', () => {
     expect(run).not.toHaveBeenCalled();
     revokeSessionByToken(db, 'token');
     expect(run).toHaveBeenCalled();
+  });
+
+  // ── requireAuth tests ──
+
+  test('requireAuth returns test user with permissions in test env', () => {
+    process.env.NODE_ENV = 'test';
+    const req = new Request('http://localhost:3000/api/x');
+    const auth = requireAuth(req, { prepare: vi.fn() });
+    expect(auth.user.user_type).toBe('admin');
+    expect(auth.user.permissions).toContain('surveys.take');
+    expect(auth.user.permissions).toContain('users.manage');
+    expect(auth.session).toBeDefined();
+  });
+
+  test('requireAuth returns unauthorized without valid session', () => {
+    process.env.NODE_ENV = 'development';
+    const db = mockDbForSession(null);
+    const req = new Request('http://localhost:3000/api/x', { headers: { cookie: `${SESSION_COOKIE_NAME}=tok` } });
+    const auth = requireAuth(req, db, { requireCsrf: false });
+    expect(auth.error.status).toBe(401);
+  });
+
+  // ── requirePermission tests ──
+
+  test('requirePermission returns test user with permissions in test env', () => {
+    process.env.NODE_ENV = 'test';
+    const req = new Request('http://localhost:3000/api/x');
+    const auth = requirePermission(req, { prepare: vi.fn() }, 'goals.manage');
+    expect(auth.user.permissions).toContain('goals.manage');
+    expect(auth.error).toBeUndefined();
+  });
+
+  test('requirePermission returns forbidden when user lacks permission', () => {
+    process.env.NODE_ENV = 'development';
+    const goodRow = {
+      session_id: 1,
+      user_id: 9,
+      csrf_token: 'abc',
+      expires_at: '2099-01-01T00:00:00.000Z',
+      absolute_expires_at: '2099-01-01T00:00:00.000Z',
+      revoked_at: null,
+      first_name: 'A',
+      last_name: 'B',
+      email: 'a@x.com',
+      verified: 1,
+      user_type: 'staff',
+      access_rank: 50,
+    };
+
+    const db = {
+      prepare: vi.fn((sql) => {
+        if (sql.includes('WHERE s.token_hash = ?')) return { get: vi.fn(() => goodRow) };
+        if (sql.includes('FROM role_permission')) return { all: vi.fn(() => []) };
+        if (sql.includes('FROM user_permission')) return { all: vi.fn(() => []) };
+        return { get: vi.fn(), run: vi.fn(), all: vi.fn(() => []) };
+      }),
+    };
+
+    const req = new Request('http://localhost:3000/api/x', {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=tok` },
+    });
+    const auth = requirePermission(req, db, 'users.manage', { requireCsrf: false });
+    expect(auth.error.status).toBe(403);
   });
 });

@@ -14,7 +14,8 @@ vi.mock('@/lib/container/service-container', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { email: 'admin@test.com', access_rank: 100 } }),
+  requirePermission: () => ({ user: { email: 'admin@test.com', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { email: 'admin@test.com', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
 }));
 
 import { GET, POST, PUT, DELETE } from '@/app/api/admin/users/route';

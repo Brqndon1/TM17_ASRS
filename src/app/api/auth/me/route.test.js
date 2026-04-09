@@ -3,13 +3,24 @@ vi.mock('@/lib/container/service-container', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({
+  requirePermission: () => ({
     user: {
       user_id: 1,
       email: 'admin@test.com',
       first_name: 'Admin',
       last_name: 'User',
       user_type: 'admin',
+      permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'],
+    },
+  }),
+  requireAuth: () => ({
+    user: {
+      user_id: 1,
+      email: 'admin@test.com',
+      first_name: 'Admin',
+      last_name: 'User',
+      user_type: 'admin',
+      permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'],
     },
   }),
 }));

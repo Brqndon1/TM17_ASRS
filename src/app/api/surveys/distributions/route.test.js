@@ -8,7 +8,8 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { user_id: 2, user_type: 'staff', access_rank: 50 } }),
+  requirePermission: () => ({ user: { user_id: 2, user_type: 'staff', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { user_id: 2, user_type: 'staff', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
 }));
 
 import { GET, POST } from '@/app/api/surveys/distributions/route';

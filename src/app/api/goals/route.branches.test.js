@@ -6,7 +6,8 @@ vi.mock('@/lib/db', () => ({
   initializeDatabase: vi.fn(),
 }));
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { access_rank: 100, email: 'staff@test.com' } }),
+  requirePermission: () => ({ user: { email: 'staff@test.com', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { email: 'staff@test.com', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
 }));
 vi.mock('@/lib/container/service-container', () => ({
   getServiceContainer: () => ({ eventBus: { publish: publishMock } }),

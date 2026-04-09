@@ -8,6 +8,9 @@ export const EVENTS = {
   TOAST_REQUESTED: 'toast.requested',
   /** Emitted when a staff save conflicts with a newer server version; admins should review. */
   GOAL_EDIT_CONFLICT: 'goal.edit.conflict',
+  ROLE_CREATED: 'role.created',
+  ROLE_UPDATED: 'role.updated',
+  ROLE_DELETED: 'role.deleted',
 };
 
 export default EVENTS;

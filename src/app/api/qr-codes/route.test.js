@@ -1,5 +1,5 @@
 const prepareMock = vi.hoisted(() => vi.fn());
-const requireAccessMock = vi.hoisted(() => vi.fn());
+const requirePermissionMock = vi.hoisted(() => vi.fn());
 const initializeDatabaseMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
@@ -8,7 +8,8 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: requireAccessMock,
+  requirePermission: requirePermissionMock,
+  requireAuth: requirePermissionMock,
 }));
 
 import { GET } from '@/app/api/qr-codes/route';
@@ -16,12 +17,12 @@ import { GET } from '@/app/api/qr-codes/route';
 describe('/api/qr-codes GET', () => {
   beforeEach(() => {
     prepareMock.mockReset();
-    requireAccessMock.mockReset();
+    requirePermissionMock.mockReset();
     initializeDatabaseMock.mockClear();
   });
 
   test('returns 401 when user is unauthorized', async () => {
-    requireAccessMock.mockReturnValue({ error: new Response(null, { status: 401 }) });
+    requirePermissionMock.mockReturnValue({ error: new Response(null, { status: 401 }) });
 
     const req = new Request('http://localhost:3000/api/qr-codes');
     const res = await GET(req);
@@ -30,7 +31,7 @@ describe('/api/qr-codes GET', () => {
   });
 
   test('returns transformed QR code list with stats', async () => {
-    requireAccessMock.mockReturnValue({ user: { user_id: 1, access_rank: 100 } });
+    requirePermissionMock.mockReturnValue({ user: { user_id: 1, permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } });
 
     prepareMock.mockReturnValue({
       all: vi.fn(() => [

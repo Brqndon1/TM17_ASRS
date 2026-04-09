@@ -6,7 +6,7 @@ const validateReportUpdatePayloadMock = vi.hoisted(() => vi.fn());
 const queryTableDataMock = vi.hoisted(() => vi.fn());
 const toReportListItemDtoMock = vi.hoisted(() => vi.fn((r) => r));
 const toReportDetailDtoMock = vi.hoisted(() => vi.fn((r) => r));
-const requireAccessMock = vi.hoisted(() => vi.fn(() => ({ user: { access_rank: 100 } })));
+const requirePermissionMock = vi.hoisted(() => vi.fn(() => ({ user: { permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } })));
 
 vi.mock('@/lib/report-validation', () => ({
   validateReportCreatePayload: validateReportCreatePayloadMock,
@@ -37,7 +37,7 @@ vi.mock('@/lib/container/service-container', () => ({
   }),
 }));
 
-vi.mock('@/lib/auth/server-auth', () => ({ requireAccess: requireAccessMock }));
+vi.mock('@/lib/auth/server-auth', () => ({ requirePermission: requirePermissionMock, requireAuth: requirePermissionMock }));
 
 import { GET, POST, PUT, DELETE } from '@/app/api/reports/route';
 
@@ -51,8 +51,8 @@ describe('/api/reports branch coverage', () => {
     queryTableDataMock.mockReset();
     toReportListItemDtoMock.mockClear();
     toReportDetailDtoMock.mockClear();
-    requireAccessMock.mockReset();
-    requireAccessMock.mockReturnValue({ user: { access_rank: 100 } });
+    requirePermissionMock.mockReset();
+    requirePermissionMock.mockReturnValue({ user: { permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } });
     publishMock.mockReset();
     reportEngineMock.validateTrendConfig.mockReset();
     reportEngineMock.processReportData.mockReset();
@@ -76,7 +76,7 @@ describe('/api/reports branch coverage', () => {
     expect((await POST(req({}))).status).toBe(400);
 
     validateReportCreatePayloadMock.mockReturnValue({ valid: true, value: { initiativeId: 2, name: 'R1' } });
-    requireAccessMock.mockReturnValueOnce({ error: new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }) });
+    requirePermissionMock.mockReturnValueOnce({ error: new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 }) });
     expect((await POST(req({ initiativeId: 2 }))).status).toBe(403);
 
     prepareMock.mockImplementation((sql) => {

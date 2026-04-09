@@ -8,9 +8,10 @@ vi.mock('@/lib/db', () => ({
 }));
 
 // Default: admin user with access
-const mockRequireAccess = vi.hoisted(() => vi.fn());
+const mockRequirePermission = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: (...args) => mockRequireAccess(...args),
+  requirePermission: (...args) => mockRequirePermission(...args),
+  requireAuth: (...args) => mockRequirePermission(...args),
 }));
 
 import { GET } from '@/app/api/audit-log/route';
@@ -23,9 +24,9 @@ describe('/api/audit-log GET', () => {
   beforeEach(() => {
     prepareMock.mockReset();
     initializeDatabaseMock.mockReset();
-    mockRequireAccess.mockReset();
-    mockRequireAccess.mockReturnValue({
-      user: { user_id: 1, email: 'admin@test.com', access_rank: 100, user_type: 'admin' },
+    mockRequirePermission.mockReset();
+    mockRequirePermission.mockReturnValue({
+      user: { user_id: 1, email: 'admin@test.com', user_type: 'admin', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] },
     });
   });
 
@@ -33,7 +34,7 @@ describe('/api/audit-log GET', () => {
 
   test('returns 401 when user is not authenticated', async () => {
     const mockResponse = new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401 });
-    mockRequireAccess.mockReturnValue({ error: mockResponse });
+    mockRequirePermission.mockReturnValue({ error: mockResponse });
 
     const res = await GET(mkRequest());
     expect(res.status).toBe(401);
@@ -41,7 +42,7 @@ describe('/api/audit-log GET', () => {
 
   test('returns 403 when user is staff (not admin)', async () => {
     const mockResponse = new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-    mockRequireAccess.mockReturnValue({ error: mockResponse });
+    mockRequirePermission.mockReturnValue({ error: mockResponse });
 
     const res = await GET(mkRequest());
     expect(res.status).toBe(403);
@@ -55,10 +56,11 @@ describe('/api/audit-log GET', () => {
 
     await GET(mkRequest());
 
-    expect(mockRequireAccess).toHaveBeenCalledWith(
+    expect(mockRequirePermission).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ minAccessRank: 100, requireCsrf: false })
+      expect.any(String),
+      expect.objectContaining({ requireCsrf: false })
     );
   });
 

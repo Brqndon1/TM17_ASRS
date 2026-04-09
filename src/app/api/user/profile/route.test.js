@@ -1,6 +1,6 @@
 const prepareMock = vi.hoisted(() => vi.fn());
 const execMock = vi.hoisted(() => vi.fn());
-const requireAccessMock = vi.hoisted(() => vi.fn());
+const requirePermissionMock = vi.hoisted(() => vi.fn());
 const hashPasswordMock = vi.hoisted(() => vi.fn(() => 'hashed_pw'));
 const verifyPasswordMock = vi.hoisted(() => vi.fn(() => true));
 
@@ -14,7 +14,8 @@ vi.mock('@/lib/container/service-container', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: requireAccessMock,
+  requirePermission: requirePermissionMock,
+  requireAuth: requirePermissionMock,
 }));
 
 vi.mock('@/lib/auth/passwords', () => ({
@@ -28,7 +29,7 @@ describe('/api/user/profile', () => {
   beforeEach(() => {
     prepareMock.mockReset();
     execMock.mockReset();
-    requireAccessMock.mockReset();
+    requirePermissionMock.mockReset();
     hashPasswordMock.mockClear();
     verifyPasswordMock.mockClear();
   });
@@ -38,7 +39,7 @@ describe('/api/user/profile', () => {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });
-    requireAccessMock.mockReturnValue({ error: unauthorized });
+    requirePermissionMock.mockReturnValue({ error: unauthorized });
 
     const req = new Request('http://localhost:3000/api/user/profile');
     const res = await GET(req);
@@ -46,7 +47,7 @@ describe('/api/user/profile', () => {
   });
 
   test('GET returns profile and submissions when authorized', async () => {
-    requireAccessMock.mockReturnValue({ user: { user_id: 5 } });
+    requirePermissionMock.mockReturnValue({ user: { user_id: 5, permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } });
 
     prepareMock.mockImplementation((sql) => {
       if (sql.includes('FROM user u')) {
@@ -84,7 +85,7 @@ describe('/api/user/profile', () => {
   });
 
   test('PUT returns 400 for invalid email format', async () => {
-    requireAccessMock.mockReturnValue({ user: { user_id: 5 } });
+    requirePermissionMock.mockReturnValue({ user: { user_id: 5, permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } });
 
     const req = new Request('http://localhost:3000/api/user/profile', {
       method: 'PUT',
@@ -101,7 +102,7 @@ describe('/api/user/profile', () => {
   });
 
   test('DELETE blocks deleting only admin account', async () => {
-    requireAccessMock.mockReturnValue({ user: { user_id: 1, user_type: 'admin' } });
+    requirePermissionMock.mockReturnValue({ user: { user_id: 1, user_type: 'admin', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } });
 
     prepareMock.mockImplementation((sql) => {
       if (sql.includes('COUNT(*) AS cnt')) {

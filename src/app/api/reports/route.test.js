@@ -13,7 +13,8 @@ vi.mock('@/lib/query-helpers', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({ user: { user_id: 1, user_type: 'staff', access_rank: 50 } }),
+  requirePermission: () => ({ user: { user_id: 1, user_type: 'staff', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
+  requireAuth: () => ({ user: { user_id: 1, user_type: 'staff', permissions: ['surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create', 'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view', 'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage'] } }),
 }));
 
 import { GET, PUT } from '@/app/api/reports/route';

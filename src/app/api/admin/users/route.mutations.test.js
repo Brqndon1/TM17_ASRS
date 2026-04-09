@@ -10,7 +10,10 @@ vi.mock('@/lib/container/service-container', () => ({
 }));
 
 vi.mock('@/lib/auth/server-auth', () => ({
-  requireAccess: () => ({
+  requirePermission: () => ({
+    error: new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), { status: 403 }),
+  }),
+  requireAuth: () => ({
     error: new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), { status: 403 }),
   }),
 }));
