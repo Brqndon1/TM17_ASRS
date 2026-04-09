@@ -14,8 +14,11 @@ export default function SurveyPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [isMounted, setIsMounted] = useState(false);
-  const [isQrAccess, setIsQrAccess] = useState(false);
-  const userRole = isMounted ? (user?.user_type || 'public') : 'public';
+  const [isQrAccess] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(new URLSearchParams(window.location.search).get('qr'));
+  });
+  const userRole = user?.user_type || 'public';
   const isPublicView = isQrAccess || userRole === 'public';
 
   // Form fields
@@ -55,14 +58,10 @@ export default function SurveyPage() {
   useEffect(() => {
     setIsMounted(true);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasQrParam = Boolean(urlParams.get('qr'));
-
-    if (hasQrParam) {
-      setIsQrAccess(true);
+    if (isQrAccess) {
       setSurveyOpen(true);
     }
-  }, []);
+  }, [isQrAccess]);
 
   // Check for an active distribution on mount (public users only)
   useEffect(() => {
@@ -444,14 +443,25 @@ export default function SurveyPage() {
     { value: 'very_dissatisfied', label: 'Very Dissatisfied', emoji: '😞' },
   ];
 
+  if (!isMounted) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
+        <Header />
+        <main style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1.5rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>Loading…</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
       <Header />
 
-      <main style={{ 
-        maxWidth: isPublicView ? '680px' : '1100px', 
-        margin: '0 auto', 
-        padding: isPublicView ? '2rem 1.5rem' : '1.5rem' 
+      <main style={{
+        maxWidth: isPublicView ? '680px' : '1100px',
+        margin: '0 auto',
+        padding: isPublicView ? '2rem 1.5rem' : '1.5rem'
       }}>
         <BackButton />
         {!isPublicView && (
