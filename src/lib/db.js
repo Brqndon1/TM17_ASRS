@@ -417,6 +417,25 @@ function initializeDatabase() {
       min_access_rank INTEGER NOT NULL DEFAULT 1
     );
 
+    -- Permission-based role access (replaces access_rank system)
+
+    CREATE TABLE IF NOT EXISTS permission (
+      permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      description TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS role_permission (
+      role_permission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_type_id INTEGER NOT NULL REFERENCES user_type(user_type_id) ON DELETE CASCADE,
+      permission_id INTEGER NOT NULL REFERENCES permission(permission_id) ON DELETE CASCADE,
+      UNIQUE(user_type_id, permission_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_role_permission_user_type ON role_permission(user_type_id);
+    CREATE INDEX IF NOT EXISTS idx_role_permission_permission ON role_permission(permission_id);
+
     -- Legacy tables (current /api/surveys and /api/reports routes)
 
       CREATE TABLE IF NOT EXISTS surveys (
@@ -716,6 +735,49 @@ function initializeDatabase() {
   insertUserType.run('public', 10);
   insertUserType.run('staff', 50);
   insertUserType.run('admin', 100);
+
+  // ── Seed permissions ──────────────────────────────────
+  const seedPerm = db.prepare(
+    'INSERT OR IGNORE INTO permission (key, label) VALUES (?, ?)'
+  );
+  seedPerm.run('surveys.take', 'Take Surveys');
+  seedPerm.run('initiatives.manage', 'Initiatives');
+  seedPerm.run('reporting.view', 'Reporting');
+  seedPerm.run('reports.create', 'Report Creation');
+  seedPerm.run('forms.create', 'Form Creation');
+  seedPerm.run('surveys.distribute', 'Survey Distribution');
+  seedPerm.run('goals.manage', 'Goals & Scoring');
+  seedPerm.run('performance.view', 'Performance Dashboard');
+  seedPerm.run('budgets.manage', 'Budget Reporting');
+  seedPerm.run('conflicts.manage', 'Data Conflicts');
+  seedPerm.run('users.manage', 'User Management');
+  seedPerm.run('audit.view', 'Audit Logs');
+  seedPerm.run('import.manage', 'Data Import');
+
+  // ── Seed default role permissions ─────────────────────
+  function seedRolePermission(roleType, permissionKey) {
+    db.prepare(`
+      INSERT OR IGNORE INTO role_permission (user_type_id, permission_id)
+      SELECT ut.user_type_id, p.permission_id
+      FROM user_type ut, permission p
+      WHERE ut.type = ? AND p.key = ?
+    `).run(roleType, permissionKey);
+  }
+
+  const allPermKeys = [
+    'surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create',
+    'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view',
+    'budgets.manage', 'conflicts.manage', 'users.manage', 'audit.view', 'import.manage',
+  ];
+  for (const key of allPermKeys) seedRolePermission('admin', key);
+
+  const staffPermKeys = [
+    'surveys.take', 'initiatives.manage', 'reporting.view', 'reports.create',
+    'forms.create', 'surveys.distribute', 'goals.manage', 'performance.view',
+  ];
+  for (const key of staffPermKeys) seedRolePermission('staff', key);
+
+  seedRolePermission('public', 'surveys.take');
 
   // ── Seed initiative data from JSON files ──────────────
   function toCamelKey(displayName) {
