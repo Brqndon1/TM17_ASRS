@@ -1,7 +1,6 @@
 'use client';
 
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
@@ -45,6 +44,25 @@ const ATTRIBUTE_CATALOG = [
   'Feasibility Score',
 ];
 
+function statusPill(status) {
+  if (!status) return <span className="pill pill-gray">Draft</span>;
+  const s = status.toLowerCase();
+  if (s === 'active')    return <span className="pill pill-green">Active</span>;
+  if (s === 'in review') return <span className="pill pill-yellow">In Review</span>;
+  if (s === 'draft')     return <span className="pill pill-gray">Draft</span>;
+  if (s === 'archived')  return <span className="pill pill-red">Archived</span>;
+  return <span className="pill pill-gray">{status}</span>;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function InitiativeCreationPage() {
 
   const [userRole, setUserRole] = useState('public');
@@ -59,8 +77,34 @@ export default function InitiativeCreationPage() {
   }, []);
 
   const router = useRouter();
+
+  // ── Initiative list state ──────────────────────────────
+  const [initiatives, setInitiatives] = useState([]);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+
+  const fetchInitiatives = async () => {
+    try {
+      setIsLoadingList(true);
+      const response = await apiFetch('/api/initiatives');
+      const data = await response.json();
+      if (response.ok) {
+        setInitiatives(data.initiatives || []);
+      }
+    } catch (error) {
+      console.error('Error fetching initiatives:', error);
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitiatives();
+  }, []);
+
+  // ── Create-form state ──────────────────────────────────
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
   const [selectedAttributes, setSelectedAttributes] = useState([]);
   const [customAttributes, setCustomAttributes] = useState([]);
   const [newAttribute, setNewAttribute] = useState('');
@@ -114,7 +158,7 @@ export default function InitiativeCreationPage() {
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, saveAsDraft = false) => {
     e.preventDefault();
     setMessage('');
     setIsSubmitting(true);
@@ -135,9 +179,20 @@ export default function InitiativeCreationPage() {
       ? questions.map((q) => q.trim()).filter(Boolean)
       : [];
 
+    const effectiveStatus = saveAsDraft ? 'draft' : status;
+
     try {
       // collect reason before creating initiative
-      setPendingAction({ type: 'createInitiative', payload: { name: name.trim(), description: description.trim(), attributes: selectedAttributes, questions: cleanedQuestions, settings: { status, isPublic } } });
+      setPendingAction({
+        type: 'createInitiative',
+        payload: {
+          name: name.trim(),
+          description: description.trim(),
+          attributes: selectedAttributes,
+          questions: cleanedQuestions,
+          settings: { status: effectiveStatus, isPublic },
+        },
+      });
       setShowReasonModal(true);
     } catch (error) {
       setMessage('Connection error. Please try again.');
@@ -165,6 +220,7 @@ export default function InitiativeCreationPage() {
         setMessage('Initiative created successfully!');
         setName('');
         setDescription('');
+        setCategory('');
         setSelectedAttributes([]);
         setCustomAttributes([]);
         setNewAttribute('');
@@ -172,6 +228,7 @@ export default function InitiativeCreationPage() {
         setQuestions(['']);
         setStatus('Active');
         setIsPublic(false);
+        fetchInitiatives();
         setTimeout(() => router.push('/'), 2000);
       } else {
         setMessage(`${data.error || 'Failed to create initiative'}`);
@@ -185,324 +242,421 @@ export default function InitiativeCreationPage() {
     }
   };
 
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+  // ── Derived stats ──────────────────────────────────────
+  const totalCount    = initiatives.length;
+  const activeCount   = initiatives.filter(i => {
+    const s = (i.settings?.status || '').toLowerCase();
+    return s === 'active' || s === '';
+  }).length;
+  const draftCount    = initiatives.filter(i => {
+    const s = (i.settings?.status || '').toLowerCase();
+    return s === 'draft' || s === 'archived';
+  }).length;
 
-      <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-        <BackButton />
-        
-        {(userRole === 'admin' || userRole === 'staff') ? (
-          <>
-            {/* Page Header */}
-            <div style={{ marginBottom: '2rem' }}>
-              <h1 style={{
-                fontSize: '1.75rem',
-                fontWeight: '700',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.4rem',
-              }}>
-                Create Initiative
-              </h1>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', margin: 0 }}>
-                Define a new ASRS initiative with its name, description, attributes, and settings.
-              </p>
+  const canCreate = userRole === 'admin' || userRole === 'staff';
+
+  return (
+    <PageLayout title="Initiatives">
+
+      {/* ── Page header row ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0 }}>Initiatives</h2>
+        {canCreate && (
+          <button
+            className="btn-primary"
+            onClick={() => document.getElementById('create-form')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            + New Initiative
+          </button>
+        )}
+      </div>
+
+      {/* ── Stats row ── */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-label">Total Initiatives</div>
+          <div className="stat-value">{totalCount}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Active</div>
+          <div className="stat-value">{activeCount}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Draft / Archived</div>
+          <div className="stat-value">{draftCount}</div>
+        </div>
+      </div>
+
+      {/* ── Initiatives table card ── */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <span className="card-title">All Initiatives</span>
+        </div>
+
+        {isLoadingList ? (
+          <p style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+            Loading initiatives…
+          </p>
+        ) : initiatives.length === 0 ? (
+          <p style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+            No initiatives yet. {canCreate && 'Use the form below to create one.'}
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Initiative</th>
+                  <th>Category</th>
+                  <th>Created</th>
+                  <th>Participants</th>
+                  <th>Surveys</th>
+                  <th>Status</th>
+                  {canCreate && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {initiatives.map((initiative) => {
+                  const s = initiative.settings?.status || 'active';
+                  return (
+                    <tr key={initiative.id}>
+                      <td style={{ fontWeight: 600, color: '#111827' }}>{initiative.name}</td>
+                      <td style={{ color: '#6B7280' }}>{initiative.category || '—'}</td>
+                      <td style={{ color: '#6B7280' }}>{formatDate(initiative.created_at)}</td>
+                      <td style={{ color: '#6B7280' }}>{initiative.participant_count ?? '—'}</td>
+                      <td style={{ color: '#6B7280' }}>{initiative.survey_count ?? '—'}</td>
+                      <td>{statusPill(s)}</td>
+                      {canCreate && (
+                        <td>
+                          <span
+                            style={{ color: '#E67E22', cursor: 'pointer', fontSize: 13, fontWeight: 500, marginRight: 12 }}
+                            onClick={() => router.push(`/initiative-creation?edit=${initiative.id}`)}
+                          >
+                            Edit
+                          </span>
+                          <span
+                            style={{ color: '#6B7280', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                            onClick={() => router.push(`/initiative-creation?archive=${initiative.id}`)}
+                          >
+                            Archive
+                          </span>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Create form ── */}
+      {canCreate ? (
+        <div id="create-form" className="card">
+          <div className="card-header">
+            <span className="card-title">Create Initiative</span>
+          </div>
+
+          {/* Status message */}
+          {message && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              marginBottom: '1.25rem',
+              backgroundColor: message.includes('successfully') ? '#e8f5e9' : '#ffebee',
+              border: `1px solid ${message.includes('successfully') ? '#c8e6c9' : '#ffcdd2'}`,
+              borderRadius: '8px',
+              color: message.includes('successfully') ? '#2e7d32' : '#c62828',
+              fontSize: '0.9rem',
+            }}>
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={(e) => handleSubmit(e, false)}>
+
+            {/* ── Row 1: Name + Category ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={labelStyle}>
+                  Initiative Name <span style={{ color: '#c62828' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., E-Gaming and Careers"
+                  required
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+                >
+                  <option value="">Select category…</option>
+                  <option value="STEM">STEM</option>
+                  <option value="Arts">Arts</option>
+                  <option value="Sports">Sports</option>
+                  <option value="Community">Community</option>
+                  <option value="Academic">Academic</option>
+                  <option value="Career">Career</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
             </div>
 
-            {/* Status Message */}
-            {message && (
-              <div style={{
-                padding: '0.75rem 1rem',
-                marginBottom: '1.5rem',
-                backgroundColor: message.includes('successfully') ? '#e8f5e9' : '#ffebee',
-                border: `1px solid ${message.includes('successfully') ? '#c8e6c9' : '#ffcdd2'}`,
-                borderRadius: '8px',
-                color: message.includes('successfully') ? '#2e7d32' : '#c62828',
-                fontSize: '0.9rem',
-              }}>
-                {message}
-              </div>
-            )}
+            {/* ── Description ── */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the initiative's purpose and goals…"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+              />
+            </div>
 
-            <form onSubmit={handleSubmit}>
-              {/* ── Name & Description ─────────────────────── */}
-              <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
-                <h2 style={sectionHeadingStyle}>Basic Information</h2>
-
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={labelStyle}>
-                    Initiative Name <span style={{ color: '#c62828' }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g., E-Gaming and Careers"
-                    required
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Description</label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe the initiative's purpose and goals..."
-                    rows={3}
-                    style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                  />
-                </div>
-              </div>
-
-              {/* ── Attributes ─────────────────────────────── */}
-              <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
-                <h2 style={sectionHeadingStyle}>
-                  Attributes{' '}
-                  <span style={{ color: '#c62828', fontSize: '0.85rem' }}>*</span>
-                  <span style={{
-                    fontSize: '0.8rem',
-                    fontWeight: '400',
-                    color: 'var(--color-text-light)',
-                    marginLeft: '0.5rem',
-                  }}>
+            {/* ── Attributes ── */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>
+                  Attributes <span style={{ color: '#c62828' }}>*</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '400', color: '#9CA3AF', marginLeft: '0.5rem' }}>
                     {selectedAttributes.length} selected
                   </span>
-                </h2>
-
+                </label>
                 {userRole === 'admin' && (
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={labelStyle}>Add Custom Attribute (Admin only)</label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type="text"
-                        value={newAttribute}
-                        onChange={(e) => setNewAttribute(e.target.value)}
-                        placeholder="e.g., Mentor Participation"
-                        style={{ ...inputStyle, marginBottom: 0 }}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCustomAttribute}
-                        className="asrs-btn-secondary"
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        Add Attribute
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{
-                  maxHeight: '240px',
-                  overflowY: 'auto',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  borderRadius: '8px',
-                  padding: '0.5rem',
-                  backgroundColor: 'var(--color-bg-primary)',
-                }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: '0.25rem',
-                  }}>
-                    {allAttributes.map((attribute) => {
-                      const isSelected = selectedAttributes.includes(attribute);
-                      return (
-                        <label
-                          key={attribute}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '6px',
-                            backgroundColor: isSelected ? 'var(--color-bg-secondary)' : 'transparent',
-                            border: isSelected ? '1px solid var(--color-bg-tertiary)' : '1px solid transparent',
-                            transition: 'all 0.15s ease',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleAttributeToggle(attribute)}
-                            style={{ marginRight: '0.5rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
-                          />
-                          <span style={{ color: 'var(--color-text-primary)' }}>{attribute}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Settings ───────────────────────────────── */}
-              <div className="asrs-card" style={{ marginBottom: '1.25rem' }}>
-                <h2 style={sectionHeadingStyle}>Settings</h2>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
-                    <label style={labelStyle}>Status</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      style={{ ...inputStyle, cursor: 'pointer' }}
-                    >
-                      <option value="active">Active</option>
-                      <option value="archived">Archived</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      padding: '0.625rem 0.75rem',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-bg-secondary)',
-                      border: '1px solid var(--color-bg-tertiary)',
-                      width: '100%',
-                      transition: 'background-color 0.15s ease',
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={isPublic}
-                        onChange={(e) => setIsPublic(e.target.checked)}
-                        style={{ marginRight: '0.6rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
-                      />
-                      <span style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
-                        Publicly visible
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Questions ──────────────────────────────── */}
-              <div className="asrs-card" style={{ marginBottom: '1.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: addQuestions ? '1rem' : 0 }}>
-                  <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>Questions</h2>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    color: 'var(--color-text-secondary)',
-                  }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <input
-                      type="checkbox"
-                      checked={addQuestions}
-                      onChange={(e) => setAddQuestions(e.target.checked)}
-                      style={{ marginRight: '0.4rem', cursor: 'pointer', accentColor: 'var(--color-asrs-orange)' }}
+                      type="text"
+                      value={newAttribute}
+                      onChange={(e) => setNewAttribute(e.target.value)}
+                      placeholder="Custom attribute…"
+                      style={{ ...inputStyle, width: 180, marginBottom: 0, fontSize: '0.85rem', padding: '0.4rem 0.6rem' }}
+                      onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
                     />
-                    Add questions
-                  </label>
-                </div>
-
-                {addQuestions && (
-                  <div>
-                    {questions.map((q, i) => (
-                      <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <input
-                          type="text"
-                          value={q}
-                          onChange={(e) => handleQuestionChange(i, e.target.value)}
-                          placeholder={`Question ${i + 1}`}
-                          style={{ ...inputStyle, flex: 1 }}
-                        />
-                        {questions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeQuestionField(i)}
-                            style={{
-                              padding: '0.5rem 0.75rem',
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-bg-tertiary)',
-                              background: 'white',
-                              cursor: 'pointer',
-                              color: '#c62828',
-                              fontWeight: '600',
-                              fontSize: '0.85rem',
-                              transition: 'background-color 0.15s',
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fff5f5'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    ))}
                     <button
                       type="button"
-                      onClick={addQuestionField}
-                      className="asrs-btn-secondary"
-                      style={{ marginTop: '0.25rem', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                      onClick={handleAddCustomAttribute}
+                      className="btn-outline"
+                      style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.4rem 0.75rem' }}
                     >
-                      + Add another question
+                      Add
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* ── Submit ─────────────────────────────────── */}
+              <div style={{
+                maxHeight: '200px',
+                overflowY: 'auto',
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                padding: '0.5rem',
+                backgroundColor: '#F9FAFB',
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: '0.25rem',
+                }}>
+                  {allAttributes.map((attribute) => {
+                    const isSelected = selectedAttributes.includes(attribute);
+                    return (
+                      <label
+                        key={attribute}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          padding: '0.4rem 0.6rem',
+                          borderRadius: '6px',
+                          backgroundColor: isSelected ? '#FFF7ED' : 'transparent',
+                          border: isSelected ? '1px solid #FDBA74' : '1px solid transparent',
+                          transition: 'all 0.15s ease',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleAttributeToggle(attribute)}
+                          style={{ marginRight: '0.5rem', cursor: 'pointer', accentColor: '#E67E22' }}
+                        />
+                        <span style={{ color: '#111827' }}>{attribute}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Settings row ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+                >
+                  <option value="Active">Active</option>
+                  <option value="draft">Draft</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  padding: '0.625rem 0.75rem',
+                  borderRadius: '8px',
+                  backgroundColor: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  width: '100%',
+                  transition: 'background-color 0.15s ease',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    style={{ marginRight: '0.6rem', cursor: 'pointer', accentColor: '#E67E22' }}
+                  />
+                  <span style={{ fontSize: '0.9rem', color: '#111827' }}>Publicly visible</span>
+                </label>
+              </div>
+            </div>
+
+            {/* ── Questions ── */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: addQuestions ? '0.75rem' : 0 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Questions</label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  color: '#6B7280',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={addQuestions}
+                    onChange={(e) => setAddQuestions(e.target.checked)}
+                    style={{ marginRight: '0.4rem', cursor: 'pointer', accentColor: '#E67E22' }}
+                  />
+                  Add questions
+                </label>
+              </div>
+
+              {addQuestions && (
+                <div>
+                  {questions.map((q, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={q}
+                        onChange={(e) => handleQuestionChange(i, e.target.value)}
+                        placeholder={`Question ${i + 1}`}
+                        style={{ ...inputStyle, flex: 1 }}
+                        onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+                      />
+                      {questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestionField(i)}
+                          className="btn-outline"
+                          style={{ color: '#c62828', borderColor: '#FECACA' }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addQuestionField}
+                    className="btn-outline"
+                    style={{ marginTop: '0.25rem', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                  >
+                    + Add another question
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Form actions ── */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="btn-outline"
+                onClick={(e) => handleSubmit(e, true)}
+                style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                Save as Draft
+              </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="asrs-btn-primary"
-                style={{
-                  width: '100%',
-                  padding: '0.85rem',
-                  fontSize: '1rem',
-                  opacity: isSubmitting ? 0.6 : 1,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
+                className="btn-primary"
+                style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
               >
-                {isSubmitting ? 'Creating...' : 'Create Initiative'}
+                {isSubmitting ? 'Creating…' : 'Create Initiative'}
               </button>
-
-            </form>
-            {/* Reason modal for creating initiatives */}
-            <ReasonModal open={showReasonModal} onClose={() => setShowReasonModal(false)} onSubmit={handleReasonSubmit} title="Why are you creating this initiative?" />
-              
-          </>
-        ) : (
-          <div className="asrs-card">
-            {/* Cannot access this page */}
-            <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-                Unauthorized Access
-              </h2>
-              <p style={{ color: 'var(--color-text-secondary)', marginBottom: '0.5rem', lineHeight: 1.6 }}>
-                Only staff and admin can create initiatives.<br />
-              </p>
-              <p style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
-                If you believe this is an error, please contact the administrator.
-              </p>
             </div>
+
+          </form>
+
+          {/* Reason modal for creating initiatives */}
+          <ReasonModal
+            open={showReasonModal}
+            onClose={() => setShowReasonModal(false)}
+            onSubmit={handleReasonSubmit}
+            title="Why are you creating this initiative?"
+          />
+        </div>
+      ) : (
+        <div className="card">
+          <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: '#111827', marginBottom: '0.5rem' }}>
+              Unauthorized Access
+            </h2>
+            <p style={{ color: '#6B7280', marginBottom: '0.5rem', lineHeight: 1.6 }}>
+              Only staff and admin can create initiatives.
+            </p>
+            <p style={{ color: '#9CA3AF', fontSize: '0.85rem' }}>
+              If you believe this is an error, please contact the administrator.
+            </p>
           </div>
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+
+    </PageLayout>
   );
 }
 
 // ── Shared styles ────────────────────────────────────────
 
-const sectionHeadingStyle = {
-  fontSize: '1rem',
-  fontWeight: '700',
-  color: 'var(--color-text-primary)',
-  marginBottom: '1rem',
-  paddingBottom: '0.5rem',
-  borderBottom: '1px solid var(--color-bg-tertiary)',
-};
-
 const labelStyle = {
   display: 'block',
-  color: 'var(--color-text-primary)',
+  color: '#111827',
   marginBottom: '0.4rem',
   fontWeight: '600',
   fontSize: '0.9rem',
@@ -511,11 +665,12 @@ const labelStyle = {
 const inputStyle = {
   width: '100%',
   padding: '0.625rem 0.75rem',
-  border: '1px solid var(--color-bg-tertiary)',
+  border: '1px solid #E5E7EB',
   borderRadius: '8px',
   fontSize: '0.9rem',
-  color: 'var(--color-text-primary)',
+  color: '#111827',
   backgroundColor: 'white',
   outline: 'none',
   boxSizing: 'border-box',
+  transition: 'border-color 150ms ease, box-shadow 150ms ease',
 };
