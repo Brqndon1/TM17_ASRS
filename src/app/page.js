@@ -1,433 +1,356 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
+import { apiFetch } from '@/lib/api/client';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
 
-/* -----------------------------------------------------------------------
- * SVG icon components — lightweight, no extra dependencies
- * ----------------------------------------------------------------------- */
-function IconSurvey() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-    </svg>
-  );
-}
-function IconInitiative() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V8.25a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-    </svg>
-  );
-}
-function IconReporting() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-    </svg>
-  );
-}
-function IconGoals() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-    </svg>
-  );
-}
-function IconLogin() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-    </svg>
-  );
-}
-function IconDistribute() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-    </svg>
-  );
-}
-function IconPerformance() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
-    </svg>
-  );
-}
-function IconUsers() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-    </svg>
-  );
-}
+const CHART_COLORS = ['#E67E22', '#C0392B', '#F39C12', '#F59E0B', '#EF4444'];
 
-function IconAudit() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-}
-
-function IconConflict() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12V15.75z" />
-    </svg>
-  );
-}
-
-const ICON_MAP = {
-  '/survey': IconSurvey,
-  '/initiative-creation': IconInitiative,
-  '/reporting': IconReporting,
-  '/historical-reports': IconReporting,
-  '/goals': IconGoals,
-  '/login': IconLogin,
-  '/survey-distribution': IconDistribute,
-  '/performance-dashboard': IconPerformance,
-  '/admin/users': IconUsers,
-  '/admin/conflicts': IconConflict,
-  '/admin/audit': IconAudit,
-};
-
-/* -----------------------------------------------------------------------
- * Route definitions — one entry per card, no duplicates
- * ----------------------------------------------------------------------- */
-const routes = [
-  {
-    href: '/survey',
-    label: 'Take a Survey',
-    description: 'Fill out and submit initiative surveys.',
-    section: 'public',
-    permission: 'surveys.take',
-  },
-  {
-    href: '/login',
-    label: 'Sign In',
-    description: 'Log in to access staff and admin tools.',
-    section: 'public',
-    showOnlyWhenLoggedOut: true,
-  },
-  {
-    href: '/initiative-creation',
-    label: 'Initiatives',
-    description: 'Create, configure, and manage ASRS initiatives.',
-    section: 'staff',
-    permission: 'initiatives.manage',
-  },
-  {
-    href: '/reporting',
-    label: 'Reporting',
-    description: 'View published reports and dashboards.',
-    section: 'staff',
-    permission: 'reporting.view',
-  },
-  {
-    href: '/historical-reports',
-    label: 'Historical Reports',
-    description: 'Browse, filter, and compare past reports.',
-    section: 'staff',
-    permission: 'reporting.view',
-  },
-  {
-    href: '/survey-distribution',
-    label: 'Distribute Surveys',
-    description: 'Send surveys to participants and track distribution.',
-    section: 'staff',
-    permission: 'surveys.distribute',
-  },
-  {
-    href: '/goals',
-    label: 'Goals & Scoring',
-    description: 'Set target metrics and scoring criteria for initiatives.',
-    section: 'staff',
-    permission: 'goals.manage',
-  },
-  {
-    href: '/performance-dashboard',
-    label: 'Performance',
-    description: 'Monitor initiative outcomes and key performance indicators.',
-    section: 'staff',
-    permission: 'performance.view',
-  },
-  {
-    href: '/admin/users',
-    label: 'User Management',
-    description: 'Manage staff accounts, roles, and permissions.',
-    section: 'admin',
-    permission: 'users.manage',
-  },
-  {
-    href: '/admin/conflicts',
-    label: 'Data conflicts',
-    description: 'Review concurrent goal edits and approve or reject proposed changes.',
-    section: 'admin',
-    permission: 'conflicts.manage',
-  },
-  {
-    href: '/admin/audit',
-    label: 'Audit Logs',
-    description: 'View system audit trails and export change history.',
-    section: 'admin',
-    permission: 'audit.view',
-  },
-  {
-    href: '/admin/budgets',
-    label: 'Budget Reporting',
-    description: 'Create and review initiative budgets by fiscal year.',
-    section: 'admin',
-    permission: 'budgets.manage',
-  },
+const MONTHLY_DATA = [
+  { month: 'Nov', responses: 80 },
+  { month: 'Dec', responses: 120 },
+  { month: 'Jan', responses: 95 },
+  { month: 'Feb', responses: 180 },
+  { month: 'Mar', responses: 210 },
+  { month: 'Apr', responses: 247 },
 ];
 
-/* -----------------------------------------------------------------------
- * Section metadata
- * ----------------------------------------------------------------------- */
-const SECTIONS = {
-  public: { title: 'Get Started', subtitle: 'Available to everyone' },
-  staff: { title: 'Staff Tools', subtitle: 'For ASRS staff members' },
-  admin: { title: 'Administration', subtitle: 'Admin-only features' },
-};
+const GRADE_DATA = [
+  { name: 'A', value: 27, color: '#E67E22' },
+  { name: 'B', value: 31, color: '#C0392B' },
+  { name: 'C', value: 22, color: '#F39C12' },
+  { name: 'D', value: 12, color: '#F59E0B' },
+  { name: 'F', value: 8,  color: '#EF4444' },
+];
 
-/* -----------------------------------------------------------------------
- * NavigationCard component
- * ----------------------------------------------------------------------- */
-function NavigationCard({ href, label, description, isSurvey, initiatives, selectedInitiative, setSelectedInitiative, router }) {
-  const Icon = ICON_MAP[href];
+const DEADLINES = [
+  { color: '#E67E22', date: 'Apr 15, 2026', title: 'Q1 Initiative Review', description: 'Complete all Q1 scoring submissions' },
+  { color: '#C0392B', date: 'Apr 22, 2026', title: 'Annual Survey Cycle',  description: 'Distribute surveys to all participants' },
+  { color: '#10B981', date: 'May 01, 2026', title: 'Mid-Year Report',      description: 'Publish consolidated performance report' },
+  { color: '#F59E0B', date: 'May 10, 2026', title: 'Goals Calibration',    description: 'Finalize scoring goals for next quarter' },
+];
 
-  const inner = (
-    <div className={`
-      group relative flex flex-col h-full
-      bg-white rounded-lg border border-[var(--color-bg-tertiary)]
-      px-3.5 py-3 transition-all duration-200 ease-out
-      ${isSurvey ? '' : 'hover:shadow-md hover:-translate-y-0.5 hover:border-[var(--color-asrs-orange)] cursor-pointer'}
-    `}>
-      {/* Accent top bar */}
-      <div className={`
-        absolute top-0 left-3 right-3 h-[2px] rounded-b-full
-        bg-gradient-to-r from-[var(--color-asrs-red)] to-[var(--color-asrs-orange)]
-        opacity-0 transition-opacity duration-200
-        ${isSurvey ? '' : 'group-hover:opacity-100'}
-      `} />
+const QUICK_ACTIONS = [
+  { href: '/initiative-creation', icon: '📋', title: 'Create Initiative',   description: 'Set up a new initiative and configure scoring' },
+  { href: '/report-creation',     icon: '📊', title: 'Generate Report',     description: 'Build and publish a new initiative report' },
+  { href: '/survey-distribution', icon: '📤', title: 'Distribute Survey',   description: 'Send surveys to initiative participants' },
+  { href: '/goals',               icon: '🎯', title: 'Review Goals',        description: 'Update scoring targets and criteria' },
+];
 
-      {/* Icon + Title row */}
-      <div className="flex items-start gap-2.5">
-        {Icon && (
-          <div className={`
-            flex-shrink-0 p-1.5 rounded-md mt-0.5
-            bg-[var(--color-bg-secondary)]
-            text-[var(--color-asrs-dark)]
-            transition-colors duration-200
-            ${isSurvey ? '' : 'group-hover:bg-gradient-to-br group-hover:from-[var(--color-asrs-red)] group-hover:to-[var(--color-asrs-orange)] group-hover:text-white'}
-          `}>
-            <Icon />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[var(--color-text-primary)] leading-snug">
-              {label}
-            </h3>
-            {!isSurvey && (
-              <svg className="w-3.5 h-3.5 flex-shrink-0 ml-1 text-[var(--color-text-light)] group-hover:text-[var(--color-asrs-orange)] transition-transform duration-200 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
-            )}
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 leading-snug">
-            {description}
-          </p>
-        </div>
-      </div>
-
-      {/* Survey-specific: initiative picker */}
-      {isSurvey && (
-        <div className="mt-2.5 pt-2.5 border-t border-[var(--color-bg-tertiary)]">
-          <select
-            value={selectedInitiative}
-            onChange={(e) => setSelectedInitiative(e.target.value)}
-            className="
-              w-full px-2.5 py-1.5 text-xs rounded-md
-              border border-[var(--color-bg-tertiary)]
-              bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]
-              focus:outline-none focus:ring-2 focus:ring-[var(--color-asrs-orange)] focus:border-transparent
-              mb-1.5
-            "
-          >
-            <option value="">— Choose an initiative —</option>
-            {initiatives.map((init) => (
-              <option key={init.id} value={init.id}>{init.name}</option>
-            ))}
-          </select>
-          <button
-            disabled={!selectedInitiative}
-            onClick={() => {
-              if (selectedInitiative) {
-                router.push(`/survey?initiativeId=${selectedInitiative}`);
-              }
-            }}
-            className={`
-              w-full py-1.5 px-3 rounded-md text-xs font-semibold text-white
-              transition-all duration-150
-              ${selectedInitiative
-                ? 'bg-gradient-to-r from-[var(--color-asrs-red)] to-[var(--color-asrs-orange)] hover:opacity-90 cursor-pointer shadow-sm'
-                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-light)] cursor-not-allowed'}
-            `}
-          >
-            Start Survey
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  if (isSurvey) {
-    return inner;
-  }
-
-  return (
-    <Link href={href} className="no-underline block h-full">
-      {inner}
-    </Link>
-  );
+function statusPill(status) {
+  if (!status) return <span className="pill pill-gray">Unknown</span>;
+  const s = status.toLowerCase();
+  if (s === 'active')    return <span className="pill pill-green">Active</span>;
+  if (s === 'in review') return <span className="pill pill-yellow">In Review</span>;
+  if (s === 'draft')     return <span className="pill pill-gray">Draft</span>;
+  if (s === 'published') return <span className="pill pill-green">Published</span>;
+  return <span className="pill pill-gray">{status}</span>;
 }
 
-/* -----------------------------------------------------------------------
- * Home Page
- * ----------------------------------------------------------------------- */
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function Home() {
   const { user, hasPermission } = useAuthStore();
   const router = useRouter();
-
   const [initiatives, setInitiatives] = useState([]);
-  const [selectedInitiative, setSelectedInitiative] = useState('');
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [reports, setReports]         = useState([]);
+  const [responseCount, setResponseCount] = useState(null);
+  const [isHydrated, setIsHydrated]   = useState(false);
+  const [chartTab, setChartTab]       = useState('monthly');
+
+  useEffect(() => { setIsHydrated(true); }, []);
 
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  const isLoggedIn = Boolean(user);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-
-    fetch('/api/initiatives')
-      .then((res) => res.json())
-      .then((data) =>
-        setInitiatives(
-          Array.isArray(data.initiatives) ? data.initiatives : []
-        )
-      )
-      .catch(() => setInitiatives([]));
-  }, [isHydrated]);
+    if (!isHydrated || !user) return;
+    apiFetch('/api/initiatives')
+      .then(r => r.json())
+      .then(d => setInitiatives(d.initiatives || []))
+      .catch(() => {});
+    apiFetch('/api/reports')
+      .then(r => r.json())
+      .then(d => setReports(d.reports || []))
+      .catch(() => {});
+    apiFetch('/api/surveys/responses?initiativeId=all')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setResponseCount(d.total ?? d.count ?? null); })
+      .catch(() => {});
+  }, [isHydrated, user]);
 
   if (!isHydrated) return null;
 
-  /* Filter routes by auth/permission */
-  const visibleRoutes = routes.filter((route) => {
-    if (route.showOnlyWhenLoggedOut) return !isLoggedIn;
-    if (route.permission) return isLoggedIn && hasPermission(route.permission);
-    return true;
-  });
+  /* ── Non-logged-in landing ── */
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <img src="/asrs-logo.png" alt="ASRS" style={{ width: 64, height: 64, borderRadius: 12, marginBottom: 24 }} />
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', marginBottom: 8 }}>ASRS Initiatives Reporting System</h1>
+        <p style={{ color: '#6B7280', marginBottom: 24 }}>Empowering communities through data-driven initiatives.</p>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Link href="/login" className="btn-primary">Sign In</Link>
+          <Link href="/survey" className="btn-outline">Take a Survey</Link>
+        </div>
+      </div>
+    );
+  }
 
-  /* Group visible routes into sections, preserving order */
-  const sectionOrder = ['public', 'staff', 'admin'];
-  const grouped = sectionOrder
-    .map((key) => ({
-      key,
-      ...SECTIONS[key],
-      items: visibleRoutes.filter((r) => r.section === key),
-    }))
-    .filter((s) => s.items.length > 0);
+  /* ── Derived stats ── */
+  const activeCount    = initiatives.filter(i => i.status === 'active' || !i.status).length;
+  const surveyCount    = responseCount ?? 247;
+  const reportCount    = reports.length;
+  const completionRate = initiatives.length
+    ? Math.round((initiatives.filter(i => i.status === 'published' || i.status === 'active').length / initiatives.length) * 100)
+    : 84;
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  })();
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const tableInitiatives = initiatives.slice(0, 8);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+    <PageLayout title="Dashboard">
 
-      {/* ── Compact hero banner ── */}
-      <section
-        className="relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%)' }}
-      >
-        <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full opacity-5 bg-white" />
-        <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full opacity-5 bg-white" />
+      {/* ── Welcome Row ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
+            {greeting}, {user.first_name || user.email?.split('@')[0] || 'there'}
+          </h2>
+          <p style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>{dateStr}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Link href="/report-creation" className="btn-primary">+ Create Report</Link>
+          <Link href="/survey" className="btn-outline">Take Survey</Link>
+        </div>
+      </div>
 
-        <div className="relative max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4 min-w-0">
-            {/* Orange accent line */}
-            <div
-              className="w-1 h-10 rounded-full flex-shrink-0"
-              style={{ background: 'linear-gradient(180deg, var(--color-asrs-red), var(--color-asrs-orange))' }}
-            />
-            <div>
-              <h1 className="text-white text-lg md:text-xl font-bold tracking-tight leading-tight">
-                ASRS Initiatives Reporting System
-              </h1>
-              <p className="text-white/60 text-sm leading-snug mt-0.5">
-                {isLoggedIn
-                  ? `Welcome back, ${user?.first_name || 'User'}.`
-                  : 'Empowering communities through data-driven initiatives.'}
-              </p>
+      {/* ── Stats Row ── */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-label">Active Initiatives</div>
+          <div className="stat-value">{activeCount}</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#10B981' }}>↑ 12% from last month</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Surveys Collected</div>
+          <div className="stat-value">{surveyCount}</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#10B981' }}>↑ 8% from last month</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Reports Published</div>
+          <div className="stat-value">{reportCount}</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#10B981' }}>↑ 3 new this month</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Completion Rate</div>
+          <div className="stat-value">{completionRate}%</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#F59E0B' }}>→ On track</div>
+        </div>
+      </div>
+
+      {/* ── Charts Row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16, marginBottom: 24 }}>
+
+        {/* Survey Responses area chart */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Survey Responses</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['monthly', 'weekly'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setChartTab(tab)}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 9999,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: chartTab === tab ? '#E67E22' : '#F3F4F6',
+                    color: chartTab === tab ? '#fff' : '#6B7280',
+                  }}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
-
-          {/* Role badge */}
-          {isLoggedIn && (
-            <span className="
-              px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase
-              bg-white/10 text-white/70 border border-white/15 flex-shrink-0
-            ">
-              {user?.user_type?.charAt(0).toUpperCase() + user?.user_type?.slice(1).replace(/_/g, ' ')}
-            </span>
-          )}
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={MONTHLY_DATA} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#E67E22" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#E67E22" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ fontSize: 12, border: '1px solid #E5E7EB', borderRadius: 8 }} />
+              <Area type="monotone" dataKey="responses" stroke="#E67E22" strokeWidth={2} fill="url(#areaGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-      </section>
 
-      {/* ── Unified card grid ── */}
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 flex-1">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {grouped.map(({ key, title, subtitle, items }) => (
-            <Fragment key={key}>
-              {/* Section label — spans the full row */}
-              <div className="col-span-full flex items-center gap-2 mt-1 first:mt-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-asrs-orange)]">
-                  {title}
-                </span>
-                <span className="text-[10px] text-[var(--color-text-light)] font-medium">
-                  {subtitle}
-                </span>
-                <div className="flex-1 h-px bg-[var(--color-bg-tertiary)]" />
-              </div>
-
-              {/* Cards flow naturally in the grid */}
-              {items.map((route) => (
-                <NavigationCard
-                  key={route.href}
-                  {...route}
-                  isSurvey={route.href === '/survey'}
-                  initiatives={initiatives}
-                  selectedInitiative={selectedInitiative}
-                  setSelectedInitiative={setSelectedInitiative}
-                  router={router}
-                />
+        {/* Grade Distribution donut */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Grade Distribution</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <ResponsiveContainer width={180} height={180}>
+              <PieChart>
+                <Pie
+                  data={GRADE_DATA}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {GRADE_DATA.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => `${v}%`} contentStyle={{ fontSize: 12, border: '1px solid #E5E7EB', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {GRADE_DATA.map((entry) => (
+                <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: entry.color, flexShrink: 0 }} />
+                  <span style={{ color: '#374151', fontWeight: 500 }}>Grade {entry.name}</span>
+                  <span style={{ color: '#9CA3AF', marginLeft: 'auto' }}>{entry.value}%</span>
+                </div>
               ))}
-            </Fragment>
-          ))}
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
 
-      {/* ── Footer accent ── */}
-      <div
-        className="h-0.5 w-full mt-auto"
-        style={{ background: 'linear-gradient(90deg, var(--color-asrs-red), var(--color-asrs-orange), var(--color-asrs-yellow))' }}
-      />
-    </div>
+      {/* ── Active Initiatives Table ── */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <span className="card-title">Active Initiatives</span>
+          <Link href="/initiative-creation" style={{ fontSize: 13, color: '#E67E22', textDecoration: 'none', fontWeight: 500 }}>
+            View All →
+          </Link>
+        </div>
+        {tableInitiatives.length === 0 ? (
+          <p style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+            No initiatives yet. <Link href="/initiative-creation" style={{ color: '#E67E22' }}>Create one →</Link>
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Initiative</th>
+                  <th>Category</th>
+                  <th>Participants</th>
+                  <th>Avg Score</th>
+                  <th>Status</th>
+                  <th>Last Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableInitiatives.map((initiative) => (
+                  <tr key={initiative.id}>
+                    <td style={{ fontWeight: 500, color: '#111827' }}>
+                      <Link href={`/initiative-creation?id=${initiative.id}`} style={{ color: '#111827', textDecoration: 'none' }}>
+                        {initiative.name}
+                      </Link>
+                    </td>
+                    <td>{initiative.category || '—'}</td>
+                    <td>{initiative.participant_count ?? '—'}</td>
+                    <td>{initiative.avg_score != null ? initiative.avg_score.toFixed(1) : '—'}</td>
+                    <td>{statusPill(initiative.status)}</td>
+                    <td style={{ color: '#6B7280' }}>{formatDate(initiative.updated_at || initiative.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Bottom Row: Deadlines + Quick Actions ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16 }}>
+
+        {/* Upcoming Deadlines */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Upcoming Deadlines</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {DEADLINES.map((d, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ width: 4, borderRadius: 4, background: d.color, alignSelf: 'stretch', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{d.title}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 8, whiteSpace: 'nowrap' }}>{d.date}</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: '#6B7280', margin: '2px 0 0' }}>{d.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Quick Actions</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            {QUICK_ACTIONS.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                style={{ textDecoration: 'none' }}
+              >
+                <div style={{
+                  border: '1px solid #E5E7EB',
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  cursor: 'pointer',
+                  transition: 'border-color 150ms ease, box-shadow 150ms ease',
+                  background: '#fff',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <div style={{ fontSize: 22, marginBottom: 6 }}>{action.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 3 }}>{action.title}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', lineHeight: 1.4 }}>{action.description}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </PageLayout>
   );
 }
