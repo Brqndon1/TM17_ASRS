@@ -1,15 +1,15 @@
 'use client';
 
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
 import { getScoreColor } from '@/lib/score-utils';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
 
 export default function GoalsPage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { user } = useAuthStore();
   const [initiatives, setInitiatives] = useState([]);
   const [selectedInitiative, setSelectedInitiative] = useState('');
   const [goals, setGoals] = useState([]);
@@ -36,20 +36,12 @@ export default function GoalsPage() {
   const [editGoal, setEditGoal] = useState({});
   const [editBaselineUpdatedAt, setEditBaselineUpdatedAt] = useState('');
 
-  // Check staff or admin access
+  // Auth check: staff or admin required
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      router.push('/login');
-      return;
-    }
-    const parsed = JSON.parse(storedUser);
-    if (parsed.user_type !== 'admin' && parsed.user_type !== 'staff') {
+    if (user && user.user_type !== 'admin' && user.user_type !== 'staff') {
       router.push('/');
-      return;
     }
-    setUser(parsed);
-  }, [router]);
+  }, [user, router]);
 
   // Fetch initiatives on mount
   useEffect(() => {
@@ -231,528 +223,576 @@ export default function GoalsPage() {
     }
   }
 
-  if (!user) return null;
+  function getStatusBadge(score) {
+    if (score >= 100) {
+      return <span className="pill pill-blue">Exceeding</span>;
+    } else if (score >= 70) {
+      return <span className="pill pill-green">On Track</span>;
+    } else {
+      return <span className="pill pill-yellow">Below</span>;
+    }
+  }
+
+  // Ring progress SVG helper
+  function RingProgress({ score, size = 80 }) {
+    const radius = (size - 12) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const pct = Math.min(Math.max(score || 0, 0), 100);
+    const offset = circumference - (pct / 100) * circumference;
+    const color = getScoreColor(pct);
+
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#F3F4F6"
+          strokeWidth="8"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+    );
+  }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+    <PageLayout title="Goals & Scoring">
+      {/* Initiative selector — sits just below the topbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+        <select
+          value={selectedInitiative}
+          onChange={(e) => setSelectedInitiative(e.target.value)}
+          style={{
+            border: '1.5px solid #E5E7EB',
+            borderRadius: 8,
+            padding: '9px 14px',
+            minWidth: 280,
+            fontSize: 14,
+            color: 'var(--color-text-primary)',
+            backgroundColor: '#fff',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="">— Select an initiative —</option>
+          {initiatives.map((init) => (
+            <option key={init.initiative_id} value={init.initiative_id}>
+              {init.initiative_name}
+            </option>
+          ))}
+        </select>
 
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-
-        <div className="asrs-card" style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-            Initiative Goals & Scoring
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-            Define goals per initiative with target metrics, weights, and scoring criteria.
-          </p>
-
-          {/* Initiative Selector */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{
-              display: 'block',
-              color: 'var(--color-text-primary)',
-              marginBottom: '0.5rem',
-              fontWeight: '600',
-              fontSize: '0.95rem',
-            }}>
-              Select Initiative
-            </label>
-            <select
-              value={selectedInitiative}
-              onChange={(e) => setSelectedInitiative(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.625rem 0.75rem',
-                border: '1px solid var(--color-bg-tertiary)',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-                color: 'var(--color-text-primary)',
-                backgroundColor: 'white',
-                outline: 'none',
-                boxSizing: 'border-box',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="">-- Choose an initiative --</option>
-              {initiatives.map((init) => (
-                <option key={init.initiative_id} value={init.initiative_id}>
-                  {init.initiative_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Message */}
-        {message && (
-          <div style={{
-            padding: '0.75rem',
-            marginBottom: '1rem',
-            backgroundColor: message.includes('successfully') || message.includes('deleted') ? '#e8f5e9' : '#ffebee',
-            border: `1px solid ${message.includes('successfully') || message.includes('deleted') ? '#c8e6c9' : '#ffcdd2'}`,
-            borderRadius: '8px',
-            color: message.includes('successfully') || message.includes('deleted') ? '#2e7d32' : '#c62828',
-            fontSize: '0.9rem',
-          }}>
-            {message}
-          </div>
-        )}
-
-        {/* Overall Score Display */}
         {selectedInitiative && !isLoading && (
-          <div className="asrs-card" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
-              Overall Initiative Score
-            </h2>
-            <div style={{
-              fontSize: '3rem',
-              fontWeight: '800',
-              color: getScoreColor(overallScore),
-              marginBottom: '0.5rem',
-            }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Overall score:</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: getScoreColor(overallScore) }}>
               {overallScore}%
-            </div>
-            {/* Progress bar */}
-            <div style={{
-              width: '100%',
-              maxWidth: '400px',
-              height: '12px',
-              backgroundColor: 'var(--color-bg-tertiary)',
-              borderRadius: '6px',
-              margin: '0 auto',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${Math.min(overallScore, 100)}%`,
-                height: '100%',
-                backgroundColor: getScoreColor(overallScore),
-                borderRadius: '6px',
-                transition: 'width 0.5s ease',
-              }} />
-            </div>
-            <p style={{ color: 'var(--color-text-light)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              {goals.length} goal{goals.length !== 1 ? 's' : ''} configured
-            </p>
+            </span>
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div style={{
-            padding: '0.75rem',
-            marginBottom: '1rem',
-            backgroundColor: '#ffebee',
-            border: '1px solid #ffcdd2',
-            borderRadius: '8px',
-            color: '#c62828',
-            fontSize: '0.9rem',
-          }}>
-            {error}
+        <div style={{ marginLeft: 'auto' }}>
+          {selectedInitiative && (
+            <button
+              className="btn-primary"
+              onClick={() => setShowAddForm(!showAddForm)}
+            >
+              {showAddForm ? 'Cancel' : '+ Add Goal'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Feedback message */}
+      {message && (
+        <div style={{
+          padding: '10px 16px',
+          marginBottom: 20,
+          borderRadius: 8,
+          fontSize: 13,
+          backgroundColor: message.includes('successfully') || message.includes('deleted') ? '#ECFDF5' : '#FEF2F2',
+          border: `1px solid ${message.includes('successfully') || message.includes('deleted') ? '#A7F3D0' : '#FECACA'}`,
+          color: message.includes('successfully') || message.includes('deleted') ? '#065F46' : '#991B1B',
+        }}>
+          {message}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding: '10px 16px',
+          marginBottom: 20,
+          borderRadius: 8,
+          fontSize: 13,
+          backgroundColor: '#FEF2F2',
+          border: '1px solid #FECACA',
+          color: '#991B1B',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)', fontSize: 14 }}>
+          Loading goals...
+        </div>
+      )}
+
+      {/* Add Goal Form */}
+      {showAddForm && selectedInitiative && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-header">
+            <span className="card-title">New Goal</span>
           </div>
-        )}
-
-        {/* Loading */}
-        {isLoading && (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
-            Loading goals...
-          </div>
-        )}
-
-        {/* Goals List */}
-        {selectedInitiative && !isLoading && (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                Goals
-              </h2>
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="asrs-btn-primary"
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              >
-                {showAddForm ? 'Cancel' : '+ Add Goal'}
-              </button>
-            </div>
-
-            {/* Add Goal Form */}
-            {showAddForm && (
-              <div className="asrs-card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '1rem' }}>
-                  New Goal
-                </h3>
-                <form onSubmit={handleAddGoal}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={labelStyle}>Goal Name *</label>
-                      <input
-                        type="text"
-                        value={newGoal.goal_name}
-                        onChange={(e) => setNewGoal({ ...newGoal, goal_name: e.target.value })}
-                        placeholder="e.g., Increase Participation"
-                        required
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Target Metric *</label>
-                      <input
-                        type="text"
-                        value={newGoal.target_metric}
-                        onChange={(e) => setNewGoal({ ...newGoal, target_metric: e.target.value })}
-                        placeholder="e.g., Number of participants"
-                        required
-                        style={inputStyle}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={labelStyle}>Description</label>
-                    <textarea
-                      value={newGoal.description}
-                      onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })}
-                      placeholder="Optional description of this goal..."
-                      rows={2}
-                      style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={labelStyle}>Deadline (Optional)</label>
-                    <input
-                      type="date"
-                      value={newGoal.deadline}
-                      onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={labelStyle}>Target Value *</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={newGoal.target_value}
-                        onChange={(e) => setNewGoal({ ...newGoal, target_value: e.target.value })}
-                        placeholder="500"
-                        required
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Current Value</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={newGoal.current_value}
-                        onChange={(e) => setNewGoal({ ...newGoal, current_value: e.target.value })}
-                        placeholder="0"
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Weight (%) *</label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="1.01"
-                        max="99.99"
-                        value={newGoal.weight}
-                        onChange={(e) => setNewGoal({ ...newGoal, weight: e.target.value })}
-                        placeholder="2"
-                        required
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Scoring Method *</label>
-                      <select
-                        value={newGoal.scoring_method}
-                        onChange={(e) => setNewGoal({ ...newGoal, scoring_method: e.target.value })}
-                        style={{ ...inputStyle, cursor: 'pointer' }}
-                      >
-                        <option value="linear">Linear</option>
-                        <option value="threshold">Threshold</option>
-                        <option value="binary">Binary</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="asrs-btn-primary"
-                    style={{ padding: '0.625rem 1.5rem', fontSize: '0.95rem' }}
-                  >
-                    Save Goal
-                  </button>
-                </form>
+          <form onSubmit={handleAddGoal}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={labelStyle}>Goal Name *</label>
+                <input
+                  type="text"
+                  value={newGoal.goal_name}
+                  onChange={(e) => setNewGoal({ ...newGoal, goal_name: e.target.value })}
+                  placeholder="e.g., Increase Participation"
+                  required
+                  style={inputStyle}
+                />
               </div>
-            )}
-
-            {/* Goals Cards */}
-            {goals.length === 0 && !showAddForm && (
-              <div className="asrs-card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                No goals configured for this initiative yet. Click &quot;+ Add Goal&quot; to create one.
+              <div>
+                <label style={labelStyle}>Target Metric *</label>
+                <input
+                  type="text"
+                  value={newGoal.target_metric}
+                  onChange={(e) => setNewGoal({ ...newGoal, target_metric: e.target.value })}
+                  placeholder="e.g., Number of participants"
+                  required
+                  style={inputStyle}
+                />
               </div>
-            )}
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {goals.map((goal) => (
-                <div key={goal.goal_id} className="asrs-card" style={{ position: 'relative' }}>
-                  {editingGoalId === goal.goal_id ? (
-                    /* ---- Edit Mode ---- */
-                    <div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '1rem' }}>
-                        Editing Goal
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                        <div>
-                          <label style={labelStyle}>Goal Name</label>
-                          <input
-                            type="text"
-                            value={editGoal.goal_name}
-                            onChange={(e) => setEditGoal({ ...editGoal, goal_name: e.target.value })}
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Target Metric</label>
-                          <input
-                            type="text"
-                            value={editGoal.target_metric}
-                            onChange={(e) => setEditGoal({ ...editGoal, target_metric: e.target.value })}
-                            style={inputStyle}
-                          />
-                        </div>
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={labelStyle}>Description</label>
-                        <textarea
-                          value={editGoal.description}
-                          onChange={(e) => setEditGoal({ ...editGoal, description: e.target.value })}
-                          rows={2}
-                          style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={labelStyle}>Deadline (Optional)</label>
-                        <input
-                          type="date"
-                          value={editGoal.deadline}
-                          onChange={(e) => setEditGoal({ ...editGoal, deadline: e.target.value })}
-                          style={inputStyle}
-                        />
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                        <div>
-                          <label style={labelStyle}>Target Value</label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={editGoal.target_value}
-                            onChange={(e) => setEditGoal({ ...editGoal, target_value: e.target.value })}
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Current Value</label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={editGoal.current_value}
-                            onChange={(e) => setEditGoal({ ...editGoal, current_value: e.target.value })}
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Weight (%)</label>
-                          <input
-                            type="number"
-                            step="any"
-                            min="1.01"
-                            max="99.99"
-                            value={editGoal.weight}
-                            onChange={(e) => setEditGoal({ ...editGoal, weight: e.target.value })}
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Scoring Method</label>
-                          <select
-                            value={editGoal.scoring_method}
-                            onChange={(e) => setEditGoal({ ...editGoal, scoring_method: e.target.value })}
-                            style={{ ...inputStyle, cursor: 'pointer' }}
-                          >
-                            <option value="linear">Linear</option>
-                            <option value="threshold">Threshold</option>
-                            <option value="binary">Binary</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleUpdateGoal(goal.goal_id)}
-                          className="asrs-btn-primary"
-                          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                        >
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={() => setEditingGoalId(null)}
-                          className="asrs-btn-secondary"
-                          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* ---- Display Mode ---- */
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
-                            {goal.goal_name}
-                          </h3>
-                          {goal.description && (
-                            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-                              {goal.description}
-                            </p>
-                          )}
-                        </div>
-                        {/* Score badge */}
-                        <div style={{
-                          minWidth: '70px',
-                          textAlign: 'center',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '8px',
-                          backgroundColor: getScoreColor(goal.score) + '18',
-                          marginLeft: '1rem',
-                        }}>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '800', color: getScoreColor(goal.score) }}>
-                            {goal.score}%
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-light)' }}>score</div>
-                        </div>
-                      </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Description</label>
+              <textarea
+                value={newGoal.description}
+                onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })}
+                placeholder="Optional description of this goal..."
+                rows={2}
+                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
 
-                      {/* Goal details grid */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
-                        gap: '0.75rem',
-                        marginTop: '0.75rem',
-                        padding: '0.75rem',
-                        backgroundColor: 'var(--color-bg-secondary)',
-                        borderRadius: '8px',
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Metric</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>{goal.target_metric}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Progress</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                            {goal.current_value} / {goal.target_value}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Deadline (Optional)</label>
+              <input
+                type="date"
+                value={newGoal.deadline}
+                onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <div>
+                <label style={labelStyle}>Target Value *</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={newGoal.target_value}
+                  onChange={(e) => setNewGoal({ ...newGoal, target_value: e.target.value })}
+                  placeholder="500"
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Current Value</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={newGoal.current_value}
+                  onChange={(e) => setNewGoal({ ...newGoal, current_value: e.target.value })}
+                  placeholder="0"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Weight (%) *</label>
+                <input
+                  type="number"
+                  step="any"
+                  min="1.01"
+                  max="99.99"
+                  value={newGoal.weight}
+                  onChange={(e) => setNewGoal({ ...newGoal, weight: e.target.value })}
+                  placeholder="2"
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Scoring Method *</label>
+                <select
+                  value={newGoal.scoring_method}
+                  onChange={(e) => setNewGoal({ ...newGoal, scoring_method: e.target.value })}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="linear">Linear</option>
+                  <option value="threshold">Threshold</option>
+                  <option value="binary">Binary</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" className="btn-primary">
+              Save Goal
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* No initiative selected */}
+      {!selectedInitiative && !isLoading && (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 48, fontSize: 14 }}>
+          Select an initiative above to view and manage its goals.
+        </div>
+      )}
+
+      {/* Goals content */}
+      {selectedInitiative && !isLoading && goals.length === 0 && !showAddForm && (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 48, fontSize: 14 }}>
+          No goals configured for this initiative yet. Click &quot;+ Add Goal&quot; to create one.
+        </div>
+      )}
+
+      {selectedInitiative && !isLoading && goals.length > 0 && (
+        <>
+          {/* Scoring Criteria card */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <span className="card-title">Scoring Criteria</span>
+            </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Weight (%)</th>
+                  <th>Target</th>
+                  <th>Current</th>
+                  <th>Status</th>
+                  <th style={{ width: 120 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {goals.map((goal) =>
+                  editingGoalId === goal.goal_id ? (
+                    /* ---- Edit Mode Row ---- */
+                    <tr key={goal.goal_id}>
+                      <td colSpan={6} style={{ padding: 0 }}>
+                        <div style={{ padding: '20px 16px', background: '#FAFAFA', borderRadius: 8 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
+                            Editing: {goal.goal_name}
                           </div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Weight (%)</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>{goal.weight}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Scoring</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                            {goal.scoring_method.charAt(0).toUpperCase() + goal.scoring_method.slice(1)}
-                          </div>
-                        </div>
-                        {goal.deadline && (
-                          <div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-light)', marginBottom: '0.15rem' }}>Deadline</div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                              {new Date(goal.deadline).toLocaleDateString()}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                            <div>
+                              <label style={labelStyle}>Goal Name</label>
+                              <input
+                                type="text"
+                                value={editGoal.goal_name}
+                                onChange={(e) => setEditGoal({ ...editGoal, goal_name: e.target.value })}
+                                style={inputStyle}
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Target Metric</label>
+                              <input
+                                type="text"
+                                value={editGoal.target_metric}
+                                onChange={(e) => setEditGoal({ ...editGoal, target_metric: e.target.value })}
+                                style={inputStyle}
+                              />
                             </div>
                           </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={labelStyle}>Description</label>
+                            <textarea
+                              value={editGoal.description}
+                              onChange={(e) => setEditGoal({ ...editGoal, description: e.target.value })}
+                              rows={2}
+                              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                            />
+                          </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={labelStyle}>Deadline (Optional)</label>
+                            <input
+                              type="date"
+                              value={editGoal.deadline}
+                              onChange={(e) => setEditGoal({ ...editGoal, deadline: e.target.value })}
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+                            <div>
+                              <label style={labelStyle}>Target Value</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={editGoal.target_value}
+                                onChange={(e) => setEditGoal({ ...editGoal, target_value: e.target.value })}
+                                style={inputStyle}
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Current Value</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={editGoal.current_value}
+                                onChange={(e) => setEditGoal({ ...editGoal, current_value: e.target.value })}
+                                style={inputStyle}
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Weight (%)</label>
+                              <input
+                                type="number"
+                                step="any"
+                                min="1.01"
+                                max="99.99"
+                                value={editGoal.weight}
+                                onChange={(e) => setEditGoal({ ...editGoal, weight: e.target.value })}
+                                style={inputStyle}
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Scoring Method</label>
+                              <select
+                                value={editGoal.scoring_method}
+                                onChange={(e) => setEditGoal({ ...editGoal, scoring_method: e.target.value })}
+                                style={{ ...inputStyle, cursor: 'pointer' }}
+                              >
+                                <option value="linear">Linear</option>
+                                <option value="threshold">Threshold</option>
+                                <option value="binary">Binary</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleUpdateGoal(goal.goal_id)}
+                              className="btn-primary"
+                            >
+                              Save Changes
+                            </button>
+                            <button
+                              onClick={() => setEditingGoalId(null)}
+                              className="btn-outline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    /* ---- Display Mode Row ---- */
+                    <tr key={goal.goal_id}>
+                      <td>
+                        <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 2 }}>
+                          {goal.goal_name}
+                        </div>
+                        {goal.description && (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                            {goal.description}
+                          </div>
                         )}
-                      </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-light)', marginTop: 2 }}>
+                          {goal.target_metric}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{goal.weight}%</span>
+                          <div style={{ width: 80, height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${Math.min(goal.weight, 100)}%`,
+                                height: '100%',
+                                backgroundColor: 'var(--color-asrs-orange)',
+                                borderRadius: 2,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{goal.target_value}</td>
+                      <td>
+                        <span style={{ fontWeight: 500, color: getScoreColor(goal.score) }}>
+                          {goal.current_value}
+                        </span>
+                      </td>
+                      <td>{getStatusBadge(goal.score)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => startEditing(goal)}
+                            className="btn-outline"
+                            style={{ padding: '5px 12px', fontSize: 12 }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGoal(goal.goal_id)}
+                            style={{
+                              padding: '5px 12px',
+                              fontSize: 12,
+                              borderRadius: 8,
+                              border: '1px solid #FECACA',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              cursor: 'pointer',
+                              transition: 'background 150ms ease',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FEE2E2'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FEF2F2'; }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                      {/* Progress bar */}
-                      <div style={{
-                        width: '100%',
-                        height: '6px',
-                        backgroundColor: 'var(--color-bg-tertiary)',
-                        borderRadius: '3px',
-                        marginTop: '0.75rem',
-                        overflow: 'hidden',
-                      }}>
-                        <div style={{
-                          width: `${Math.min(goal.score, 100)}%`,
-                          height: '100%',
-                          backgroundColor: getScoreColor(goal.score),
-                          borderRadius: '3px',
-                          transition: 'width 0.5s ease',
-                        }} />
-                      </div>
+          {/* Target Metrics card */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <span className="card-title">Target Metrics</span>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {goals.map((goal) => (
+                <div
+                  key={goal.goal_id}
+                  style={{
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 12,
+                    padding: 20,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#FAFAFA',
+                    transition: 'border-color 150ms ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', marginBottom: 4 }}>
+                    {goal.goal_name}
+                  </div>
 
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <button
-                          onClick={() => startEditing(goal)}
-                          className="asrs-btn-secondary"
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGoal(goal.goal_id)}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            fontSize: '0.85rem',
-                            borderRadius: '8px',
-                            border: '1px solid #ffcdd2',
-                            backgroundColor: '#fff5f5',
-                            color: '#c62828',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ffebee'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff5f5'}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                  {/* Ring progress */}
+                  <div style={{ position: 'relative', width: 80, height: 80 }}>
+                    <RingProgress score={goal.score} size={80} />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 700, color: getScoreColor(goal.score), lineHeight: 1 }}>
+                        {goal.score}%
+                      </span>
                     </div>
-                  )}
+                  </div>
+
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      Target
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {goal.target_value}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      Current
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: getScoreColor(goal.score) }}>
+                      {goal.current_value}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 4 }}>
+                    {getStatusBadge(goal.score)}
+                  </div>
                 </div>
               ))}
             </div>
-          </>
-        )}
-      </main>
-    </div>
+          </div>
+
+          {/* Save Changes button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="btn-primary"
+              onClick={() => fetchGoals(selectedInitiative)}
+            >
+              Refresh Data
+            </button>
+          </div>
+        </>
+      )}
+    </PageLayout>
   );
 }
 
-// Shared styles
+// Shared form field styles
 const labelStyle = {
   display: 'block',
   color: 'var(--color-text-primary)',
   marginBottom: '0.35rem',
   fontWeight: '600',
-  fontSize: '0.85rem',
+  fontSize: '0.8rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
 };
 
 const inputStyle = {
   width: '100%',
-  padding: '0.5rem 0.75rem',
-  border: '1px solid var(--color-bg-tertiary)',
-  borderRadius: '8px',
-  fontSize: '0.9rem',
+  padding: '8px 12px',
+  border: '1.5px solid #E5E7EB',
+  borderRadius: 8,
+  fontSize: 13,
   color: 'var(--color-text-primary)',
-  backgroundColor: 'white',
+  backgroundColor: '#fff',
   outline: 'none',
   boxSizing: 'border-box',
+  transition: 'border-color 150ms ease',
 };
