@@ -10,17 +10,17 @@ const STEPS = ['upload', 'preview', 'result'];
 
 export default function AdminImportPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const fileInputRef = useRef(null);
   const [isMounted, setIsMounted] = useState(false);
 
   // Auth guard
   useEffect(() => {
     setIsMounted(true);
-    if (user === undefined) return;
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (user.user_type !== 'admin') { router.push('/'); }
-  }, [router, user]);
+  }, [router, user, hydrated]);
 
   // State
   const [tables, setTables] = useState([]);

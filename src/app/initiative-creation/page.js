@@ -1,8 +1,8 @@
 'use client';
 
 import PageLayout from '@/components/PageLayout';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
 import ReasonModal from '@/components/ReasonModal';
 
@@ -64,6 +64,14 @@ function formatDate(dateStr) {
 }
 
 export default function InitiativeCreationPage() {
+  return (
+    <Suspense fallback={<PageLayout title="Initiatives"><div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>Loading...</div></PageLayout>}>
+      <InitiativeCreationContent />
+    </Suspense>
+  );
+}
+
+function InitiativeCreationContent() {
 
   const [userRole, setUserRole] = useState('public');
 
@@ -77,10 +85,13 @@ export default function InitiativeCreationPage() {
   }, []);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
 
   // ── Initiative list state ──────────────────────────────
   const [initiatives, setInitiatives] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   const fetchInitiatives = async () => {
     try {
@@ -100,6 +111,32 @@ export default function InitiativeCreationPage() {
   useEffect(() => {
     fetchInitiatives();
   }, []);
+
+  // Load initiative for editing
+  useEffect(() => {
+    if (!editId) { setIsEditing(false); return; }
+    setIsEditing(true);
+    apiFetch(`/api/initiatives/${editId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.initiative) {
+          const init = data.initiative;
+          setName(init.name || '');
+          setDescription(init.description || '');
+          setCategory(init.settings?.category || '');
+          setSelectedAttributes(init.attributes || []);
+          setStatus(init.settings?.status || 'Active');
+          setIsPublic(!!init.settings?.isPublic);
+          if (init.questions && init.questions.length > 0) {
+            setAddQuestions(true);
+            setQuestions(init.questions);
+          }
+          // Scroll to the form
+          setTimeout(() => document.getElementById('create-form')?.scrollIntoView({ behavior: 'smooth' }), 200);
+        }
+      })
+      .catch(err => console.error('Error loading initiative:', err));
+  }, [editId]);
 
   // ── Create-form state ──────────────────────────────────
   const [name, setName] = useState('');
@@ -208,8 +245,10 @@ export default function InitiativeCreationPage() {
     setIsSubmitting(true);
     try {
       const body = { ...pendingAction.payload, reasonType, reasonText };
-      const response = await apiFetch('/api/initiatives', {
-        method: 'POST',
+      const url = isEditing ? `/api/initiatives/${editId}` : '/api/initiatives';
+      const method = isEditing ? 'PUT' : 'POST';
+      const response = await apiFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -217,25 +256,27 @@ export default function InitiativeCreationPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('Initiative created successfully!');
-        setName('');
-        setDescription('');
-        setCategory('');
-        setSelectedAttributes([]);
-        setCustomAttributes([]);
-        setNewAttribute('');
-        setAddQuestions(false);
-        setQuestions(['']);
-        setStatus('Active');
-        setIsPublic(false);
+        setMessage(isEditing ? 'Initiative updated successfully!' : 'Initiative created successfully!');
+        if (!isEditing) {
+          setName('');
+          setDescription('');
+          setCategory('');
+          setSelectedAttributes([]);
+          setCustomAttributes([]);
+          setNewAttribute('');
+          setAddQuestions(false);
+          setQuestions(['']);
+          setStatus('Active');
+          setIsPublic(false);
+        }
         fetchInitiatives();
-        setTimeout(() => router.push('/'), 2000);
+        setTimeout(() => router.push('/initiative-creation'), 1500);
       } else {
-        setMessage(`${data.error || 'Failed to create initiative'}`);
+        setMessage(`${data.error || 'Failed to save initiative'}`);
       }
     } catch (error) {
       setMessage('Connection error. Please try again.');
-      console.error('Error creating initiative:', error);
+      console.error('Error saving initiative:', error);
     } finally {
       setIsSubmitting(false);
       setPendingAction(null);
@@ -336,7 +377,25 @@ export default function InitiativeCreationPage() {
                           </span>
                           <span
                             style={{ color: '#6B7280', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-                            onClick={() => router.push(`/initiative-creation?archive=${initiative.id}`)}
+                            onClick={async () => {
+                              if (!confirm(`Archive "${initiative.name}"? This will mark it as archived.`)) return;
+                              try {
+                                const currentSettings = initiative.settings || {};
+                                const resp = await apiFetch(`/api/initiatives/${initiative.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ settings: { ...currentSettings, status: 'archived' } }),
+                                });
+                                if (resp.ok) {
+                                  fetchInitiatives();
+                                } else {
+                                  const data = await resp.json();
+                                  alert(data.error || 'Failed to archive initiative');
+                                }
+                              } catch {
+                                alert('Connection error. Please try again.');
+                              }
+                            }}
                           >
                             Archive
                           </span>
@@ -355,7 +414,7 @@ export default function InitiativeCreationPage() {
       {canCreate ? (
         <div id="create-form" className="card">
           <div className="card-header">
-            <span className="card-title">Create Initiative</span>
+            <span className="card-title">{isEditing ? 'Edit Initiative' : 'Create Initiative'}</span>
           </div>
 
           {/* Status message */}
@@ -602,22 +661,33 @@ export default function InitiativeCreationPage() {
 
             {/* ── Form actions ── */}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="btn-outline"
-                onClick={(e) => handleSubmit(e, true)}
-                style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
-              >
-                Save as Draft
-              </button>
+              {isEditing && (
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => router.push('/initiative-creation')}
+                >
+                  Cancel
+                </button>
+              )}
+              {!isEditing && (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  className="btn-outline"
+                  onClick={(e) => handleSubmit(e, true)}
+                  style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                >
+                  Save as Draft
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="btn-primary"
                 style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
               >
-                {isSubmitting ? 'Creating…' : 'Create Initiative'}
+                {isSubmitting ? 'Saving…' : isEditing ? 'Update Initiative' : 'Create Initiative'}
               </button>
             </div>
 
@@ -628,7 +698,7 @@ export default function InitiativeCreationPage() {
             open={showReasonModal}
             onClose={() => setShowReasonModal(false)}
             onSubmit={handleReasonSubmit}
-            title="Why are you creating this initiative?"
+            title={isEditing ? "Why are you editing this initiative?" : "Why are you creating this initiative?"}
           />
         </div>
       ) : (

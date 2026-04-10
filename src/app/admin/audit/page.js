@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api/client';
 
 export default function AdminAuditPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export default function AdminAuditPage() {
   const [payloadModal, setPayloadModal] = useState(null);
 
   useEffect(() => {
-    if (user === undefined) return;
+    if (!hydrated) return;
     if (!user) {
       router.push('/login');
       return;
@@ -32,7 +32,7 @@ export default function AdminAuditPage() {
     if (user.user_type !== 'admin') {
       router.push('/');
     }
-  }, [router, user]);
+  }, [router, user, hydrated]);
 
   const fetchLogs = async () => {
     if (!user) return;

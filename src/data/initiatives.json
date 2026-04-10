@@ -138,6 +138,20 @@
         "status": "Active",
         "isPublic": false
       }
+    },
+    {
+      "id": 10,
+      "name": "g",
+      "description": "",
+      "attributes": [
+        "Attendance Rate",
+        "Donation Value"
+      ],
+      "questions": [],
+      "settings": {
+        "status": "Active",
+        "isPublic": false
+      }
     }
   ]
 }

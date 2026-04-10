@@ -31,7 +31,12 @@ export default function SurveyDistributionPage() {
   const [loadingDistributions, setLoadingDistributions] = useState(true);
 
   // QR section state
-  const [qrInitiativeId, setQrInitiativeId] = useState('');
+  const [qrTemplateId, setQrTemplateId] = useState('');
+  const [qrDescription, setQrDescription] = useState('');
+  const [qrGenerating, setQrGenerating] = useState(false);
+  const [qrResult, setQrResult] = useState(null);
+  const [qrCodes, setQrCodes] = useState([]);
+  const [qrCodesLoading, setQrCodesLoading] = useState(false);
 
   // ── Auth check ───────────────────────────────────────
   useEffect(() => {
@@ -55,6 +60,7 @@ export default function SurveyDistributionPage() {
       .catch(() => setTemplates([]));
 
     fetchDistributions();
+    fetchQrCodes();
   }, [user]);
 
   const fetchDistributions = () => {
@@ -64,6 +70,48 @@ export default function SurveyDistributionPage() {
       .then((data) => setDistributions(data.distributions || []))
       .catch(() => setDistributions([]))
       .finally(() => setLoadingDistributions(false));
+  };
+
+  // ── Fetch existing QR codes ──────────────────────────
+  const fetchQrCodes = () => {
+    setQrCodesLoading(true);
+    apiFetch('/api/qr-codes?scope=survey')
+      .then((res) => res.json())
+      .then((data) => setQrCodes(data.qrCodes || []))
+      .catch(() => setQrCodes([]))
+      .finally(() => setQrCodesLoading(false));
+  };
+
+  // ── Generate QR code ───────────────────────────────
+  const handleGenerateQR = async () => {
+    if (!qrTemplateId) return;
+    setQrGenerating(true);
+    setQrResult(null);
+    try {
+      const res = await apiFetch('/api/qr-codes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qrType: 'survey_template',
+          targetId: qrTemplateId,
+          description: qrDescription.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate QR code');
+      setQrResult(data.qrCode);
+      fetchQrCodes();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  // ── Download QR code ───────────────────────────────
+  const handleDownloadQR = (qrCodeKey, format = 'png') => {
+    const url = `/api/qr-codes/download?qrCodeKey=${qrCodeKey}&format=${format}&download=true`;
+    window.open(url, '_blank');
   };
 
   // ── Email chip helpers ───────────────────────────────
@@ -494,40 +542,201 @@ export default function SurveyDistributionPage() {
       </div>
 
       {/* ── QR Code Section ── */}
-      <div className="card">
+      <div className="card" style={{ marginBottom: '20px' }}>
         <div className="card-header">
           <h2 className="card-title">Generate QR Code</h2>
         </div>
-        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '16px', marginTop: 0 }}>
-          Generate a QR code for a survey initiative to enable quick access.
+        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '20px', marginTop: 0 }}>
+          Create scannable QR codes that link directly to your survey templates.
         </p>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '20px' }}>
-          <div style={{ flex: '1 1 280px' }}>
-            <label style={labelStyle}>Select Initiative</label>
-            <select
-              value={qrInitiativeId}
-              onChange={(e) => setQrInitiativeId(e.target.value)}
-              style={{ ...inputStyle, cursor: 'pointer' }}
+
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Left: Form */}
+          <div style={{ flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={labelStyle}>Survey Template <span style={{ color: '#E67E22' }}>*</span></label>
+              <select
+                value={qrTemplateId}
+                onChange={(e) => setQrTemplateId(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="">— Choose a template —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Description (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Lobby poster, Event handout"
+                value={qrDescription}
+                onChange={(e) => setQrDescription(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <button
+              className="btn-primary"
+              onClick={handleGenerateQR}
+              disabled={!qrTemplateId || qrGenerating}
+              style={{
+                alignSelf: 'flex-start',
+                padding: '0.65rem 1.5rem',
+                opacity: (!qrTemplateId || qrGenerating) ? 0.6 : 1,
+                cursor: (!qrTemplateId || qrGenerating) ? 'not-allowed' : 'pointer',
+              }}
             >
-              <option value="">— Select a template —</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </select>
+              {qrGenerating ? 'Generating...' : 'Generate QR Code'}
+            </button>
           </div>
-          <button className="btn-primary" style={{ padding: '0.65rem 1.5rem' }}>
-            Generate QR
-          </button>
+
+          {/* Right: QR Preview */}
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            {qrResult ? (
+              <>
+                <div style={{
+                  width: '200px', height: '200px', borderRadius: '12px',
+                  border: '1px solid #E5E7EB', overflow: 'hidden', backgroundColor: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <img
+                    src={qrResult.dataUrl}
+                    alt="Generated QR Code"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+                <div style={{ fontSize: '12px', color: '#6B7280', textAlign: 'center', maxWidth: '200px', wordBreak: 'break-all' }}>
+                  {qrResult.targetUrl}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="btn-primary"
+                    onClick={() => handleDownloadQR(qrResult.qrCodeKey, 'png')}
+                    style={{ padding: '6px 14px', fontSize: '13px' }}
+                  >
+                    Download PNG
+                  </button>
+                  <button
+                    className="btn-outline"
+                    onClick={() => handleDownloadQR(qrResult.qrCodeKey, 'svg')}
+                    style={{ padding: '6px 14px', fontSize: '13px' }}
+                  >
+                    SVG
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                width: '200px', height: '200px', border: '2px dashed #D1D5DB', borderRadius: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#9CA3AF', fontSize: '13px', textAlign: 'center', padding: '16px',
+              }}>
+                Select a template and click Generate to create a QR code
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Existing QR Codes ── */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">QR Codes</h2>
+          <span style={{ fontSize: '13px', color: '#6B7280' }}>
+            {qrCodes.length} code{qrCodes.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
-        {/* QR placeholder */}
-        <div style={{
-          width: '160px', height: '160px', border: '2px dashed #E5E7EB', borderRadius: '12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#9CA3AF', fontSize: '13px', textAlign: 'center',
-        }}>
-          QR code will appear here
-        </div>
+        {qrCodesLoading ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1.5rem' }}>Loading QR codes...</p>
+        ) : qrCodes.length === 0 ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem' }}>
+            No QR codes generated yet.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Template</th>
+                  <th>Scans</th>
+                  <th>Unique</th>
+                  <th>Conversions</th>
+                  <th>Rate</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qrCodes.map((qr) => (
+                  <tr key={qr.qrCodeId}>
+                    <td style={{ fontWeight: 500, color: '#111827' }}>
+                      {qr.description || qr.qrCodeKey}
+                    </td>
+                    <td style={{ color: '#6B7280' }}>
+                      {qr.templateTitle || '—'}
+                    </td>
+                    <td>{qr.stats.totalScans}</td>
+                    <td>{qr.stats.uniqueIPs}</td>
+                    <td>{qr.stats.conversions}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '60px', height: '6px', borderRadius: '3px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${Math.min(qr.stats.conversionRate, 100)}%`,
+                            height: '100%', backgroundColor: '#059669', borderRadius: '3px',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#6B7280' }}>{qr.stats.conversionRate}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      {qr.isExpired ? (
+                        <span className="pill pill-red">Expired</span>
+                      ) : qr.isActive ? (
+                        <span className="pill pill-green">Active</span>
+                      ) : (
+                        <span className="pill pill-gray">Inactive</span>
+                      )}
+                    </td>
+                    <td style={{ color: '#6B7280', fontSize: '13px' }}>
+                      {qr.createdAt ? new Date(qr.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => handleDownloadQR(qr.qrCodeKey, 'png')}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '13px', fontWeight: '600', color: '#E67E22', padding: 0,
+                          }}
+                        >
+                          Download
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(qr.targetUrl);
+                            setSuccessMessage('QR link copied to clipboard!');
+                            setTimeout(() => setSuccessMessage(''), 3000);
+                          }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '13px', fontWeight: '600', color: '#6B7280', padding: 0,
+                          }}
+                        >
+                          Copy Link
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </PageLayout>
   );

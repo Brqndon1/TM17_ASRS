@@ -287,7 +287,7 @@ export default function CategoriesPage() {
                   backgroundColor: 'white',
                   borderRadius: '12px',
                   border: '1px solid #E5E7EB',
-                  borderTop: `4px solid ${accentColor}`,
+                  borderTop: 'none',
                   padding: '20px',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   cursor: 'default',

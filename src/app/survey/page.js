@@ -39,6 +39,8 @@ export default function SurveyPage() {
   // Distribution / auto-close state (public users only)
   const [surveyOpen, setSurveyOpen] = useState(null); // null = loading, true = open, false = closed
   const [activeDistribution, setActiveDistribution] = useState(null);
+  const [activeDistributions, setActiveDistributions] = useState([]);
+  const [showSurveyPicker, setShowSurveyPicker] = useState(false);
 
   // QR code tracking
   const [qrCodeKey, setQrCodeKey] = useState(null);
@@ -82,14 +84,21 @@ export default function SurveyPage() {
         const dists = data.distributions || [];
         const today = new Date().toISOString().split('T')[0];
 
-        // Find a distribution that is active and whose end_date hasn't passed
-        const active = dists.find(
+        // Find all distributions that are active and whose end_date hasn't passed
+        const activeDists = dists.filter(
           (d) => d.status === 'active' && d.end_date >= today
         );
 
-        if (active) {
+        setActiveDistributions(activeDists);
+
+        if (activeDists.length > 1) {
+          // Multiple active surveys — show picker
           setSurveyOpen(true);
-          setActiveDistribution(active);
+          setShowSurveyPicker(true);
+        } else if (activeDists.length === 1) {
+          // Single active survey — load it directly
+          setSurveyOpen(true);
+          setActiveDistribution(activeDists[0]);
         } else {
           setSurveyOpen(false);
         }
@@ -617,6 +626,45 @@ export default function SurveyPage() {
                 If you believe this is an error, please contact the survey administrator.
               </p>
             </div>
+          ) : showSurveyPicker ? (
+            /* ---- Survey Picker — multiple active surveys ---- */
+            <div>
+              <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#111827', margin: '0 0 6px' }}>
+                Available Surveys
+              </h1>
+              <p style={{ color: '#6B7280', margin: '0 0 24px' }}>
+                Choose a survey to participate in.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {activeDistributions.map((dist) => (
+                  <button
+                    key={dist.distribution_id}
+                    onClick={() => {
+                      setActiveDistribution(dist);
+                      setShowSurveyPicker(false);
+                    }}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '16px 20px', borderRadius: '10px', border: '1px solid #E5E7EB',
+                      backgroundColor: '#fff', cursor: 'pointer', textAlign: 'left',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,0.1)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', marginBottom: '4px' }}>
+                        {dist.title}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                        Open until {dist.end_date}
+                      </div>
+                    </div>
+                    <span style={{ color: '#E67E22', fontWeight: 600, fontSize: '0.9rem' }}>Take Survey &rarr;</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : (
             /* ---- Survey Open ---- */
             <>
@@ -636,6 +684,21 @@ export default function SurveyPage() {
                       style={{ marginBottom: '1rem' }}
                     >
                       Manage surveys
+                    </button>
+                  )}
+                  {userRole === 'public' && activeDistributions.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setShowSurveyPicker(true);
+                        setActiveDistribution(null);
+                        setSurveyTemplate(null);
+                        setTemplateResponses({});
+                        setSubmitted(false);
+                        setError(null);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#E67E22', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', marginBottom: '1rem', padding: 0 }}
+                    >
+                      &larr; Back to all surveys
                     </button>
                   )}
 

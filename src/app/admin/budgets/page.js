@@ -18,7 +18,7 @@ const blankForm = {
 
 export default function AdminBudgetsPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
 
   const [budgets, setBudgets] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
@@ -35,7 +35,7 @@ export default function AdminBudgetsPage() {
   const [form, setForm] = useState(blankForm);
 
   useEffect(() => {
-    if (user === undefined) return;
+    if (!hydrated) return;
     if (!user) {
       router.push('/login');
       return;
@@ -44,7 +44,7 @@ export default function AdminBudgetsPage() {
       router.push('/');
       return;
     }
-  }, [router, user]);
+  }, [router, user, hydrated]);
 
   useEffect(() => {
     if (!user) return;

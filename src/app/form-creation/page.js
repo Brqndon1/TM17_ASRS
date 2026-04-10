@@ -274,103 +274,26 @@ export default function FormCreationPage() {
               </div>
             );
           })}
+
+          {/* Add question prompt — always visible at bottom of canvas */}
+          <div style={{
+            border: '2px dashed #D1D5DB',
+            borderRadius: '12px',
+            padding: '20px 24px',
+            textAlign: 'center',
+            color: '#9CA3AF',
+            cursor: 'default',
+            marginBottom: '8px',
+          }}>
+            <span style={{ fontSize: '20px', display: 'block', marginBottom: '4px' }}>+</span>
+            <span style={{ fontSize: '13px' }}>Choose a question type from the right to add it here</span>
+          </div>
         </div>
 
         {/* ── Right: Palette (40%) ── */}
         <div style={{ flex: '2 1 280px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Question Types */}
-          <div className="card" style={{ padding: '20px' }}>
-            <div className="card-header" style={{ marginBottom: '12px' }}>
-              <span className="card-title">Question Types</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {QUESTION_TYPE_DEFS.map((t) => (
-                <button
-                  key={t.type}
-                  type="button"
-                  onClick={() => {
-                    // Add from catalog if exists, otherwise create a synthetic field
-                    const catalogField = availableFields.find(f => f.field_type === t.type);
-                    if (catalogField) {
-                      addField(catalogField);
-                    } else {
-                      // Synthetic field for types not in catalog
-                      const syntheticId = `synthetic-${t.type}-${Date.now()}`;
-                      setSelectedFields(prev => [...prev, {
-                        field_id: syntheticId,
-                        field_key: t.type,
-                        field_label: t.label,
-                        field_type: t.type,
-                        scope: 'common',
-                        required: false,
-                        help_text: '',
-                        validation_rules: null,
-                      }]);
-                    }
-                  }}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#F9FAFB',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s, border-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.color = '#E67E22'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}
-                >
-                  <span>{t.icon}</span>
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Field catalog (available fields from API) */}
-            {availableFields.length > 0 && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6' }}>
-                <div style={{ fontSize: '11px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                  From Catalog
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {availableFields.map(f => {
-                    const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
-                    return (
-                      <button
-                        key={f.field_id}
-                        type="button"
-                        onClick={() => addField(f)}
-                        disabled={isAdded}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontSize: '11px',
-                          cursor: isAdded ? 'default' : 'pointer',
-                          border: `1px solid ${f.scope === 'common' ? '#BFDBFE' : '#FED7AA'}`,
-                          backgroundColor: isAdded ? '#F3F4F6' : f.scope === 'common' ? '#EFF6FF' : '#FFF7ED',
-                          color: isAdded ? '#9CA3AF' : f.scope === 'common' ? '#2563EB' : '#E67E22',
-                          opacity: isAdded ? 0.6 : 1,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {f.field_label}
-                        <span style={{ opacity: 0.6, marginLeft: '4px' }}>({f.field_type})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Form Settings */}
+          {/* Form Settings — moved to top so users see it first */}
           <div className="card" style={{ padding: '20px' }}>
             <div className="card-header" style={{ marginBottom: '12px' }}>
               <span className="card-title">Form Settings</span>
@@ -427,6 +350,104 @@ export default function FormCreationPage() {
               </div>
             )}
           </div>
+
+          {/* Add a Question */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div className="card-header" style={{ marginBottom: '4px' }}>
+              <span className="card-title">Add a Question</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
+              Click a type below to add it to your form
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {QUESTION_TYPE_DEFS.map((t) => (
+                <button
+                  key={t.type}
+                  type="button"
+                  onClick={() => {
+                    const catalogField = availableFields.find(f => f.field_type === t.type);
+                    if (catalogField) {
+                      addField(catalogField);
+                    } else {
+                      const syntheticId = `synthetic-${t.type}-${Date.now()}`;
+                      setSelectedFields(prev => [...prev, {
+                        field_id: syntheticId,
+                        field_key: t.type,
+                        field_label: t.label,
+                        field_type: t.type,
+                        scope: 'common',
+                        required: false,
+                        help_text: '',
+                        validation_rules: null,
+                      }]);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#F9FAFB',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'background-color 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.color = '#E67E22'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}
+                >
+                  <span>{t.icon}</span>
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Saved Questions — only show if catalog has fields */}
+          {availableFields.length > 0 && (
+            <div className="card" style={{ padding: '20px' }}>
+              <div className="card-header" style={{ marginBottom: '4px' }}>
+                <span className="card-title">Saved Questions</span>
+              </div>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
+                Pre-configured questions from your organization. Click to add.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {availableFields.map(f => {
+                  const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
+                  return (
+                    <button
+                      key={f.field_id}
+                      type="button"
+                      onClick={() => addField(f)}
+                      disabled={isAdded}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '9999px',
+                        fontSize: '12px',
+                        cursor: isAdded ? 'default' : 'pointer',
+                        border: `1px solid ${isAdded ? '#E5E7EB' : f.scope === 'common' ? '#BFDBFE' : '#FED7AA'}`,
+                        backgroundColor: isAdded ? '#F3F4F6' : f.scope === 'common' ? '#EFF6FF' : '#FFF7ED',
+                        color: isAdded ? '#9CA3AF' : f.scope === 'common' ? '#2563EB' : '#E67E22',
+                        opacity: isAdded ? 0.6 : 1,
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {isAdded && <span>&#10003;</span>}
+                      {f.field_label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </PageLayout>

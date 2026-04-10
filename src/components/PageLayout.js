@@ -8,24 +8,21 @@ import TopBar from '@/components/TopBar';
 
 export default function PageLayout({ title, children, requireAuth = true, requireRole = null }) {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
 
   useEffect(() => {
-    if (requireAuth) {
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) {
-        router.push('/login');
-        return;
-      }
-      if (requireRole) {
-        const parsed = JSON.parse(storedUser);
-        if (parsed.user_type !== requireRole) {
-          router.push('/');
-        }
-      }
+    if (!hydrated || !requireAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [requireAuth, requireRole, router]);
+    if (requireRole && user.user_type !== requireRole) {
+      router.push('/');
+    }
+  }, [hydrated, requireAuth, requireRole, router, user]);
 
+  // Don't render anything until auth state is known
+  if (!hydrated) return null;
   if (requireAuth && !user) return null;
 
   return (

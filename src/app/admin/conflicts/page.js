@@ -26,7 +26,7 @@ function FieldDiff({ label, before, after }) {
 
 export default function AdminGoalConflictsPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const [conflicts, setConflicts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,7 +34,7 @@ export default function AdminGoalConflictsPage() {
   const [busyId, setBusyId] = useState(null);
 
   useEffect(() => {
-    if (user === undefined) return;
+    if (!hydrated) return;
     if (!user) {
       router.push('/login');
       return;
@@ -42,7 +42,7 @@ export default function AdminGoalConflictsPage() {
     if (user.user_type !== 'admin') {
       router.push('/');
     }
-  }, [router, user]);
+  }, [router, user, hydrated]);
 
   const load = useCallback(async () => {
     if (!user || user.user_type !== 'admin') return;

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import ReportDashboard from '@/components/ReportDashboard';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
+import { apiFetch } from '@/lib/api/client';
 
 export default function HistoricalReportsPage() {
   const [userRole, setUserRole] = useState('public');
@@ -234,6 +235,32 @@ export default function HistoricalReportsPage() {
   });
 
   const monthGroups = groupByMonth(visibleReports);
+
+  async function updateReportStatus(reportId, newStatus) {
+    try {
+      const res = await apiFetch('/api/reports', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: reportId, status: newStatus }),
+      });
+      if (res.ok) {
+        fetchReports();
+      } else {
+        const data = await res.json();
+        alert(data.error || `Failed to ${newStatus} report`);
+      }
+    } catch {
+      alert('Connection error. Please try again.');
+    }
+  }
+
+  function getStatusPill(status) {
+    const s = (status || 'draft').toLowerCase();
+    if (s === 'published') return { bg: '#D1FAE5', color: '#065F46', label: 'Published' };
+    if (s === 'archived') return { bg: '#F3F4F6', color: '#6B7280', label: 'Archived' };
+    if (s === 'completed') return { bg: '#DBEAFE', color: '#1E40AF', label: 'Completed' };
+    return { bg: '#FEF3C7', color: '#92400E', label: 'Draft' };
+  }
 
   function getFormatPill(format) {
     if (!format) return null;
@@ -477,8 +504,42 @@ export default function HistoricalReportsPage() {
                         </span>
                       )}
 
+                      {/* Status pill */}
+                      {(() => {
+                        const sp = getStatusPill(r.status);
+                        return (
+                          <span style={{ padding: '0.2rem 0.65rem', borderRadius: '999px', fontSize: '0.73rem', fontWeight: 700, backgroundColor: sp.bg, color: sp.color, flexShrink: 0 }}>
+                            {sp.label}
+                          </span>
+                        );
+                      })()}
+
                       {/* Actions */}
                       <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                        {(r.status || '').toLowerCase() !== 'published' && (
+                          <button
+                            onClick={() => updateReportStatus(r.id, 'published')}
+                            style={{ fontSize: '0.83rem', fontWeight: 500, color: '#065F46', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                          >
+                            Publish
+                          </button>
+                        )}
+                        {(r.status || '').toLowerCase() === 'published' && (
+                          <button
+                            onClick={() => updateReportStatus(r.id, 'draft')}
+                            style={{ fontSize: '0.83rem', fontWeight: 500, color: '#92400E', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                          >
+                            Unpublish
+                          </button>
+                        )}
+                        {(r.status || '').toLowerCase() !== 'archived' && (
+                          <button
+                            onClick={() => { if (confirm('Archive this report?')) updateReportStatus(r.id, 'archived'); }}
+                            style={{ fontSize: '0.83rem', fontWeight: 500, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                          >
+                            Archive
+                          </button>
+                        )}
                         <button
                           onClick={() => downloadCsv(r)}
                           style={{ fontSize: '0.83rem', fontWeight: 500, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}

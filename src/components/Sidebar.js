@@ -9,16 +9,17 @@ const navGroups = [
     label: 'Main',
     items: [
       { href: '/', label: 'Dashboard', icon: 'home', permission: null },
-      { href: '/initiative-creation', label: 'Initiatives', icon: 'briefcase', permission: 'initiatives.view' },
+      { href: '/initiative-creation', label: 'Initiatives', icon: 'briefcase', permission: 'initiatives.manage' },
       { href: '/reporting', label: 'Reports', icon: 'bar-chart', permission: 'reporting.view' },
-      { href: '/survey', label: 'Surveys', icon: 'clipboard', permission: 'surveys.take' },
+      { href: '/survey', label: 'Surveys', icon: 'clipboard', permission: 'surveys.take', staffHref: '/manage-surveys', staffPermission: 'surveys.distribute' },
     ],
   },
   {
     label: 'Analytics',
     items: [
-      { href: '/goals', label: 'Goals & Scoring', icon: 'target', permission: 'goals.view' },
-      { href: '/performance/goals', label: 'Performance', icon: 'trending-up', permission: 'reporting.view' },
+      { href: '/goals', label: 'Goals & Scoring', icon: 'target', permission: 'goals.manage' },
+      { href: '/performance/goals', label: 'Progress', icon: 'trending-up', permission: 'performance.view' },
+      { href: '/categories', label: 'Categories', icon: 'grid', permission: 'initiatives.manage' },
       { href: '/historical-reports', label: 'Historical', icon: 'clock', permission: 'reporting.view' },
     ],
   },
@@ -26,9 +27,11 @@ const navGroups = [
     label: 'Admin',
     requireRole: 'admin',
     items: [
-      { href: '/admin/users', label: 'User Management', icon: 'users', permission: 'admin.users' },
-      { href: '/admin/audit', label: 'Audit Logs', icon: 'file-text', permission: 'admin.audit' },
-      { href: '/admin/budgets', label: 'Budgets', icon: 'dollar-sign', permission: 'admin.budgets' },
+      { href: '/admin/users', label: 'User Management', icon: 'users', permission: 'users.manage' },
+      { href: '/admin/audit', label: 'Audit Logs', icon: 'file-text', permission: 'audit.view' },
+      { href: '/admin/budgets', label: 'Budgets', icon: 'dollar-sign', permission: 'budgets.manage' },
+      { href: '/admin/conflicts', label: 'Conflicts', icon: 'alert', permission: 'conflicts.manage' },
+      { href: '/admin/import', label: 'Import', icon: 'upload', permission: 'import.manage' },
     ],
   },
 ];
@@ -44,6 +47,9 @@ const icons = {
   users: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
   'file-text': <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>,
   'dollar-sign': <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+  grid: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>,
+  alert: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
+  upload: <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>,
 };
 
 export default function Sidebar() {
@@ -83,16 +89,21 @@ export default function Sidebar() {
           return (
             <div key={group.label}>
               <div className="nav-group-label">{group.label}</div>
-              {visibleItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`nav-item ${isActive(item.href) ? 'active' : ''}`}
-                >
-                  {icons[item.icon]}
-                  {item.label}
-                </Link>
-              ))}
+              {visibleItems.map((item) => {
+                const resolvedHref = item.staffHref && hasPermission(item.staffPermission)
+                  ? item.staffHref
+                  : item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={resolvedHref}
+                    className={`nav-item ${isActive(resolvedHref) ? 'active' : ''}`}
+                  >
+                    {icons[item.icon]}
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           );
         })}

@@ -151,7 +151,7 @@ export default function ManageSurveysPage() {
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
         <button
           className="btn-primary"
-          onClick={() => router.push('/survey')}
+          onClick={() => router.push('/form-creation')}
         >
           + Create Survey
         </button>

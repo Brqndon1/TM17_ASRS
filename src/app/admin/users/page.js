@@ -9,7 +9,7 @@ import ReasonModal from '@/components/ReasonModal';
 
 export default function AdminUsersPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, hydrated } = useAuthStore();
   const [isMounted, setIsMounted] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export default function AdminUsersPage() {
   // Check auth
   useEffect(() => {
     setIsMounted(true);
-    if (user === undefined) return;
+    if (!hydrated) return;
     if (!user) {
       router.push('/login');
       return;
@@ -74,7 +74,7 @@ export default function AdminUsersPage() {
     if (user.user_type !== 'admin' && !user.permissions?.includes('users.manage')) {
       router.push('/');
     }
-  }, [router, user]);
+  }, [router, user, hydrated]);
 
   // Fetch users
   const fetchUsers = async () => {
