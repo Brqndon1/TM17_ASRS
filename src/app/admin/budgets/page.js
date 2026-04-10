@@ -1,6 +1,6 @@
 'use client';
 
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
@@ -72,6 +72,9 @@ export default function AdminBudgetsPage() {
     budgets.forEach((budget) => values.add(budget.department || 'General'));
     return Array.from(values).sort();
   }, [budgets]);
+
+  // Stats
+  const totalBudget = useMemo(() => budgets.reduce((sum, b) => sum + Number(b.personnel || 0) + Number(b.equipment || 0) + Number(b.operations || 0) + Number(b.travel || 0), 0), [budgets]);
 
   async function fetchInitiatives() {
     try {
@@ -245,43 +248,76 @@ export default function AdminBudgetsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  const inputSt = {
+    border: '1px solid #E5E7EB',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    fontSize: '0.9rem',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+  };
+
+  const labelSt = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
+    fontWeight: '600',
+    fontSize: '0.85rem',
+    color: '#374151',
+  };
+
+  const fmt = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '0.25rem' }}>Budget Reporting</h1>
-            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-              Admin-only initiative budget reporting with fiscal year, department categorization, and allocation history.
-            </p>
-          </div>
+    <PageLayout title="Budget Management">
+      {/* Stats Row */}
+      <div className="stats-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Total Budgets</div>
+          <div className="stat-value">{budgets.length}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">Total Allocated</div>
+          <div className="stat-value">${fmt(totalBudget)}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Departments</div>
+          <div className="stat-value">{departments.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Fiscal Years</div>
+          <div className="stat-value">{new Set(budgets.map(b => b.fiscal_year)).size}</div>
+        </div>
+      </div>
 
-        {error && (
-          <div style={{ marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '10px', backgroundColor: '#ffebee', color: '#b00020' }}>
-            {error}
-          </div>
-        )}
+      {error && (
+        <div style={{ marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '8px', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA' }}>
+          {error}
+        </div>
+      )}
 
-        {success && (
-          <div style={{ marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '10px', backgroundColor: '#e8f5e9', color: '#2e7d32' }}>
-            {success}
-          </div>
-        )}
+      {success && (
+        <div style={{ marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '8px', backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+          {success}
+        </div>
+      )}
 
-        <section className="asrs-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-          <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>{selectedBudgetId ? 'Edit Budget' : 'Create Budget'}</h2>
-
+      {/* Add / Edit Budget Form */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header">
+          <h2 className="card-title">{selectedBudgetId ? 'Edit Budget' : 'Add Budget'}</h2>
+        </div>
+        <div style={{ padding: '1.25rem' }}>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Initiative
                 <select
                   value={form.initiativeId}
                   onChange={(e) => updateForm('initiativeId', e.target.value)}
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 >
                   <option value="">Select initiative</option>
                   {initiatives.map((initiative) => (
@@ -290,17 +326,17 @@ export default function AdminBudgetsPage() {
                 </select>
               </label>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Department
                 <input
                   value={form.department}
                   onChange={(e) => updateForm('department', e.target.value)}
                   placeholder="e.g. Academic, IT, Facilities"
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
 
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Fiscal Year
                 <input
                   type="number"
@@ -309,13 +345,13 @@ export default function AdminBudgetsPage() {
                   min="2020"
                   step="1"
                   placeholder="2025"
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
             </div>
 
             <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Personnel $
                 <input
                   type="number"
@@ -323,10 +359,10 @@ export default function AdminBudgetsPage() {
                   step="0.01"
                   value={form.personnel}
                   onChange={(e) => updateForm('personnel', e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Equipment $
                 <input
                   type="number"
@@ -334,10 +370,10 @@ export default function AdminBudgetsPage() {
                   step="0.01"
                   value={form.equipment}
                   onChange={(e) => updateForm('equipment', e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Operations $
                 <input
                   type="number"
@@ -345,10 +381,10 @@ export default function AdminBudgetsPage() {
                   step="0.01"
                   value={form.operations}
                   onChange={(e) => updateForm('operations', e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={labelSt}>
                 Travel $
                 <input
                   type="number"
@@ -356,7 +392,7 @@ export default function AdminBudgetsPage() {
                   step="0.01"
                   value={form.travel}
                   onChange={(e) => updateForm('travel', e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
+                  style={inputSt}
                 />
               </label>
             </div>
@@ -364,158 +400,163 @@ export default function AdminBudgetsPage() {
             <div style={{ marginTop: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               <button
                 type="submit"
-                className="asrs-btn-primary"
-                style={{ padding: '0.75rem 1.1rem', minWidth: '160px' }}
+                className="btn-primary"
                 disabled={saving}
+                style={{ opacity: saving ? 0.6 : 1 }}
               >
-                {saving ? 'Saving…' : selectedBudgetId ? 'Update Budget' : 'Create Budget'}
+                {saving ? 'Saving...' : selectedBudgetId ? 'Update Budget' : 'Create Budget'}
               </button>
               <button
                 type="button"
                 onClick={clearForm}
-                style={{ padding: '0.75rem 1.1rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white', color: 'var(--color-text-primary)' }}
+                className="btn-outline"
               >
                 Clear Form
               </button>
             </div>
           </form>
-        </section>
+        </div>
+      </div>
 
-        <section className="asrs-card" style={{ padding: '1.25rem' }}>
-          <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Existing Budgets</h2>
-              <p style={{ margin: '0.35rem 0 0', color: 'var(--color-text-secondary)' }}>
-                Grouped by department and fiscal year. Use the filters or edit an item.
-              </p>
-            </div>
-            <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', width: '100%', maxWidth: '600px' }}>
-              <select
-                value={filterDepartment}
-                onChange={(e) => setFilterDepartment(e.target.value)}
-                style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white' }}
-              >
-                <option value="">All departments</option>
-                {departments.map((department) => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min="2020"
-                step="1"
-                placeholder="Filter by year"
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
-                style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
-              />
-            </div>
+      {/* Budgets Table */}
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <h2 className="card-title">Existing Budgets</h2>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <select
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+              style={{ border: '1px solid #E5E7EB', borderRadius: '8px', padding: '9px 14px', fontSize: '0.875rem', backgroundColor: 'white', outline: 'none' }}
+            >
+              <option value="">All departments</option>
+              {departments.map((department) => (
+                <option key={department} value={department}>{department}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="2020"
+              step="1"
+              placeholder="Filter by year"
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value.startsWith('-') ? e.target.value.slice(1) : e.target.value)}
+              style={{ border: '1px solid #E5E7EB', borderRadius: '8px', padding: '9px 14px', fontSize: '0.875rem', outline: 'none', width: '140px' }}
+            />
           </div>
+        </div>
 
+        <div style={{ overflowX: 'auto' }}>
           {loading ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading budgets…</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>Loading budgets...</div>
           ) : filteredBudgets.length === 0 ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>No budgets found.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>No budgets found.</div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8f9fa' }}>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Department</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Initiative</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Year</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Personnel</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Equipment</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Operations</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Travel</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBudgets.map((budget) => (
-                    <tr key={budget.budget_id} style={{ borderBottom: '1px solid #e8eaed' }}>
-                      <td style={{ padding: '0.85rem 1rem' }}>{budget.department || 'General'}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{budget.initiative_name}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{budget.fiscal_year}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{Number(budget.personnel).toFixed(2)}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{Number(budget.equipment).toFixed(2)}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{Number(budget.operations).toFixed(2)}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>{Number(budget.travel).toFixed(2)}</td>
-                      <td style={{ padding: '0.85rem 1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Initiative</th>
+                  <th>Year</th>
+                  <th>Personnel</th>
+                  <th>Equipment</th>
+                  <th>Operations</th>
+                  <th>Travel</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBudgets.map((budget) => (
+                  <tr key={budget.budget_id}>
+                    <td>{budget.department || 'General'}</td>
+                    <td>{budget.initiative_name}</td>
+                    <td>{budget.fiscal_year}</td>
+                    <td>${fmt(budget.personnel)}</td>
+                    <td>${fmt(budget.equipment)}</td>
+                    <td>${fmt(budget.operations)}</td>
+                    <td>${fmt(budget.travel)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           type="button"
                           onClick={() => handleEdit(budget)}
-                          style={{ padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white', cursor: 'pointer' }}
+                          className="btn-outline"
+                          style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem' }}
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => fetchHistory(budget)}
-                          style={{ padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white', cursor: 'pointer' }}
+                          className="btn-outline"
+                          style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem' }}
                         >
                           History
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(budget.budget_id)}
-                          style={{ padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid #f44336', background: '#ffebee', color: '#b00020', cursor: 'pointer' }}
+                          style={{
+                            padding: '0.4rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
+                            border: '1px solid #FECACA', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer',
+                          }}
                         >
                           Delete
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </section>
-      </main>
+        </div>
+      </div>
 
+      {/* History Modal */}
       {historyOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto', background: 'white', borderRadius: '14px', padding: '1.25rem', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+          <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto', background: 'white', borderRadius: '14px', padding: '1.5rem', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Allocation History</h2>
-                <p style={{ margin: '0.35rem 0 0', color: 'var(--color-text-secondary)' }}>{historyLabel}</p>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700', color: '#111827' }}>Allocation History</h2>
+                <p style={{ margin: '0.25rem 0 0', color: '#6B7280', fontSize: '0.875rem' }}>{historyLabel}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)', background: 'white', cursor: 'pointer' }}
+                className="btn-outline"
+                style={{ padding: '0.5rem 0.9rem' }}
               >
                 Close
               </button>
             </div>
 
             {historyRows.length === 0 ? (
-              <div style={{ padding: '1rem', color: 'var(--color-text-secondary)' }}>No allocation history available for this budget.</div>
+              <div style={{ padding: '1rem', color: '#6B7280' }}>No allocation history available for this budget.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#f8f9fa' }}>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>When</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Changed By</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Department</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Personnel</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Equipment</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Operations</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Travel</th>
+                    <tr>
+                      <th>When</th>
+                      <th>Changed By</th>
+                      <th>Department</th>
+                      <th>Personnel</th>
+                      <th>Equipment</th>
+                      <th>Operations</th>
+                      <th>Travel</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historyRows.map((row) => (
-                      <tr key={row.history_id} style={{ borderBottom: '1px solid #e8eaed' }}>
-                        <td style={{ padding: '0.75rem 1rem' }}>{new Date(row.created_at).toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{row.changed_by_email || 'System'}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{row.department || 'General'}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{Number(row.personnel).toFixed(2)}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{Number(row.equipment).toFixed(2)}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{Number(row.operations).toFixed(2)}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>{Number(row.travel).toFixed(2)}</td>
+                      <tr key={row.history_id}>
+                        <td>{new Date(row.created_at).toLocaleString()}</td>
+                        <td>{row.changed_by_email || 'System'}</td>
+                        <td>{row.department || 'General'}</td>
+                        <td>${fmt(row.personnel)}</td>
+                        <td>${fmt(row.equipment)}</td>
+                        <td>${fmt(row.operations)}</td>
+                        <td>${fmt(row.travel)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -525,6 +566,6 @@ export default function AdminBudgetsPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

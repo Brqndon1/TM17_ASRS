@@ -1,6 +1,6 @@
 'use client';
 
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
@@ -12,12 +12,12 @@ function FieldDiff({ label, before, after }) {
     <div style={{ marginBottom: '0.35rem', fontSize: '0.88rem' }}>
       <span style={{ fontWeight: 600 }}>{label}:</span>{' '}
       {same ? (
-        <span style={{ color: 'var(--color-text-secondary)' }}>{String(before ?? '—')}</span>
+        <span style={{ color: '#6B7280' }}>{String(before ?? '—')}</span>
       ) : (
         <>
-          <span style={{ textDecoration: 'line-through', color: '#c0392b' }}>{String(before ?? '—')}</span>
+          <span style={{ textDecoration: 'line-through', color: '#DC2626' }}>{String(before ?? '—')}</span>
           {' → '}
-          <span style={{ color: '#27ae60', fontWeight: 600 }}>{String(after ?? '—')}</span>
+          <span style={{ color: '#16A34A', fontWeight: 600 }}>{String(after ?? '—')}</span>
         </>
       )}
     </div>
@@ -102,128 +102,152 @@ export default function AdminGoalConflictsPage() {
     deadline: 'Deadline',
   };
 
+  const pendingCount = conflicts.filter(c => c.status === 'pending').length;
+  const resolvedCount = conflicts.filter(c => c.status === 'resolved').length;
+
+  const getStatusPill = (status, resolution) => {
+    if (status === 'pending') return <span className="pill-yellow">Pending</span>;
+    if (resolution === 'rejected') return <span className="pill-red">Rejected</span>;
+    return <span className="pill-green">Resolved</span>;
+  };
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '0.25rem' }}>Goal edit conflicts</h1>
-        <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-          When two people edit the same goal, the second save is held for review. Approve to apply their proposed values, or reject to keep the current server copy.
-        </p>
-
-        <div className="asrs-card" style={{ display: 'flex', gap: '0.75rem', padding: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontWeight: 600 }}>Status</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ padding: '0.45rem 0.6rem', borderRadius: '8px', border: '1px solid var(--color-bg-tertiary)' }}
-            >
-              <option value="pending">Pending</option>
-              <option value="resolved">Resolved</option>
-              <option value="all">All</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => load()} className="asrs-btn-primary" style={{ padding: '0.5rem 0.9rem' }}>
-            Refresh
-          </button>
+    <PageLayout title="Conflict Resolution">
+      {/* Stats Row */}
+      <div className="stats-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Pending</div>
+          <div className="stat-value">{pendingCount}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">Resolved</div>
+          <div className="stat-value">{resolvedCount}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Total</div>
+          <div className="stat-value">{conflicts.length}</div>
+        </div>
+      </div>
 
-        {error && (
-          <div className="asrs-card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', borderLeft: '4px solid #c0392b' }}>
-            {error}
-          </div>
-        )}
+      {/* Filter Bar */}
+      <div className="card" style={{ display: 'flex', gap: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600', fontSize: '0.875rem', color: '#374151' }}>
+          Status:
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ border: '1px solid #E5E7EB', borderRadius: '8px', padding: '9px 14px', fontSize: '0.875rem', backgroundColor: 'white', outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+        <button type="button" onClick={() => load()} className="btn-primary">
+          Refresh
+        </button>
+      </div>
 
-        {loading ? (
-          <div className="asrs-card" style={{ padding: '2rem', textAlign: 'center' }}>Loading…</div>
-        ) : conflicts.length === 0 ? (
-          <div className="asrs-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            No conflicts in this view.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {conflicts.map((c) => {
-              const patch = c.proposed_patch || {};
-              const snap = c.server_snapshot || {};
-              const fields = new Set([...Object.keys(patch), ...Object.keys(snap)].filter((k) => k !== 'updated_at'));
-              return (
-                <div key={c.conflict_id} className="asrs-card" style={{ padding: '1.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                        Goal #{c.goal_id} — {snap.goal_name || 'Goal'}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
-                        {c.initiative_name} · Submitted by {c.submitter_email} · {new Date(c.created_at).toLocaleString()}
-                      </div>
+      {error && (
+        <div style={{ padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: '8px', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderLeft: '4px solid #DC2626' }}>
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card" style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>Loading...</div>
+      ) : conflicts.length === 0 ? (
+        <div className="card" style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>
+          No conflicts in this view.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {conflicts.map((c) => {
+            const patch = c.proposed_patch || {};
+            const snap = c.server_snapshot || {};
+            const fields = new Set([...Object.keys(patch), ...Object.keys(snap)].filter((k) => k !== 'updated_at'));
+            return (
+              <div key={c.conflict_id} className="card" style={{ padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '1.05rem', color: '#111827' }}>
+                      Goal #{c.goal_id} — {snap.goal_name || 'Goal'}
                     </div>
-                    <div
-                      style={{
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '6px',
-                        background: c.status === 'pending' ? '#fff3cd' : '#d4edda',
-                        color: c.status === 'pending' ? '#856404' : '#155724',
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      {c.status}
-                      {c.resolution ? ` · ${c.resolution.replace(/_/g, ' ')}` : ''}
+                    <div style={{ fontSize: '0.85rem', color: '#6B7280', marginTop: '0.25rem' }}>
+                      {c.initiative_name} · Submitted by {c.submitter_email} · {new Date(c.created_at).toLocaleString()}
                     </div>
                   </div>
-
-                  <div style={{ marginBottom: '0.75rem', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-                    Client expected <code>updated_at</code> {c.expected_updated_at}; server had {c.detected_server_updated_at} when the conflict was recorded.
+                  <div style={{ alignSelf: 'flex-start' }}>
+                    {getStatusPill(c.status, c.resolution)}
+                    {c.resolution && (
+                      <span style={{ fontSize: '0.75rem', color: '#6B7280', marginLeft: '0.4rem' }}>
+                        {c.resolution.replace(/_/g, ' ')}
+                      </span>
+                    )}
                   </div>
+                </div>
 
-                  <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ marginBottom: '0.75rem', fontSize: '0.82rem', color: '#9CA3AF' }}>
+                  Client expected <code>updated_at</code> {c.expected_updated_at}; server had {c.detected_server_updated_at} when the conflict was recorded.
+                </div>
+
+                {/* Side-by-side diff */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ background: '#FEF2F2', borderRadius: '8px', padding: '0.75rem 1rem', border: '1px solid #FECACA' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Current (Server)</div>
                     {Array.from(fields).map((key) => (
-                      <FieldDiff key={key} label={fieldLabels[key] || key} before={snap[key]} after={patch[key]} />
+                      <div key={key} style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                        <span style={{ fontWeight: 600, color: '#374151' }}>{fieldLabels[key] || key}:</span>{' '}
+                        <span style={{ color: '#6B7280' }}>{String(snap[key] ?? '—')}</span>
+                      </div>
                     ))}
                   </div>
-
-                  {c.status === 'pending' && (
-                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="asrs-btn-primary"
-                        disabled={busyId === c.conflict_id}
-                        onClick={() => resolve(c.conflict_id, 'apply')}
-                        style={{ padding: '0.5rem 1rem' }}
-                      >
-                        {busyId === c.conflict_id ? 'Working…' : 'Approve (apply proposed values)'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyId === c.conflict_id}
-                        onClick={() => resolve(c.conflict_id, 'reject')}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          borderRadius: '8px',
-                          border: '1px solid var(--color-bg-tertiary)',
-                          background: 'white',
-                          cursor: busyId === c.conflict_id ? 'default' : 'pointer',
-                        }}
-                      >
-                        Reject (keep current data)
-                      </button>
-                    </div>
-                  )}
-                  {c.status === 'resolved' && c.resolved_by_email && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                      Resolved by {c.resolved_by_email}
-                      {c.resolved_at ? ` · ${new Date(c.resolved_at).toLocaleString()}` : ''}
-                    </div>
-                  )}
+                  <div style={{ background: '#F0FDF4', borderRadius: '8px', padding: '0.75rem 1rem', border: '1px solid #BBF7D0' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#16A34A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Proposed (Incoming)</div>
+                    {Array.from(fields).map((key) => (
+                      <div key={key} style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                        <span style={{ fontWeight: 600, color: '#374151' }}>{fieldLabels[key] || key}:</span>{' '}
+                        <span style={{ color: JSON.stringify(snap[key]) !== JSON.stringify(patch[key]) ? '#16A34A' : '#6B7280', fontWeight: JSON.stringify(snap[key]) !== JSON.stringify(patch[key]) ? 600 : 400 }}>
+                          {String(patch[key] ?? '—')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+
+                {c.status === 'pending' && (
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={busyId === c.conflict_id}
+                      onClick={() => resolve(c.conflict_id, 'apply')}
+                      style={{ opacity: busyId === c.conflict_id ? 0.6 : 1 }}
+                    >
+                      {busyId === c.conflict_id ? 'Working...' : 'Accept (apply proposed values)'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === c.conflict_id}
+                      onClick={() => resolve(c.conflict_id, 'reject')}
+                      className="btn-outline"
+                      style={{ opacity: busyId === c.conflict_id ? 0.6 : 1 }}
+                    >
+                      Reject (keep current data)
+                    </button>
+                  </div>
+                )}
+                {c.status === 'resolved' && c.resolved_by_email && (
+                  <div style={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                    Resolved by {c.resolved_by_email}
+                    {c.resolved_at ? ` · ${new Date(c.resolved_at).toLocaleString()}` : ''}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </PageLayout>
   );
 }

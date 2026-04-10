@@ -1,6 +1,6 @@
 'use client';
 
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
@@ -300,70 +300,83 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole;
   });
 
-  // Role badge styling
-  const getRoleBadgeStyle = (role) => ({
-    display: 'inline-block',
-    padding: '0.2rem 0.65rem',
-    borderRadius: '12px',
-    fontSize: '0.75rem',
-    fontWeight: '700',
-    textTransform: 'capitalize',
-    letterSpacing: '0.03em',
-    backgroundColor: role === 'admin' ? '#e8eaf6' : role === 'staff' ? '#e8f5e9' : '#fff3e0',
-    color: role === 'admin' ? '#283593' : role === 'staff' ? '#2e7d32' : '#e65100',
-    border: `1px solid ${role === 'admin' ? '#c5cae9' : role === 'staff' ? '#c8e6c9' : '#ffe0b2'}`,
-  });
+  const getRolePillClass = (role) => {
+    if (role === 'admin') return 'pill-orange';
+    if (role === 'staff') return 'pill-blue';
+    return 'pill-gray';
+  };
 
   const formatRoleName = (type) => type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
 
-  // Don't render until client-side mount + auth check completes
-  if (!isMounted || !user) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem', textAlign: 'center' }}>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Checking permissions...</p>
-        </main>
-      </div>
-    );
-  }
+  // Stats
+  const totalUsers = users.length;
+  const activeUsers = users.filter(u => u.verified).length;
+  const adminCount = users.filter(u => u.user_type === 'admin').length;
+  const staffCount = users.filter(u => u.user_type === 'staff').length;
+
+  if (!isMounted || !user) return null;
+
+  const inputSt = {
+    border: '1px solid #E5E7EB',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    fontSize: '0.9rem',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+  };
+
+  const selectSt = {
+    border: '1px solid #E5E7EB',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    fontSize: '0.9rem',
+    outline: 'none',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+  };
+
+  const labelSt = {
+    display: 'block',
+    fontWeight: '600',
+    fontSize: '0.85rem',
+    marginBottom: '0.3rem',
+    color: '#374151',
+  };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        {/* Page Title + Action Button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
-              User Management
-            </h1>
-            <p style={{ color: 'var(--color-text-secondary)', marginTop: '0.25rem', fontSize: '0.95rem' }}>
-              Manage users, roles, and permissions.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              if (activeTab === 'users') { setShowAddForm(true); setAddError(''); }
-              else { setShowCreateRole(true); setRolesError(''); }
-            }}
-            className="asrs-btn-primary"
-            style={{ padding: '0.6rem 1.25rem', fontSize: '0.9rem' }}
-          >
-            {activeTab === 'users' ? '+ Add User' : '+ Create Role'}
-          </button>
+    <PageLayout title="User Management">
+      {/* Stats Row */}
+      <div className="stats-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Total Users</div>
+          <div className="stat-value">{totalUsers}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">Active Users</div>
+          <div className="stat-value">{activeUsers}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Admins</div>
+          <div className="stat-value">{adminCount}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Staff</div>
+          <div className="stat-value">{staffCount}</div>
+        </div>
+      </div>
 
-        {/* Tab Bar */}
-        <div style={{ display: 'flex', gap: '0', marginBottom: '1.5rem', borderBottom: '2px solid var(--color-bg-tertiary)' }}>
+      {/* Tab Bar + Action Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0', borderBottom: '2px solid #E5E7EB' }}>
           <button
             onClick={() => setActiveTab('users')}
             style={{
               padding: '0.6rem 1.5rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
               border: 'none', backgroundColor: 'transparent',
-              borderBottom: activeTab === 'users' ? '2px solid var(--color-asrs-orange)' : '2px solid transparent',
-              color: activeTab === 'users' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'users' ? '2px solid #E67E22' : '2px solid transparent',
+              color: activeTab === 'users' ? '#111827' : '#6B7280',
               marginBottom: '-2px',
             }}
           >
@@ -374,359 +387,333 @@ export default function AdminUsersPage() {
             style={{
               padding: '0.6rem 1.5rem', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
               border: 'none', backgroundColor: 'transparent',
-              borderBottom: activeTab === 'roles' ? '2px solid var(--color-asrs-orange)' : '2px solid transparent',
-              color: activeTab === 'roles' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'roles' ? '2px solid #E67E22' : '2px solid transparent',
+              color: activeTab === 'roles' ? '#111827' : '#6B7280',
               marginBottom: '-2px',
             }}
           >
             Roles & Permissions
           </button>
         </div>
+        <button
+          onClick={() => {
+            if (activeTab === 'users') { setShowAddForm(true); setAddError(''); }
+            else { setShowCreateRole(true); setRolesError(''); }
+          }}
+          className="btn-primary"
+        >
+          {activeTab === 'users' ? '+ Add User' : '+ Create Role'}
+        </button>
+      </div>
 
-        {/* Success Message */}
-        {successMsg && (
-          <div style={{
-            padding: '0.75rem 1rem', marginBottom: '1rem',
-            backgroundColor: '#e8f5e9', border: '1px solid #c8e6c9',
-            borderRadius: '8px', color: '#2e7d32', fontSize: '0.9rem', whiteSpace: 'pre-line',
-          }}>
-            {successMsg}
+      <div style={{ marginBottom: '1.5rem' }} />
+
+      {/* Success Message */}
+      {successMsg && (
+        <div style={{
+          padding: '0.75rem 1rem', marginBottom: '1rem',
+          backgroundColor: '#D1FAE5', border: '1px solid #A7F3D0',
+          borderRadius: '8px', color: '#065F46', fontSize: '0.9rem', whiteSpace: 'pre-line',
+        }}>
+          {successMsg}
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          padding: '0.75rem 1rem', marginBottom: '1rem',
+          backgroundColor: '#FEE2E2', border: '1px solid #FECACA',
+          borderRadius: '8px', color: '#991B1B', fontSize: '0.9rem',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* ═══════════════════ USERS TAB ═══════════════════ */}
+      {activeTab === 'users' && (
+        <>
+          {/* Filters Bar */}
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 250px' }}>
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={inputSt}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#6B7280' }}>Role:</label>
+              <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} style={selectSt}>
+                <option value="all">All Roles</option>
+                {roles.map((r) => (
+                  <option key={r.user_type_id} value={r.type}>{formatRoleName(r.type)}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: '500' }}>
+              {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+            </div>
           </div>
-        )}
 
-        {/* Error Message */}
-        {error && (
-          <div style={{
-            padding: '0.75rem 1rem', marginBottom: '1rem',
-            backgroundColor: '#ffebee', border: '1px solid #ffcdd2',
-            borderRadius: '8px', color: '#c62828', fontSize: '0.9rem',
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* ═══════════════════ USERS TAB ═══════════════════ */}
-        {activeTab === 'users' && (
-          <>
-            {/* Filters Bar */}
-            <div className="asrs-card" style={{
-              display: 'flex', alignItems: 'center', gap: '1rem',
-              padding: '1rem 1.25rem', marginBottom: '1rem', flexWrap: 'wrap',
-            }}>
-              <div style={{ flex: '1 1 250px' }}>
-                <input
-                  type="text"
-                  placeholder="Search by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
-                  Role:
-                </label>
-                <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} style={selectStyle}>
-                  <option value="all">All Roles</option>
-                  {roles.map((r) => (
-                    <option key={r.user_type_id} value={r.type}>{formatRoleName(r.type)}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+          {/* Users Table */}
+          {loading ? (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>Loading users...</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+              {searchTerm || filterRole !== 'all' ? 'No users match your filters.' : 'No users found.'}
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((u) => {
+                      const isSelf = u.email === user.email;
+                      return (
+                        <tr key={u.user_id}>
+                          <td>
+                            <span style={{ fontWeight: '600', color: '#111827' }}>
+                              {u.first_name} {u.last_name}
+                            </span>
+                            {isSelf && (
+                              <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#6B7280', fontStyle: 'italic' }}>
+                                (you)
+                              </span>
+                            )}
+                          </td>
+                          <td>{u.email}</td>
+                          <td>{u.phone_number || '—'}</td>
+                          <td>
+                            <span className={getRolePillClass(u.user_type)}>{formatRoleName(u.user_type)}</span>
+                          </td>
+                          <td>
+                            {u.verified ? (
+                              <span className="pill-green">Active</span>
+                            ) : (
+                              <span className="pill-yellow">Pending</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                              <select
+                                value={u.user_type}
+                                onChange={(e) => handleRoleChange(u.user_id, e.target.value)}
+                                disabled={isSelf}
+                                style={{
+                                  ...selectSt,
+                                  fontSize: '0.8rem',
+                                  padding: '0.3rem 0.5rem',
+                                  opacity: isSelf ? 0.5 : 1,
+                                  cursor: isSelf ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                {roles.map((r) => (
+                                  <option key={r.user_type_id} value={r.type}>{formatRoleName(r.type)}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => setDeleteTarget(u)}
+                                disabled={isSelf}
+                                title={isSelf ? 'Cannot delete your own account' : 'Delete user'}
+                                style={{
+                                  padding: '0.3rem 0.75rem', borderRadius: '6px',
+                                  fontSize: '0.8rem', fontWeight: '600',
+                                  backgroundColor: isSelf ? '#F9FAFB' : '#FEE2E2',
+                                  color: isSelf ? '#D1D5DB' : '#991B1B',
+                                  border: `1px solid ${isSelf ? '#E5E7EB' : '#FECACA'}`,
+                                  cursor: isSelf ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
+          )}
+        </>
+      )}
 
-            {/* Loading / Empty / Table */}
-            {loading ? (
-              <div className="asrs-card" style={{ padding: '3rem', textAlign: 'center' }}>
-                <p style={{ color: 'var(--color-text-secondary)' }}>Loading users...</p>
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="asrs-card" style={{ padding: '3rem', textAlign: 'center' }}>
-                <p style={{ color: 'var(--color-text-secondary)' }}>
-                  {searchTerm || filterRole !== 'all' ? 'No users match your filters.' : 'No users found.'}
-                </p>
-              </div>
-            ) : (
-              <div className="asrs-card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                        <th style={thStyle}>Name</th>
-                        <th style={thStyle}>Email</th>
-                        <th style={thStyle}>Phone</th>
-                        <th style={thStyle}>Role</th>
-                        <th style={thStyle}>Status</th>
-                        <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map((u) => {
-                        const isSelf = u.email === user.email;
-                        return (
-                          <tr
-                            key={u.user_id}
-                            style={{ borderBottom: '1px solid #eee' }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fafbfc')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                          >
-                            <td style={tdStyle}>
-                              <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                                {u.first_name} {u.last_name}
-                              </span>
-                              {isSelf && (
-                                <span style={{
-                                  marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--color-text-secondary)',
-                                  fontStyle: 'italic',
-                                }}>
-                                  (you)
-                                </span>
-                              )}
-                            </td>
-                            <td style={tdStyle}>{u.email}</td>
-                            <td style={tdStyle}>{u.phone_number || '—'}</td>
-                            <td style={tdStyle}>
-                              <span style={getRoleBadgeStyle(u.user_type)}>{formatRoleName(u.user_type)}</span>
-                            </td>
-                            <td style={tdStyle}>
-                              {u.verified ? (
-                                <span style={{ color: '#2e7d32', fontSize: '0.8rem', fontWeight: '600' }}>Verified</span>
-                              ) : (
-                                <span style={{ color: '#e65100', fontSize: '0.8rem', fontWeight: '600' }}>Pending</span>
-                              )}
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'center' }}>
-                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
-                                <select
-                                  value={u.user_type}
-                                  onChange={(e) => handleRoleChange(u.user_id, e.target.value)}
-                                  disabled={isSelf}
-                                  style={{
-                                    ...selectStyle,
-                                    fontSize: '0.8rem',
-                                    padding: '0.3rem 0.5rem',
-                                    opacity: isSelf ? 0.5 : 1,
-                                    cursor: isSelf ? 'not-allowed' : 'pointer',
-                                  }}
-                                >
-                                  {roles.map((r) => (
-                                    <option key={r.user_type_id} value={r.type}>{formatRoleName(r.type)}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => setDeleteTarget(u)}
-                                  disabled={isSelf}
-                                  title={isSelf ? 'Cannot delete your own account' : 'Delete user'}
-                                  style={{
-                                    ...actionBtnStyle,
-                                    backgroundColor: isSelf ? '#f5f5f5' : '#ffebee',
-                                    color: isSelf ? '#bbb' : '#c62828',
-                                    border: `1px solid ${isSelf ? '#eee' : '#ffcdd2'}`,
-                                    cursor: isSelf ? 'not-allowed' : 'pointer',
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+      {/* ═══════════════════ ROLES TAB ═══════════════════ */}
+      {activeTab === 'roles' && (
+        <>
+          {rolesError && (
+            <div style={{
+              padding: '0.75rem 1rem', marginBottom: '1rem',
+              backgroundColor: '#FEE2E2', border: '1px solid #FECACA',
+              borderRadius: '8px', color: '#991B1B', fontSize: '0.9rem',
+            }}>
+              {rolesError}
+            </div>
+          )}
 
-        {/* ═══════════════════ ROLES TAB ═══════════════════ */}
-        {activeTab === 'roles' && (
-          <>
-            {rolesError && (
-              <div style={{
-                padding: '0.75rem 1rem', marginBottom: '1rem',
-                backgroundColor: '#ffebee', border: '1px solid #ffcdd2',
-                borderRadius: '8px', color: '#c62828', fontSize: '0.9rem',
-              }}>
-                {rolesError}
-              </div>
-            )}
-
-            {rolesLoading ? (
-              <div className="asrs-card" style={{ padding: '3rem', textAlign: 'center' }}>
-                <p style={{ color: 'var(--color-text-secondary)' }}>Loading roles...</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {roles.map((role) => {
-                  const isEditing = editingRoleId === role.user_type_id;
-                  return (
-                    <div key={role.user_type_id} className="asrs-card" style={{ padding: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditing ? '1rem' : '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
-                            {formatRoleName(role.type)}
-                          </h3>
-                          {role.is_system && (
-                            <span style={{
-                              fontSize: '0.7rem', fontWeight: '600', padding: '0.15rem 0.5rem',
-                              borderRadius: '10px', backgroundColor: '#e8eaf6', color: '#283593',
-                              border: '1px solid #c5cae9', textTransform: 'uppercase', letterSpacing: '0.03em',
-                            }}>
-                              System
-                            </span>
-                          )}
-                          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                            {role.user_count} user{role.user_count !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {isEditing ? (
-                            <>
-                              <button
-                                onClick={() => setEditingRoleId(null)}
-                                style={{
-                                  padding: '0.35rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
-                                  border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
-                                  color: 'var(--color-text-primary)', cursor: 'pointer',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={() => handleSaveRolePermissions(role.user_type_id)}
-                                disabled={savingRole}
-                                className="asrs-btn-primary"
-                                style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', opacity: savingRole ? 0.6 : 1 }}
-                              >
-                                {savingRole ? 'Saving...' : 'Save'}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => { setEditingRoleId(role.user_type_id); setEditingPermissions([...role.permissions]); }}
-                                style={{
-                                  padding: '0.35rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
-                                  border: '1px solid #bbdefb', backgroundColor: '#e3f2fd',
-                                  color: '#1565c0', cursor: 'pointer',
-                                }}
-                              >
-                                Edit Permissions
-                              </button>
-                              {!role.is_system && (
-                                <button
-                                  onClick={() => handleDeleteRole(role.user_type_id, role.type)}
-                                  disabled={role.user_count > 0}
-                                  title={role.user_count > 0 ? 'Reassign users before deleting' : 'Delete role'}
-                                  style={{
-                                    padding: '0.35rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
-                                    border: `1px solid ${role.user_count > 0 ? '#eee' : '#ffcdd2'}`,
-                                    backgroundColor: role.user_count > 0 ? '#f5f5f5' : '#ffebee',
-                                    color: role.user_count > 0 ? '#bbb' : '#c62828',
-                                    cursor: role.user_count > 0 ? 'not-allowed' : 'pointer',
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
+          {rolesLoading ? (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>Loading roles...</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {roles.map((role) => {
+                const isEditing = editingRoleId === role.user_type_id;
+                return (
+                  <div key={role.user_type_id} className="card" style={{ padding: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditing ? '1rem' : '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: 0 }}>
+                          {formatRoleName(role.type)}
+                        </h3>
+                        {role.is_system && (
+                          <span className="pill-blue" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>System</span>
+                        )}
+                        <span style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                          {role.user_count} user{role.user_count !== 1 ? 's' : ''}
+                        </span>
                       </div>
-
-                      {/* Permission grid */}
-                      {isEditing ? (
-                        <div style={{
-                          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                          gap: '0.5rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px',
-                        }}>
-                          {allPermissions.map((perm) => {
-                            const checked = editingPermissions.includes(perm.key);
-                            const disabled = role.type === 'admin' && perm.key === 'users.manage';
-                            return (
-                              <label
-                                key={perm.key}
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => setEditingRoleId(null)}
+                              className="btn-outline"
+                              style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSaveRolePermissions(role.user_type_id)}
+                              disabled={savingRole}
+                              className="btn-primary"
+                              style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', opacity: savingRole ? 0.6 : 1 }}
+                            >
+                              {savingRole ? 'Saving...' : 'Save'}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => { setEditingRoleId(role.user_type_id); setEditingPermissions([...role.permissions]); }}
+                              style={{
+                                padding: '0.35rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
+                                border: '1px solid #BFDBFE', backgroundColor: '#EFF6FF',
+                                color: '#1D4ED8', cursor: 'pointer',
+                              }}
+                            >
+                              Edit Permissions
+                            </button>
+                            {!role.is_system && (
+                              <button
+                                onClick={() => handleDeleteRole(role.user_type_id, role.type)}
+                                disabled={role.user_count > 0}
+                                title={role.user_count > 0 ? 'Reassign users before deleting' : 'Delete role'}
                                 style={{
-                                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                  fontSize: '0.85rem', color: disabled ? '#999' : 'var(--color-text-primary)',
-                                  cursor: disabled ? 'not-allowed' : 'pointer',
+                                  padding: '0.35rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
+                                  border: `1px solid ${role.user_count > 0 ? '#E5E7EB' : '#FECACA'}`,
+                                  backgroundColor: role.user_count > 0 ? '#F9FAFB' : '#FEE2E2',
+                                  color: role.user_count > 0 ? '#D1D5DB' : '#991B1B',
+                                  cursor: role.user_count > 0 ? 'not-allowed' : 'pointer',
                                 }}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={disabled}
-                                  onChange={() => togglePermission(perm.key, editingPermissions, setEditingPermissions)}
-                                  style={{ accentColor: 'var(--color-asrs-orange)' }}
-                                />
-                                {perm.label}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          {role.permissions.length === 0 ? (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>No permissions assigned</span>
-                          ) : (
-                            role.permissions.map((key) => {
-                              const perm = allPermissions.find(p => p.key === key);
-                              return (
-                                <span key={key} style={{
-                                  fontSize: '0.75rem', fontWeight: '600', padding: '0.2rem 0.6rem',
-                                  borderRadius: '10px', backgroundColor: '#e8f5e9', color: '#2e7d32',
-                                  border: '1px solid #c8e6c9',
-                                }}>
-                                  {perm ? perm.label : key}
-                                </span>
-                              );
-                            })
-                          )}
-                        </div>
-                      )}
+                                Delete
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </main>
+
+                    {/* Permission grid */}
+                    {isEditing ? (
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                        gap: '0.5rem', padding: '1rem', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB',
+                      }}>
+                        {allPermissions.map((perm) => {
+                          const checked = editingPermissions.includes(perm.key);
+                          const disabled = role.type === 'admin' && perm.key === 'users.manage';
+                          return (
+                            <label
+                              key={perm.key}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                fontSize: '0.85rem', color: disabled ? '#9CA3AF' : '#374151',
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={disabled}
+                                onChange={() => togglePermission(perm.key, editingPermissions, setEditingPermissions)}
+                                style={{ accentColor: '#E67E22' }}
+                              />
+                              {perm.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {role.permissions.length === 0 ? (
+                          <span style={{ fontSize: '0.8rem', color: '#9CA3AF', fontStyle: 'italic' }}>No permissions assigned</span>
+                        ) : (
+                          role.permissions.map((key) => {
+                            const perm = allPermissions.find(p => p.key === key);
+                            return (
+                              <span key={key} className="pill-green" style={{ fontSize: '0.75rem' }}>
+                                {perm ? perm.label : key}
+                              </span>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
       {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}
       {deleteTarget && (
         <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.5rem 0' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', margin: '0 0 0.5rem 0' }}>
               Confirm Deletion
             </h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+            <p style={{ color: '#6B7280', fontSize: '0.95rem', marginBottom: '0.75rem' }}>
               Are you sure you want to delete this user? This action cannot be undone.
             </p>
             <div style={{
-              padding: '0.75rem 1rem', backgroundColor: '#f8f9fa',
-              borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem',
+              padding: '0.75rem 1rem', backgroundColor: '#F9FAFB',
+              borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #E5E7EB',
             }}>
               <strong>{deleteTarget.first_name} {deleteTarget.last_name}</strong>
               <br />
-              <span style={{ color: 'var(--color-text-secondary)' }}>{deleteTarget.email}</span>
-              <span style={{ ...getRoleBadgeStyle(deleteTarget.user_type), marginLeft: '0.75rem' }}>
-                {formatRoleName(deleteTarget.user_type)}
-              </span>
+              <span style={{ color: '#6B7280' }}>{deleteTarget.email}</span>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setDeleteTarget(null)}
-                style={{
-                  padding: '0.5rem 1.25rem', borderRadius: '8px',
-                  border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
-                  color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
-                }}
+                className="btn-outline"
+                style={{ padding: '0.5rem 1.25rem' }}
               >
                 Cancel
               </button>
@@ -737,7 +724,7 @@ export default function AdminUsersPage() {
                 }}
                 style={{
                   padding: '0.5rem 1.25rem', borderRadius: '8px',
-                  border: '1px solid #ef5350', backgroundColor: '#ef5350',
+                  border: '1px solid #EF4444', backgroundColor: '#EF4444',
                   color: 'white', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
                 }}
               >
@@ -759,18 +746,18 @@ export default function AdminUsersPage() {
       {showAddForm && (
         <div style={overlayStyle} onClick={() => setShowAddForm(false)}>
           <div style={{ ...modalStyle, maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.25rem 0' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', margin: '0 0 0.25rem 0' }}>
               Add New User
             </h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+            <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
               An invite email will be sent so they can set their own password.
             </p>
 
             {addError && (
               <div style={{
                 padding: '0.6rem 0.75rem', marginBottom: '1rem',
-                backgroundColor: '#ffebee', border: '1px solid #ffcdd2',
-                borderRadius: '8px', color: '#c62828', fontSize: '0.85rem',
+                backgroundColor: '#FEE2E2', border: '1px solid #FECACA',
+                borderRadius: '8px', color: '#991B1B', fontSize: '0.85rem',
               }}>
                 {addError}
               </div>
@@ -779,28 +766,28 @@ export default function AdminUsersPage() {
             <form onSubmit={handleAddUser}>
               <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>First Name</label>
-                  <input type="text" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })} required disabled={addLoading} style={inputStyle} />
+                  <label style={labelSt}>First Name</label>
+                  <input type="text" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })} required disabled={addLoading} style={inputSt} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Last Name</label>
-                  <input type="text" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })} required disabled={addLoading} style={inputStyle} />
+                  <label style={labelSt}>Last Name</label>
+                  <input type="text" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })} required disabled={addLoading} style={inputSt} />
                 </div>
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Phone Number</label>
-                <input type="tel" value={addForm.phone_number} onChange={(e) => setAddForm({ ...addForm, phone_number: e.target.value })} disabled={addLoading} required maxLength={10} placeholder="10 digits" style={inputStyle} />
+                <label style={labelSt}>Phone Number</label>
+                <input type="tel" value={addForm.phone_number} onChange={(e) => setAddForm({ ...addForm, phone_number: e.target.value })} disabled={addLoading} required maxLength={10} placeholder="10 digits" style={inputSt} />
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Email</label>
-                <input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} required disabled={addLoading} style={inputStyle} />
+                <label style={labelSt}>Email</label>
+                <input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} required disabled={addLoading} style={inputSt} />
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <label style={labelStyle}>Role</label>
-                <select value={addForm.user_type} onChange={(e) => setAddForm({ ...addForm, user_type: e.target.value })} disabled={addLoading} style={selectStyle}>
+                <label style={labelSt}>Role</label>
+                <select value={addForm.user_type} onChange={(e) => setAddForm({ ...addForm, user_type: e.target.value })} disabled={addLoading} style={{ ...selectSt, width: '100%' }}>
                   {roles.length > 0 ? (
                     roles.map((r) => (
                       <option key={r.user_type_id} value={r.type}>{formatRoleName(r.type)}</option>
@@ -816,17 +803,10 @@ export default function AdminUsersPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowAddForm(false)} style={{
-                  padding: '0.5rem 1.25rem', borderRadius: '8px',
-                  border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
-                  color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
-                }}>
+                <button type="button" onClick={() => setShowAddForm(false)} className="btn-outline" style={{ padding: '0.5rem 1.25rem' }}>
                   Cancel
                 </button>
-                <button type="submit" className="asrs-btn-primary" disabled={addLoading} style={{
-                  padding: '0.5rem 1.25rem', fontSize: '0.9rem',
-                  opacity: addLoading ? 0.6 : 1, cursor: addLoading ? 'not-allowed' : 'pointer',
-                }}>
+                <button type="submit" className="btn-primary" disabled={addLoading} style={{ padding: '0.5rem 1.25rem', opacity: addLoading ? 0.6 : 1, cursor: addLoading ? 'not-allowed' : 'pointer' }}>
                   {addLoading ? 'Sending invite...' : 'Send Invite'}
                 </button>
               </div>
@@ -839,23 +819,23 @@ export default function AdminUsersPage() {
       {showCreateRole && (
         <div style={overlayStyle} onClick={() => setShowCreateRole(false)}>
           <div style={{ ...modalStyle, maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.25rem 0' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', margin: '0 0 0.25rem 0' }}>
               Create New Role
             </h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+            <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
               Define a role name and select which features it can access.
             </p>
 
             <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Role Name</label>
-              <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="e.g. Budget Manager" style={inputStyle} />
+              <label style={labelSt}>Role Name</label>
+              <input type="text" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="e.g. Budget Manager" style={inputSt} />
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
-              <label style={labelStyle}>Permissions</label>
+              <label style={labelSt}>Permissions</label>
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: '0.5rem', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px',
+                gap: '0.5rem', padding: '1rem', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB',
               }}>
                 {allPermissions.map((perm) => (
                   <label key={perm.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -863,7 +843,7 @@ export default function AdminUsersPage() {
                       type="checkbox"
                       checked={newRolePermissions.includes(perm.key)}
                       onChange={() => togglePermission(perm.key, newRolePermissions, setNewRolePermissions)}
-                      style={{ accentColor: 'var(--color-asrs-orange)' }}
+                      style={{ accentColor: '#E67E22' }}
                     />
                     {perm.label}
                   </label>
@@ -872,22 +852,14 @@ export default function AdminUsersPage() {
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowCreateRole(false)} style={{
-                padding: '0.5rem 1.25rem', borderRadius: '8px',
-                border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
-                color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
-              }}>
+              <button onClick={() => setShowCreateRole(false)} className="btn-outline" style={{ padding: '0.5rem 1.25rem' }}>
                 Cancel
               </button>
               <button
                 onClick={handleCreateRole}
                 disabled={createRoleLoading || !newRoleName.trim()}
-                className="asrs-btn-primary"
-                style={{
-                  padding: '0.5rem 1.25rem', fontSize: '0.9rem',
-                  opacity: createRoleLoading || !newRoleName.trim() ? 0.6 : 1,
-                  cursor: createRoleLoading || !newRoleName.trim() ? 'not-allowed' : 'pointer',
-                }}
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.25rem', opacity: createRoleLoading || !newRoleName.trim() ? 0.6 : 1, cursor: createRoleLoading || !newRoleName.trim() ? 'not-allowed' : 'pointer' }}
               >
                 {createRoleLoading ? 'Creating...' : 'Create Role'}
               </button>
@@ -895,43 +867,9 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }
-
-/* ── Shared Styles ───────────────────────────────────────────────────────── */
-
-const thStyle = {
-  textAlign: 'left', padding: '0.75rem 1rem', fontWeight: '700',
-  fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#555',
-};
-
-const tdStyle = {
-  padding: '0.75rem 1rem', color: 'var(--color-text-secondary)',
-};
-
-const actionBtnStyle = {
-  padding: '0.3rem 0.75rem', borderRadius: '6px',
-  fontSize: '0.8rem', fontWeight: '600', transition: 'opacity 0.15s',
-};
-
-const inputStyle = {
-  width: '100%', padding: '0.5rem 0.75rem',
-  border: '1px solid var(--color-bg-tertiary)', borderRadius: '8px',
-  fontSize: '0.9rem', color: 'var(--color-text-primary)',
-  backgroundColor: 'white', outline: 'none', boxSizing: 'border-box',
-};
-
-const selectStyle = {
-  padding: '0.5rem 0.75rem', border: '1px solid var(--color-bg-tertiary)',
-  borderRadius: '8px', fontSize: '0.9rem', color: 'var(--color-text-primary)',
-  backgroundColor: 'white', outline: 'none', cursor: 'pointer',
-};
-
-const labelStyle = {
-  display: 'block', color: 'var(--color-text-primary)',
-  marginBottom: '0.3rem', fontWeight: '600', fontSize: '0.85rem',
-};
 
 const overlayStyle = {
   position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
