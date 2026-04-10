@@ -11,6 +11,8 @@ export function useAuthStore() {
     const unsubscribe = store.subscribe((nextUser) => {
       setUser(nextUser);
     });
+    // Validate localStorage matches server session on first mount
+    store.validateSession();
     return unsubscribe;
   }, [store]);
 

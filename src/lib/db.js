@@ -981,6 +981,7 @@ function initializeDatabase() {
 
   const adminType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'admin'").get();
   const staffType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'staff'").get();
+  const publicType = db.prepare("SELECT user_type_id FROM user_type WHERE type = 'public'").get();
 
   const insertUser = db.prepare(
     'INSERT OR IGNORE INTO user (first_name, last_name, email, password, user_type_id, verified) VALUES (?, ?, ?, ?, ?, 1)'
@@ -991,6 +992,9 @@ function initializeDatabase() {
   if (staffType) {
     insertUser.run('Test', 'Staff', 'staff@test.com', hashPassword('staff123'), staffType.user_type_id);
   }
+  if (publicType) {
+    insertUser.run('Test', 'Public', 'public@test.com', hashPassword('public123'), publicType.user_type_id);
+  }
 
   // Ensure seeded dev test accounts can log in without email verification.
   db.prepare(`
@@ -998,7 +1002,7 @@ function initializeDatabase() {
     SET verified = 1,
         verification_token = NULL,
         token_expires_at = NULL
-    WHERE email IN ('admin@test.com', 'staff@test.com')
+    WHERE email IN ('admin@test.com', 'staff@test.com', 'public@test.com')
   `).run();
 
     _initialized = true;

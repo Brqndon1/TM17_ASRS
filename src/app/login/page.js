@@ -63,10 +63,10 @@ export default function LoginPage() {
               textAlign: 'center',
             }}
           >
-            Admin / Staff Login
+            Login
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem', textAlign: 'center' }}>
-            Sign in to access staff and admin features.
+            Sign in to your account.
           </p>
 
           {message && (

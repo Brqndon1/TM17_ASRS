@@ -117,7 +117,7 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     initializeDatabase();
-    const auth = requirePermission(request, db, 'surveys.distribute', { requireCsrf: false });
+    const auth = requirePermission(request, db, 'surveys.take', { requireCsrf: false });
     if (auth.error) return auth.error;
 
     const rows = db.prepare(`

@@ -542,8 +542,9 @@ export default function Header() {
     } catch (error) {
       console.error('Logout request failed:', error);
     }
-    clearUser();
     router.push('/login');
+    // Clear after navigation is queued so re-render redirects don't race
+    setTimeout(() => clearUser(), 0);
   }
 
   function isActive(href) {
@@ -658,22 +659,26 @@ export default function Header() {
                   Distribute
                 </Link>
               )}
-              <Link 
-                href="/reporting" 
+              {hasPermission('reporting.view') && (
+              <Link
+                href="/reporting"
                 style={getNavLinkStyle('/reporting')}
                 onMouseEnter={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/reporting') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
                 Reporting
               </Link>
-              <Link 
-                href="/initiative-creation" 
+              )}
+              {hasPermission('initiatives.manage') && (
+              <Link
+                href="/initiative-creation"
                 style={getNavLinkStyle('/initiative-creation')}
                 onMouseEnter={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)')}
                 onMouseLeave={(e) => !isActive('/initiative-creation') && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
                 Initiatives
               </Link>
+              )}
 
                 {hasPermission('goals.manage') && (
                     <GoalsDropdown

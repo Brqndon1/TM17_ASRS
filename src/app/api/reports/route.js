@@ -124,6 +124,11 @@ export async function POST(request) {
   const startedAt = Date.now();
 
   try {
+    const container = getServiceContainer();
+    const { db, reportEngine, eventBus, clock } = container;
+    const auth = requirePermission(request, db, 'reports.create');
+    if (auth.error) return auth.error;
+
     const body = await request.json();
     const payloadValidation = validateReportCreatePayload(body);
     if (!payloadValidation.valid) {
@@ -131,10 +136,6 @@ export async function POST(request) {
     }
 
     const payload = payloadValidation.value;
-    const container = getServiceContainer();
-    const { db, reportEngine, eventBus, clock } = container;
-    const auth = requirePermission(request, db, 'reports.create');
-    if (auth.error) return auth.error;
     const initiativeId = Number(payload.initiativeId);
 
     const initiative = db.prepare(

@@ -75,7 +75,10 @@ export default function SurveyPage() {
     }
 
     fetch('/api/surveys/distributions')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Not authorized');
+        return res.json();
+      })
       .then((data) => {
         const dists = data.distributions || [];
         const today = new Date().toISOString().split('T')[0];

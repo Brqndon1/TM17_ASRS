@@ -19,7 +19,10 @@ export default function FormCreationPage() {
   useEffect(() => {
     Promise.all([
       apiFetch('/api/initiatives').then(r => r.json()),
-      apiFetch('/api/admin/fields').then(r => r.json()),
+      apiFetch('/api/admin/fields').then(r => {
+        if (!r.ok) return { common: [], initiative_specific: [], staff_only: [] };
+        return r.json();
+      }),
     ]).then(([initData, fieldData]) => {
       setInitiatives(Array.isArray(initData) ? initData : initData.initiatives || []);
       setFieldCatalog(fieldData);

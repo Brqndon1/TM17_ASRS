@@ -45,6 +45,35 @@ class AuthStore {
     }
   }
 
+  validateSession() {
+    if (this._validating || typeof window === 'undefined') return;
+    this._validating = true;
+
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then((res) => {
+        if (!res.ok) {
+          // Server says no valid session — clear stale localStorage
+          if (this.user) {
+            this.setUser(null);
+          }
+          return;
+        }
+        return res.json().then((data) => {
+          const serverUser = data.user;
+          // Sync localStorage with server truth
+          if (!this.user || this.user.user_id !== serverUser.user_id) {
+            this.setUser(serverUser);
+          }
+        });
+      })
+      .catch(() => {
+        // Network error — keep local state as-is
+      })
+      .finally(() => {
+        this._validating = false;
+      });
+  }
+
   getUser() {
     this.ensureHydrated();
     return this.user;

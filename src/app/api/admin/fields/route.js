@@ -7,7 +7,7 @@ const VALID_SCOPES = ['common', 'initiative_specific', 'staff_only'];
 
 export async function GET(request) {
   try {
-    const auth = requirePermission(request, db, 'users.manage');
+    const auth = requirePermission(request, db, 'forms.create');
     if (auth.error) return auth.error;
 
     const fields = db.prepare(`
