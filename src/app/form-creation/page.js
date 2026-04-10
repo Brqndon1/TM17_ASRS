@@ -1,9 +1,22 @@
 'use client';
 
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api/client';
+
+// Question type labels + icons
+const QUESTION_TYPE_DEFS = [
+  { type: 'text',       label: 'Short Text',    icon: '📝' },
+  { type: 'textarea',   label: 'Long Text',     icon: '📄' },
+  { type: 'number',     label: 'Number',        icon: '🔢' },
+  { type: 'select',     label: 'Dropdown',      icon: '⌄' },
+  { type: 'checkbox',   label: 'Checkbox',      icon: '☑' },
+  { type: 'radio',      label: 'Multiple Choice', icon: '⊙' },
+  { type: 'date',       label: 'Date',          icon: '📅' },
+  { type: 'rating',     label: 'Rating',        icon: '★' },
+  { type: 'email',      label: 'Email',         icon: '@' },
+  { type: 'url',        label: 'URL / Link',    icon: '🔗' },
+];
 
 export default function FormCreationPage() {
   const [userRole, setUserRole] = useState('staff');
@@ -110,34 +123,269 @@ export default function FormCreationPage() {
     }
   };
 
-  const cardStyle = { padding: '1.5rem', marginBottom: '1.5rem' };
-  const labelStyle = { display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--color-text-primary)' };
-  const inputStyle = { width: '100%', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)', fontSize: '1rem' };
-
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header userRole={userRole} onRoleChange={setUserRole} />
-        <main style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 1.5rem', textAlign: 'center' }}>
-          <p>Loading...</p>
-        </main>
-      </div>
+      <PageLayout title="Surveys">
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>Loading...</div>
+      </PageLayout>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
-      <main style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-        <form onSubmit={handleSubmit}>
-          {/* Form Details */}
-          <div className="asrs-card" style={cardStyle}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '1.5rem' }}>Form Creation</h1>
+    <PageLayout title="Surveys">
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Form Builder</h1>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => {
+              if (selectedFields.length === 0) { alert('Add questions first to preview.'); return; }
+              alert(`Preview: ${formName || 'Untitled Form'}\n${selectedFields.length} question(s)`);
+            }}
+          >
+            Preview Form
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={saving}
+            onClick={handleSubmit}
+            style={{ opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? 'Saving...' : 'Save Form'}
+          </button>
+        </div>
+      </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Initiative *</label>
-              <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} required style={inputStyle}>
+      {/* Builder layout: 60/40 split */}
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+        {/* ── Left: Canvas (60%) ── */}
+        <div style={{ flex: '3 1 400px', minWidth: 0 }}>
+          {/* Empty state */}
+          {selectedFields.length === 0 && (
+            <div style={{
+              border: '2px dashed #E5E7EB',
+              borderRadius: '12px',
+              padding: '48px 24px',
+              textAlign: 'center',
+              color: '#9CA3AF',
+              marginBottom: '16px',
+            }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
+              <p style={{ fontWeight: '600', margin: '0 0 4px' }}>No questions yet</p>
+              <p style={{ fontSize: '13px', margin: 0 }}>Add question types from the palette on the right</p>
+            </div>
+          )}
+
+          {/* Question blocks */}
+          {selectedFields.map((sf, idx) => {
+            const typeDef = QUESTION_TYPE_DEFS.find(t => t.type === sf.field_type) || { label: sf.field_type, icon: '?' };
+            return (
+              <div
+                key={sf.field_id}
+                style={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                }}
+              >
+                {/* Drag handle + order buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', paddingTop: '2px', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => moveField(idx, -1)}
+                    disabled={idx === 0}
+                    style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 0.6, fontSize: '14px', padding: '0', lineHeight: '1' }}
+                  >▲</button>
+                  <div style={{ color: '#D1D5DB', fontSize: '18px', lineHeight: '1', textAlign: 'center' }}>⠿</div>
+                  <button
+                    type="button"
+                    onClick={() => moveField(idx, 1)}
+                    disabled={idx === selectedFields.length - 1}
+                    style={{ background: 'none', border: 'none', cursor: idx === selectedFields.length - 1 ? 'default' : 'pointer', opacity: idx === selectedFields.length - 1 ? 0.3 : 0.6, fontSize: '14px', padding: '0', lineHeight: '1' }}
+                  >▼</button>
+                </div>
+
+                {/* Question content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#FFF7ED', color: '#E67E22', border: '1px solid #FED7AA' }}>
+                      {typeDef.icon} {typeDef.label}
+                    </span>
+                    {sf.scope === 'initiative_specific' && (
+                      <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '9999px', backgroundColor: '#EFF6FF', color: '#2563EB' }}>initiative</span>
+                    )}
+                    {sf.required && (
+                      <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: '600' }}>required</span>
+                    )}
+                  </div>
+
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827', marginBottom: '6px' }}>
+                    {sf.field_label}
+                  </div>
+
+                  {/* Preview field */}
+                  {(sf.field_type === 'text' || sf.field_type === 'email' || sf.field_type === 'url' || sf.field_type === 'number' || sf.field_type === 'date') && (
+                    <div style={{ height: '32px', border: '1px solid #E5E7EB', borderRadius: '6px', backgroundColor: '#F9FAFB' }} />
+                  )}
+                  {sf.field_type === 'textarea' && (
+                    <div style={{ height: '56px', border: '1px solid #E5E7EB', borderRadius: '6px', backgroundColor: '#F9FAFB' }} />
+                  )}
+                  {sf.field_type === 'rating' && (
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: '18px', color: '#D1D5DB' }}>★</span>)}
+                    </div>
+                  )}
+
+                  {/* Config row */}
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#6B7280', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={sf.required}
+                        onChange={e => updateFieldConfig(sf.field_id, 'required', e.target.checked)}
+                      />
+                      Required
+                    </label>
+                    <input
+                      placeholder="Help text (optional)"
+                      value={sf.help_text}
+                      onChange={e => updateFieldConfig(sf.field_id, 'help_text', e.target.value)}
+                      style={{ flex: 1, minWidth: '140px', padding: '5px 8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '12px', color: '#374151', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Delete button */}
+                <button
+                  type="button"
+                  onClick={() => removeField(sf.field_id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '18px', padding: '0', flexShrink: 0 }}
+                  title="Remove question"
+                >×</button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Right: Palette (40%) ── */}
+        <div style={{ flex: '2 1 280px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Question Types */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div className="card-header" style={{ marginBottom: '12px' }}>
+              <span className="card-title">Question Types</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {QUESTION_TYPE_DEFS.map((t) => (
+                <button
+                  key={t.type}
+                  type="button"
+                  onClick={() => {
+                    // Add from catalog if exists, otherwise create a synthetic field
+                    const catalogField = availableFields.find(f => f.field_type === t.type);
+                    if (catalogField) {
+                      addField(catalogField);
+                    } else {
+                      // Synthetic field for types not in catalog
+                      const syntheticId = `synthetic-${t.type}-${Date.now()}`;
+                      setSelectedFields(prev => [...prev, {
+                        field_id: syntheticId,
+                        field_key: t.type,
+                        field_label: t.label,
+                        field_type: t.type,
+                        scope: 'common',
+                        required: false,
+                        help_text: '',
+                        validation_rules: null,
+                      }]);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#F9FAFB',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'background-color 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.color = '#E67E22'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}
+                >
+                  <span>{t.icon}</span>
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Field catalog (available fields from API) */}
+            {availableFields.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6' }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  From Catalog
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {availableFields.map(f => {
+                    const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
+                    return (
+                      <button
+                        key={f.field_id}
+                        type="button"
+                        onClick={() => addField(f)}
+                        disabled={isAdded}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '11px',
+                          cursor: isAdded ? 'default' : 'pointer',
+                          border: `1px solid ${f.scope === 'common' ? '#BFDBFE' : '#FED7AA'}`,
+                          backgroundColor: isAdded ? '#F3F4F6' : f.scope === 'common' ? '#EFF6FF' : '#FFF7ED',
+                          color: isAdded ? '#9CA3AF' : f.scope === 'common' ? '#2563EB' : '#E67E22',
+                          opacity: isAdded ? 0.6 : 1,
+                          fontWeight: '500',
+                        }}
+                      >
+                        {f.field_label}
+                        <span style={{ opacity: 0.6, marginLeft: '4px' }}>({f.field_type})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Form Settings */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div className="card-header" style={{ marginBottom: '12px' }}>
+              <span className="card-title">Form Settings</span>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Initiative *
+              </label>
+              <select
+                value={selectedInitiative}
+                onChange={e => setSelectedInitiative(e.target.value)}
+                required
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '13px', color: '#111827', backgroundColor: 'white', outline: 'none' }}
+              >
                 <option value="">Select an initiative...</option>
                 {initiatives.map(i => (
                   <option key={i.initiative_id || i.id} value={i.initiative_id || i.id}>
@@ -147,102 +395,40 @@ export default function FormCreationPage() {
               </select>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Form Name *</label>
-              <input value={formName} onChange={e => setFormName(e.target.value)} required placeholder="e.g. Student Experience Survey" style={inputStyle} />
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Form Title *
+              </label>
+              <input
+                value={formName}
+                onChange={e => setFormName(e.target.value)}
+                required
+                placeholder="e.g. Student Experience Survey"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '13px', color: '#111827', outline: 'none', boxSizing: 'border-box' }}
+              />
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Description</label>
-              <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Brief description of this form" rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Description
+              </label>
+              <textarea
+                value={formDescription}
+                onChange={e => setFormDescription(e.target.value)}
+                placeholder="Brief description of this form..."
+                rows={3}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '13px', color: '#111827', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
             </div>
-          </div>
 
-          {/* Field Catalog */}
-          <div className="asrs-card" style={cardStyle}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem' }}>Field Catalog</h2>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-              Click a field to add it to your form. Common fields are shared across all initiatives.
-              {selectedInitiative ? ' Initiative-specific fields for the selected initiative are also shown.' : ' Select an initiative to see initiative-specific fields.'}
-            </p>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {availableFields.map(f => {
-                const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
-                return (
-                  <button key={f.field_id} type="button" onClick={() => addField(f)} disabled={isAdded}
-                    style={{
-                      padding: '0.5rem 1rem', borderRadius: 20, fontSize: '0.875rem', cursor: isAdded ? 'default' : 'pointer',
-                      border: `1px solid ${f.scope === 'common' ? 'var(--color-asrs-blue, #3b82f6)' : 'var(--color-asrs-orange, #f97316)'}`,
-                      backgroundColor: isAdded ? 'var(--color-bg-tertiary)' : 'var(--color-bg-primary)',
-                      color: isAdded ? 'var(--color-text-light)' : 'var(--color-text-primary)',
-                      opacity: isAdded ? 0.5 : 1,
-                    }}>
-                    {f.field_label} <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>({f.field_type})</span>
-                    {f.scope === 'initiative_specific' && <span style={{ fontSize: '0.7rem', marginLeft: 4, color: 'var(--color-asrs-orange, #f97316)' }}>initiative</span>}
-                  </button>
-                );
-              })}
-              {availableFields.length === 0 && (
-                <p style={{ color: 'var(--color-text-light)', fontStyle: 'italic' }}>No fields in catalog. Create fields first via the admin panel.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Selected Fields */}
-          <div className="asrs-card" style={cardStyle}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem' }}>
-              Form Fields ({selectedFields.length})
-            </h2>
-
-            {selectedFields.length === 0 ? (
-              <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-                No fields added yet. Select fields from the catalog above.
-              </p>
-            ) : (
-              selectedFields.map((sf, idx) => (
-                <div key={sf.field_id} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-                  marginBottom: '0.5rem', borderRadius: 8, border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'var(--color-bg-secondary)',
-                }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
-                      className="asrs-btn-secondary" style={{ padding: '2px 8px', fontSize: '0.75rem' }}>^</button>
-                    <button type="button" onClick={() => moveField(idx, 1)} disabled={idx === selectedFields.length - 1}
-                      className="asrs-btn-secondary" style={{ padding: '2px 8px', fontSize: '0.75rem' }}>v</button>
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 600 }}>{sf.field_label}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginLeft: 8 }}>
-                      {sf.field_type} | {sf.scope}
-                    </span>
-                  </div>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
-                    <input type="checkbox" checked={sf.required} onChange={e => updateFieldConfig(sf.field_id, 'required', e.target.checked)} />
-                    Required
-                  </label>
-
-                  <input placeholder="Help text" value={sf.help_text} onChange={e => updateFieldConfig(sf.field_id, 'help_text', e.target.value)}
-                    style={{ width: 200, padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--color-bg-tertiary)', fontSize: '0.85rem' }} />
-
-                  <button type="button" onClick={() => removeField(sf.field_id)}
-                    className="asrs-btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}>Remove</button>
-                </div>
-              ))
+            {selectedFields.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6', fontSize: '12px', color: '#6B7280' }}>
+                <strong style={{ color: '#111827' }}>{selectedFields.length}</strong> question{selectedFields.length !== 1 ? 's' : ''} added
+              </div>
             )}
           </div>
-
-          {/* Submit */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <button type="submit" disabled={saving} className="asrs-btn-primary" style={{ padding: '0.75rem 2rem' }}>
-              {saving ? 'Creating...' : 'Create Form'}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
+        </div>
+      </div>
+    </PageLayout>
   );
 }

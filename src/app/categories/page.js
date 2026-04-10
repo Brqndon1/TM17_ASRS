@@ -1,10 +1,12 @@
 'use client';
 
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
+
+// Category card accent colors (cycle through)
+const CARD_COLORS = ['#3B82F6', '#10B981', '#E67E22', '#8B5CF6', '#14B8A6', '#F59E0B', '#EF4444'];
 
 export default function CategoriesPage() {
   const [userRole, setUserRole] = useState('public');
@@ -54,7 +56,7 @@ export default function CategoriesPage() {
 
       if (response.ok) {
         setCategories(data.categories || []);
-        
+
         // Fetch linked initiatives for each category
         const initiativesMap = {};
         for (const category of (data.categories || [])) {
@@ -202,265 +204,210 @@ export default function CategoriesPage() {
 
   if (userRole !== 'admin') {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '720px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-          <BackButton />
-          <div className="asrs-card">
-            <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
-              <h2
-                style={{
-                  fontSize: '1.35rem',
-                  fontWeight: '700',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: '0.5rem',
-                }}
-              >
-                Unauthorized Access
-              </h2>
-              <p
-                style={{
-                  color: 'var(--color-text-secondary)',
-                  marginBottom: '0.5rem',
-                  lineHeight: 1.6,
-                }}
-              >
-                Only admin can manage categories.
-              </p>
-              <p style={{ color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
-                If you believe this is an error, please contact the administrator.
-              </p>
-            </div>
+      <PageLayout title="Categories">
+        <div className="card" style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: '#111827', marginBottom: '0.5rem' }}>
+              Unauthorized Access
+            </h2>
+            <p style={{ color: '#6B7280', marginBottom: '0.5rem', lineHeight: 1.6 }}>
+              Only admin can manage categories.
+            </p>
+            <p style={{ color: '#9CA3AF', fontSize: '0.85rem' }}>
+              If you believe this is an error, please contact the administrator.
+            </p>
           </div>
-        </main>
-      </div>
+        </div>
+      </PageLayout>
     );
   }
 
+  // Build mapping table rows: flatten all category→initiative relationships
+  const mappingRows = categories.flatMap((cat, catIdx) =>
+    (categoryInitiatives[cat.category_id] || []).map((rel) => ({
+      category: cat,
+      catIdx,
+      rel,
+    }))
+  );
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-
-      <main style={{ maxWidth: '900px', margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-        <BackButton />
-
-        {/* Page Header */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '2rem',
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontSize: '1.75rem',
-                fontWeight: '700',
-                color: 'var(--color-text-primary)',
-                marginBottom: '0.4rem',
-              }}
-            >
-              Categories
-            </h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', margin: 0 }}>
-              Manage initiative categories. Maximum 7 categories allowed.
-            </p>
-          </div>
-          <button
-            onClick={handleAddClick}
-            disabled={categories.length >= 7}
-            className="asrs-btn-primary"
-            style={{
-              padding: '0.6rem 1rem',
-              fontSize: '0.95rem',
-              opacity: categories.length >= 7 ? 0.5 : 1,
-              cursor: categories.length >= 7 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            + Create Category
-          </button>
+    <PageLayout title="Categories">
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', marginBottom: '4px', margin: 0 }}>Categories</h1>
+          <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>
+            Manage initiative categories. {categories.length}/7 created.
+          </p>
         </div>
-
-        {/* Status Message */}
-        {message && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              marginBottom: '1.5rem',
-              backgroundColor: message.includes('successfully') ? '#e8f5e9' : '#ffebee',
-              border: `1px solid ${
-                message.includes('successfully') ? '#c8e6c9' : '#ffcdd2'
-              }`,
-              borderRadius: '8px',
-              color: message.includes('successfully') ? '#2e7d32' : '#c62828',
-              fontSize: '0.9rem',
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        {/* Category Count */}
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            marginBottom: '1.5rem',
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderRadius: '8px',
-            border: '1px solid var(--color-bg-tertiary)',
-            fontSize: '0.9rem',
-            color: 'var(--color-text-secondary)',
-          }}
+        <button
+          onClick={handleAddClick}
+          disabled={categories.length >= 7}
+          className="btn-primary"
+          style={{ opacity: categories.length >= 7 ? 0.5 : 1, cursor: categories.length >= 7 ? 'not-allowed' : 'pointer' }}
         >
-          {categories.length} of 7 categories created
-        </div>
+          + Create Category
+        </button>
+      </div>
 
-        {/* Categories Table */}
-        <div className="asrs-card" style={{ marginBottom: '2rem' }}>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              Loading categories...
-            </div>
-          ) : categories.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              <p>No categories yet. Create your first category!</p>
+      {/* Status message */}
+      {message && (
+        <div style={{
+          padding: '10px 16px',
+          marginBottom: '20px',
+          backgroundColor: message.includes('successfully') ? '#ECFDF5' : '#FEF2F2',
+          border: `1px solid ${message.includes('successfully') ? '#A7F3D0' : '#FECACA'}`,
+          borderRadius: '8px',
+          color: message.includes('successfully') ? '#059669' : '#DC2626',
+          fontSize: '13px',
+        }}>
+          {message}
+        </div>
+      )}
+
+      {/* Category grid */}
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>Loading categories...</div>
+      ) : categories.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>
+          No categories yet. Create your first category!
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {categories.map((category, idx) => {
+            const accentColor = CARD_COLORS[idx % CARD_COLORS.length];
+            const initiativeCount = (categoryInitiatives[category.category_id] || []).length;
+
+            return (
+              <div
+                key={category.category_id}
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  borderTop: `4px solid ${accentColor}`,
+                  padding: '20px',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'default',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>
+                    {category.category_name}
+                  </h3>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    backgroundColor: accentColor + '18',
+                    color: accentColor,
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {initiativeCount} initiative{initiativeCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '16px', lineHeight: '1.5', minHeight: '40px' }}>
+                  {category.description || 'No description provided.'}
+                </p>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => handleEditClick(category)}
+                    style={{ fontSize: '12px', fontWeight: '600', color: accentColor, background: 'none', border: 'none', cursor: 'pointer', padding: '0', textDecoration: 'underline' }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(category)}
+                    style={{ fontSize: '12px', fontWeight: '600', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', padding: '0', textDecoration: 'underline' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Category-Initiative Mapping Table */}
+      {!isLoading && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Category–Initiative Mapping</span>
+          </div>
+          {mappingRows.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '2rem', fontSize: '13px' }}>
+              No initiatives have been assigned to categories yet.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                }}
-              >
+              <table className="data-table">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                    <th style={thStyle}>Category Name</th>
-                    <th style={thStyle}>Description</th>
-                    <th style={thStyle}>Created</th>
-                    <th style={thStyle} align="right">
-                      Actions
-                    </th>
+                  <tr>
+                    <th>Category</th>
+                    <th>Initiative</th>
+                    <th>Status</th>
+                    <th>Start Date</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {categories.map((category) => (
-                    <React.Fragment key={category.category_id}>
-                      <tr
-                        style={{
-                          borderBottom: '1px solid var(--color-bg-tertiary)',
-                          transition: 'background-color 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <td style={tdStyle}>
-                          <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                            {category.category_name}
-                          </span>
-                        </td>
-                        <td style={tdStyle}>{category.description || '-'}</td>
-                        <td style={tdStyle}>
-                          {new Date(category.created_at).toLocaleDateString()}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          <button
-                            onClick={() => handleEditClick(category)}
-                            style={actionButtonStyle}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setDeleteTarget(category)}
-                            style={{ ...actionButtonStyle, marginLeft: '0.5rem' }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                      {/* Initiatives subrow */}
-                      <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-                        <td colSpan="4" style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--color-bg-secondary)' }}>
-                          <div style={{ paddingLeft: '1rem' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>
-                              Linked Initiatives ({(categoryInitiatives[category.category_id] || []).length})
-                            </div>
-                            {(categoryInitiatives[category.category_id] || []).length === 0 ? (
-                              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
-                                No initiatives in this category yet.
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                {(categoryInitiatives[category.category_id] || []).map((relationship) => (
-                                  <div
-                                    key={relationship.initiative_category_id}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.5rem',
-                                      padding: '0.4rem 0.75rem',
-                                      backgroundColor: 'var(--color-bg-primary)',
-                                      border: '1px solid var(--color-bg-tertiary)',
-                                      borderRadius: '6px',
-                                      fontSize: '0.85rem',
-                                    }}
-                                  >
-                                    <span style={{ color: 'var(--color-text-primary)' }}>
-                                      {relationship.initiative_name}
-                                    </span>
-                                    <button
-                                      onClick={() => handleRemoveInitiativeFromCategory(relationship.initiative_id, category.category_id)}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#c62828',
-                                        cursor: 'pointer',
-                                        padding: '0',
-                                        fontSize: '1.1rem',
-                                        lineHeight: '1',
-                                      }}
-                                      title="Remove from category"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                  {mappingRows.map(({ category, catIdx, rel }) => {
+                    const dotColor = CARD_COLORS[catIdx % CARD_COLORS.length];
+                    return (
+                      <tr key={`${category.category_id}-${rel.initiative_id}`}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
+                            <span style={{ fontWeight: '600', color: '#111827' }}>{category.category_name}</span>
                           </div>
                         </td>
+                        <td style={{ color: '#374151' }}>{rel.initiative_name}</td>
+                        <td>
+                          <span className={`pill ${rel.status === 'active' ? 'pill-green' : rel.status === 'pending' ? 'pill-yellow' : 'pill-gray'}`}>
+                            {rel.status || 'Active'}
+                          </span>
+                        </td>
+                        <td style={{ color: '#6B7280' }}>
+                          {rel.start_date ? new Date(rel.start_date).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            onClick={() => handleRemoveInitiativeFromCategory(rel.initiative_id, category.category_id)}
+                            style={{ fontSize: '12px', fontWeight: '600', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', padding: '0' }}
+                          >
+                            Remove
+                          </button>
+                        </td>
                       </tr>
-                    </React.Fragment>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
-      </main>
+      )}
 
       {/* Add/Edit Modal */}
       {(showAddForm || editingId) && (
-        <div style={overlayStyle} onClick={() => {
-          setShowAddForm(false);
-          setEditingId(null);
-        }}>
+        <div style={overlayStyle} onClick={() => { setShowAddForm(false); setEditingId(null); }}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-primary)' }}>
+            <h2 style={{ marginBottom: '1rem', color: '#111827', fontSize: '18px', fontWeight: '700' }}>
               {editingId ? 'Edit Category' : 'Create Category'}
             </h2>
 
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={labelStyle}>
-                  Category Name <span style={{ color: '#c62828' }}>*</span>
+                  Category Name <span style={{ color: '#DC2626' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -486,40 +433,16 @@ export default function CategoriesPage() {
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setEditingId(null);
-                  }}
-                  style={{
-                    padding: '0.6rem 1.2rem',
-                    border: '1px solid var(--color-bg-tertiary)',
-                    background: 'white',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    color: 'var(--color-text-primary)',
-                    transition: 'background-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                  }}
+                  onClick={() => { setShowAddForm(false); setEditingId(null); }}
+                  className="btn-outline"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="asrs-btn-primary"
-                  style={{
-                    padding: '0.6rem 1.2rem',
-                    fontSize: '0.95rem',
-                    opacity: isSubmitting ? 0.6 : 1,
-                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  }}
+                  className="btn-primary"
+                  style={{ opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
                 >
                   {isSubmitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
                 </button>
@@ -533,57 +456,31 @@ export default function CategoriesPage() {
       {deleteTarget && (
         <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '1rem', color: 'var(--color-text-primary)' }}>
+            <h2 style={{ marginBottom: '1rem', color: '#111827', fontSize: '18px', fontWeight: '700' }}>
               Confirm Deletion
             </h2>
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
               Are you sure you want to delete the category &quot;
               <strong>{deleteTarget.category_name}</strong>
               &quot;? This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                style={{
-                  padding: '0.6rem 1.2rem',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  background: 'white',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  color: 'var(--color-text-primary)',
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                }}
-              >
+              <button onClick={() => setDeleteTarget(null)} className="btn-outline">
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={isSubmitting}
                 style={{
-                  padding: '0.6rem 1.2rem',
+                  padding: '9px 18px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#c62828',
+                  background: '#DC2626',
                   color: 'white',
                   fontWeight: '600',
-                  fontSize: '0.95rem',
+                  fontSize: '13px',
                   cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   opacity: isSubmitting ? 0.6 : 1,
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSubmitting) e.currentTarget.style.backgroundColor = '#a01818';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#c62828';
                 }}
               >
                 {isSubmitting ? 'Deleting...' : 'Delete'}
@@ -592,38 +489,11 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }
 
 // ── Shared styles ────────────────────────────────────────
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '0.75rem 1rem',
-  fontWeight: '700',
-  fontSize: '0.8rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  color: '#555',
-};
-
-const tdStyle = {
-  padding: '0.75rem 1rem',
-  color: 'var(--color-text-secondary)',
-};
-
-const actionButtonStyle = {
-  padding: '0.4rem 0.75rem',
-  borderRadius: '6px',
-  border: '1px solid var(--color-bg-tertiary)',
-  background: 'white',
-  cursor: 'pointer',
-  color: '#2C3E50',
-  fontWeight: '600',
-  fontSize: '0.8rem',
-  transition: 'background-color 0.15s',
-};
 
 const overlayStyle = {
   position: 'fixed',
@@ -649,19 +519,19 @@ const modalStyle = {
 
 const labelStyle = {
   display: 'block',
-  color: 'var(--color-text-primary)',
+  color: '#111827',
   marginBottom: '0.4rem',
   fontWeight: '600',
-  fontSize: '0.9rem',
+  fontSize: '13px',
 };
 
 const inputStyle = {
   width: '100%',
   padding: '0.625rem 0.75rem',
-  border: '1px solid var(--color-bg-tertiary)',
+  border: '1px solid #E5E7EB',
   borderRadius: '8px',
-  fontSize: '0.9rem',
-  color: 'var(--color-text-primary)',
+  fontSize: '13px',
+  color: '#111827',
   backgroundColor: 'white',
   outline: 'none',
   boxSizing: 'border-box',

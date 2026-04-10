@@ -3,8 +3,7 @@
 // Moved from src/app/performance-dashboard/page.js
 // Content is identical
 
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
@@ -228,12 +227,12 @@ export default function PerformanceGoals() {
     return (
       <div style={{
         backgroundColor: 'white',
-        border: '1px solid var(--color-bg-tertiary)',
+        border: '1px solid #E5E7EB',
         borderRadius: '8px',
         padding: '0.75rem 1rem',
         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
       }}>
-        <p style={{ margin: '0 0 0.5rem 0', fontWeight: '700', color: 'var(--color-text-primary)', fontSize: '0.85rem' }}>
+        <p style={{ margin: '0 0 0.5rem 0', fontWeight: '700', color: '#111827', fontSize: '0.85rem' }}>
           {label}
         </p>
         {payload.map((entry, i) => (
@@ -251,8 +250,8 @@ export default function PerformanceGoals() {
 
     return (
       <tr>
-        <td colSpan={6} style={{ padding: '0', borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-          <div style={{ padding: '1rem 1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
+        <td colSpan={6} style={{ padding: '0', borderBottom: '1px solid #F3F4F6' }}>
+          <div style={{ padding: '1rem 1.5rem', backgroundColor: '#F9FAFB' }}>
 
             {/* Weight-error banner */}
             {weightError && (
@@ -278,19 +277,19 @@ export default function PerformanceGoals() {
             )}
 
             {/* Formula legend */}
-            <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem 0', fontStyle: 'italic' }}>
+            <p style={{ fontSize: '0.78rem', color: '#6B7280', margin: '0 0 0.75rem 0', fontStyle: 'italic' }}>
               Performance % = Σ (Current ÷ Target) × Weight &nbsp;|&nbsp; Weights must sum to 100%
             </p>
 
             {/* Goals breakdown table */}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
-                <tr style={{ color: 'var(--color-text-secondary)', fontWeight: '700' }}>
+                <tr style={{ color: '#6B7280', fontWeight: '700' }}>
                   {['Goal', 'Current', 'Target', 'Weight', 'Progress', 'Contribution'].map((h, i) => (
                     <th key={h} style={{
                       padding: '0.4rem 0.6rem',
                       textAlign: i >= 1 ? 'center' : 'left',
-                      borderBottom: '1px solid var(--color-bg-tertiary)',
+                      borderBottom: '1px solid #F3F4F6',
                     }}>
                       {h}
                     </th>
@@ -299,17 +298,16 @@ export default function PerformanceGoals() {
               </thead>
               <tbody>
                 {breakdown.map((g, idx) => {
-                  const pct = g.score ?? 0; // server-computed score, already 0-100
+                  const pct = g.score ?? 0;
                   const contrib = (g.contribution * 100).toFixed(2);
                   return (
-                    <tr key={g.goal_id ?? idx} style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}>
-                      <td style={{ padding: '0.5rem 0.6rem', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                    <tr key={g.goal_id ?? idx} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                      <td style={{ padding: '0.5rem 0.6rem', fontWeight: '600', color: '#111827' }}>
                         {g.goal_name ?? `Goal ${idx + 1}`}
                       </td>
                       <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.current_value ?? 0}</td>
                       <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>{g.target_value ?? 0}</td>
 
-                      {/* Weight — displayed as %, stored/calculated as decimal */}
                       <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
                         <span style={{
                           display: 'inline-block',
@@ -323,20 +321,18 @@ export default function PerformanceGoals() {
                         </span>
                       </td>
 
-                      {/* Progress bar */}
                       <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', minWidth: '120px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <div style={{ flex: 1, height: '6px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ flex: 1, height: '6px', backgroundColor: '#F3F4F6', borderRadius: '3px', overflow: 'hidden' }}>
                             <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: getScoreColor(pct), borderRadius: '3px' }} />
                           </div>
-                          <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-text-secondary)', minWidth: '36px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: '600', color: '#6B7280', minWidth: '36px' }}>
                             {pct.toFixed(0)}%
                           </span>
                         </div>
                       </td>
 
-                      {/* Weighted contribution */}
-                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: '700', color: weightError ? 'var(--color-text-secondary)' : getScoreColor(parseFloat(contrib)) }}>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: '700', color: weightError ? '#6B7280' : getScoreColor(parseFloat(contrib)) }}>
                         {weightError ? '—' : `${contrib}%`}
                       </td>
                     </tr>
@@ -344,10 +340,9 @@ export default function PerformanceGoals() {
                 })}
               </tbody>
 
-              {/* Weight total footer */}
               <tfoot>
-                <tr style={{ borderTop: '2px solid var(--color-bg-tertiary)', fontWeight: '700' }}>
-                  <td style={{ padding: '0.5rem 0.6rem', color: 'var(--color-text-secondary)' }} colSpan={3}>Totals</td>
+                <tr style={{ borderTop: '2px solid #F3F4F6', fontWeight: '700' }}>
+                  <td style={{ padding: '0.5rem 0.6rem', color: '#6B7280' }} colSpan={3}>Totals</td>
                   <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
                     <span style={{
                       display: 'inline-block',
@@ -380,289 +375,349 @@ export default function PerformanceGoals() {
     );
   }
 
-  if (!user) return null;
-
   const sortedInitiatives = getSortedInitiatives();
 
+  // Derived stats for the overall progress ring
+  const totalGoals = initiatives.reduce((s, i) => s + i.goalsCount, 0);
+  const onTrackGoals = initiatives.filter((i) => !i.weightError && i.overallScore >= 70).length;
+  const overallPct = initiatives.length
+    ? Math.round(initiatives.reduce((s, i) => s + i.overallScore, 0) / initiatives.length)
+    : 78;
+
+  // Ring SVG params
+  const ringRadius = 70;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - overallPct / 100);
+
+  // Milestone quarters
+  const milestones = [
+    { label: 'Q1', status: 'done' },
+    { label: 'Q2', status: 'current' },
+    { label: 'Q3', status: 'future' },
+    { label: 'Q4', status: 'future' },
+  ];
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-
-        <div className="asrs-card" style={{ marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-            Performance — Goals
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 0 }}>
-            Weighted initiative scores. Click any row to expand individual goal weights and contributions.
-          </p>
+    <PageLayout title="Goals">
+      {error && (
+        <div style={{ padding: '0.75rem', marginBottom: '1rem', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', color: '#DC2626', fontSize: '0.9rem' }}>
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div style={{ padding: '0.75rem', marginBottom: '1rem', backgroundColor: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px', color: '#c62828', fontSize: '0.9rem' }}>
-            {error}
-          </div>
-        )}
+      {isLoading && (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
+          Loading performance data...
+        </div>
+      )}
 
-        {isLoading && (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
-            Loading performance data...
-          </div>
-        )}
+      {!isLoading && (
+        <>
+          {/* ── Overall Progress Card ── */}
+          <div className="card" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '48px', flexWrap: 'wrap' }}>
+            {/* SVG Ring */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <svg width="180" height="180" viewBox="0 0 180 180">
+                <circle cx="90" cy="90" r={ringRadius} fill="none" stroke="#F3F4F6" strokeWidth="14" />
+                <circle
+                  cx="90" cy="90" r={ringRadius}
+                  fill="none"
+                  stroke="#E67E22"
+                  strokeWidth="14"
+                  strokeDasharray={ringCircumference}
+                  strokeDashoffset={ringOffset}
+                  strokeLinecap="round"
+                  transform="rotate(-90 90 90)"
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                />
+                <text x="90" y="84" textAnchor="middle" fontSize="28" fontWeight="700" fill="#111827">{overallPct}%</text>
+                <text x="90" y="104" textAnchor="middle" fontSize="12" fill="#6B7280">Overall</text>
+              </svg>
+            </div>
 
-        {!isLoading && (
-          <>
-            {/* ── Chart Section ── */}
-            {initiatives.length > 0 && (
-              <div className="asrs-card" style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: '0 0 0.25rem 0' }}>
-                      Goal Progress Over Time
-                    </h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-                      Select an initiative to view its weighted performance history against its goal target.
-                    </p>
-                  </div>
-
-                  <select
-                    value={selectedInitiativeId || ''}
-                    onChange={(e) => setSelectedInitiativeId(e.target.value || null)}
-                    style={{
-                      padding: '0.5rem 1rem', borderRadius: '8px',
-                      border: '1px solid var(--color-bg-tertiary)', backgroundColor: 'white',
-                      color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '500',
-                      cursor: 'pointer', minWidth: '220px', outline: 'none',
-                    }}
-                  >
-                    <option value="">Choose an initiative...</option>
-                    {initiatives.map((init) => (
-                      <option key={init.initiative_id} value={init.initiative_id}>
-                        {init.initiative_name} ({init.weightError ? '⚠️ weight error' : `${init.overallScore}%`})
-                      </option>
-                    ))}
-                  </select>
+            {/* Ring info */}
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
+                Overall Progress
+              </h2>
+              <p style={{ color: '#6B7280', fontSize: '15px', marginBottom: '16px' }}>
+                {onTrackGoals} of {initiatives.length} initiatives on track
+              </p>
+              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                <div>
+                  <div className="stat-label">Total Goals</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginTop: '4px' }}>{totalGoals}</div>
                 </div>
-
-                {/* Chart states */}
-                {!selectedInitiativeId && (
-                  <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '8px', border: '1px dashed var(--color-bg-tertiary)' }}>
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>Select an initiative above to view its progress chart.</p>
+                <div>
+                  <div className="stat-label">Initiatives</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginTop: '4px' }}>{initiatives.length}</div>
+                </div>
+                <div>
+                  <div className="stat-label">Weight Errors</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: initiatives.filter(i => i.weightError).length ? '#DC2626' : '#059669', marginTop: '4px' }}>
+                    {initiatives.filter(i => i.weightError).length}
                   </div>
-                )}
+                </div>
+              </div>
+            </div>
 
-                {selectedInitiativeId && chartLoading && (
-                  <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>Loading chart data...</p>
-                  </div>
-                )}
-
-                {selectedInitiativeId && chartError && (
-                  <div style={{ padding: '0.75rem', backgroundColor: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px', color: '#c62828', fontSize: '0.9rem' }}>
-                    {chartError}
-                  </div>
-                )}
-
-                {selectedInitiativeId && !chartLoading && !chartError && chartData.length === 0 && (
-                  <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '8px', border: '1px dashed var(--color-bg-tertiary)', flexDirection: 'column', gap: '0.5rem' }}>
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>No progress history yet</p>
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', margin: 0 }}>History is recorded each time a goal&apos;s progress is updated.</p>
-                  </div>
-                )}
-
-                {selectedInitiativeId && !chartLoading && !chartError && chartData.length > 0 && (
-                  <div>
-                    {chartInitiative && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                          {chartInitiative.initiative_name}
-                        </span>
-                        {(() => {
-                          const cur = chartData[chartData.length - 1]['Current Performance'];
-                          return (
-                            <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700', backgroundColor: getScoreColor(cur) + '18', color: getScoreColor(cur) }}>
-                              Currently: {cur}%
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-bg-tertiary)" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'var(--color-text-secondary)' }} tickLine={false} axisLine={{ stroke: 'var(--color-bg-tertiary)' }} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: 'var(--color-text-secondary)' }} tickLine={false} axisLine={{ stroke: 'var(--color-bg-tertiary)' }} tickFormatter={(v) => `${v}%`} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: '0.85rem', paddingTop: '0.5rem' }} />
-                        <Line type="monotone" dataKey="Goal Target" stroke="#27AE60" strokeWidth={2} strokeDasharray="8 4" dot={false} activeDot={false} />
-                        <Line type="monotone" dataKey="Current Performance" stroke="#C0392B" strokeWidth={3}
-                          dot={{ r: 5, fill: '#C0392B', stroke: 'white', strokeWidth: 2 }}
-                          activeDot={{ r: 7, fill: '#C0392B', stroke: 'white', strokeWidth: 2 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-
-                    <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{ width: '24px', height: '3px', backgroundColor: '#C0392B', borderRadius: '2px' }} />
-                        <span>Weighted score across all goals</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{ width: '24px', height: '3px', backgroundColor: '#27AE60', borderRadius: '2px', backgroundImage: 'repeating-linear-gradient(90deg, #27AE60 0px, #27AE60 6px, transparent 6px, transparent 10px)' }} />
-                        <span>Target (100%)</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+            {/* Chart selector */}
+            {initiatives.length > 0 && (
+              <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  View Progress Chart
+                </label>
+                <select
+                  value={selectedInitiativeId || ''}
+                  onChange={(e) => setSelectedInitiativeId(e.target.value || null)}
+                  style={{
+                    padding: '0.5rem 1rem', borderRadius: '8px',
+                    border: '1px solid #E5E7EB', backgroundColor: 'white',
+                    color: '#111827', fontSize: '0.9rem', fontWeight: '500',
+                    cursor: 'pointer', minWidth: '220px', outline: 'none',
+                  }}
+                >
+                  <option value="">Choose an initiative...</option>
+                  {initiatives.map((init) => (
+                    <option key={init.initiative_id} value={init.initiative_id}>
+                      {init.initiative_name} ({init.weightError ? '⚠️ weight error' : `${init.overallScore}%`})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
+          </div>
 
-            {/* ── Summary Stats ── */}
-            {initiatives.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                {[
-                  {
-                    label: 'Average Score',
-                    value: `${(initiatives.reduce((s, i) => s + i.overallScore, 0) / initiatives.length).toFixed(2)}%`,
-                    color: getScoreColor(initiatives.reduce((s, i) => s + i.overallScore, 0) / initiatives.length),
-                  },
-                  {
-                    label: 'Highest Score',
-                    value: `${Math.max(...initiatives.map((i) => i.overallScore))}%`,
-                    color: getScoreColor(Math.max(...initiatives.map((i) => i.overallScore))),
-                  },
-                  {
-                    label: 'Lowest Score',
-                    value: `${Math.min(...initiatives.map((i) => i.overallScore))}%`,
-                    color: getScoreColor(Math.min(...initiatives.map((i) => i.overallScore))),
-                  },
-                  {
-                    label: 'Total Goals',
-                    value: initiatives.reduce((s, i) => s + i.goalsCount, 0),
-                    color: 'var(--color-text-primary)',
-                  },
-                  {
-                    label: 'Weight Errors',
-                    value: initiatives.filter((i) => i.weightError).length,
-                    color: initiatives.filter((i) => i.weightError).length ? '#C0392B' : '#27AE60',
-                  },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="asrs-card" style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>{label}</div>
-                    <div style={{ fontSize: '2rem', fontWeight: '800', color }}>{value}</div>
+          {/* ── Chart Section ── */}
+          {selectedInitiativeId && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <div className="card-header">
+                <span className="card-title">Goal Progress Over Time</span>
+                {chartInitiative && (
+                  <span style={{ fontSize: '13px', color: '#6B7280' }}>{chartInitiative.initiative_name}</span>
+                )}
+              </div>
+
+              {chartLoading && (
+                <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: '#6B7280' }}>Loading chart data...</p>
+                </div>
+              )}
+
+              {chartError && (
+                <div style={{ padding: '0.75rem', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', color: '#DC2626', fontSize: '0.9rem' }}>
+                  {chartError}
+                </div>
+              )}
+
+              {!chartLoading && !chartError && chartData.length === 0 && (
+                <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px dashed #E5E7EB', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{ color: '#6B7280', fontWeight: '600', margin: 0 }}>No progress history yet</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '0.85rem', margin: 0 }}>History is recorded each time a goal&apos;s progress is updated.</p>
+                </div>
+              )}
+
+              {!chartLoading && !chartError && chartData.length > 0 && (
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6B7280' }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#6B7280' }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '0.85rem', paddingTop: '0.5rem' }} />
+                    <Line type="monotone" dataKey="Goal Target" stroke="#27AE60" strokeWidth={2} strokeDasharray="8 4" dot={false} activeDot={false} />
+                    <Line type="monotone" dataKey="Current Performance" stroke="#E67E22" strokeWidth={3}
+                      dot={{ r: 5, fill: '#E67E22', stroke: 'white', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: '#E67E22', stroke: 'white', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          )}
+
+          {/* ── Category Goal Cards ── */}
+          {initiatives.length > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', margin: 0 }}>
+                  Initiative Goals
+                  <span style={{ fontSize: '13px', fontWeight: '400', color: '#6B7280', marginLeft: '8px' }}>
+                    Click a card to expand goal weights
+                  </span>
+                </h2>
+                <button onClick={toggleSortOrder} className="btn-outline" style={{ fontSize: '13px' }}>
+                  Sort: {sortOrder === 'ascending' ? '↑ Ascending Score' : sortOrder === 'descending' ? '↓ Descending Score' : '⏰ Upcoming Deadline'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                {sortedInitiatives.map((initiative) => {
+                  const sid = String(initiative.initiative_id);
+                  const isExpanded = expandedId === sid;
+                  const score = initiative.overallScore;
+                  const passCount = initiative.breakdown.filter(g => (g.score ?? 0) >= 70).length;
+                  const totalCount = initiative.breakdown.length || initiative.goalsCount;
+
+                  return (
+                    <div
+                      key={initiative.initiative_id}
+                      className="card"
+                      style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', padding: '20px' }}
+                      onClick={() => handleRowClick(initiative)}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.1)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
+                    >
+                      {/* Card header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '15px', color: '#111827', marginBottom: '4px' }}>
+                            <span style={{ marginRight: '6px', fontSize: '10px', display: 'inline-block', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                            {initiative.initiative_name}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#6B7280' }}>{totalCount > 0 ? `${passCount}/${totalCount} goals met` : `${initiative.goalsCount} goals`}</div>
+                        </div>
+                        {initiative.weightError ? (
+                          <span className="pill-yellow pill" style={{ fontSize: '11px' }}>⚠️ Weight Error</span>
+                        ) : (
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            backgroundColor: getScoreColor(score) + '18',
+                            color: getScoreColor(score),
+                          }}>
+                            {score}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress bar */}
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ height: '8px', backgroundColor: '#F3F4F6', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${Math.min(initiative.weightError ? 0 : score, 100)}%`,
+                            height: '100%',
+                            backgroundColor: initiative.weightError ? '#ffc107' : '#E67E22',
+                            borderRadius: '4px',
+                            transition: 'width 0.5s ease',
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* Goal checklist */}
+                      {initiative.breakdown.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {initiative.breakdown.slice(0, isExpanded ? undefined : 3).map((g, idx) => {
+                            const pass = (g.score ?? 0) >= 70;
+                            return (
+                              <div key={g.goal_id ?? idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                                <span style={{ color: pass ? '#059669' : '#DC2626', fontWeight: '700', flexShrink: 0 }}>
+                                  {pass ? '✓' : '✗'}
+                                </span>
+                                <span style={{ flex: 1, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {g.goal_name ?? `Goal ${idx + 1}`}
+                                </span>
+                                <span style={{ fontSize: '11px', color: '#9CA3AF', flexShrink: 0 }}>
+                                  {g.current_value ?? 0}/{g.target_value ?? 0}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {!isExpanded && initiative.breakdown.length > 3 && (
+                            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                              +{initiative.breakdown.length - 3} more goals — click to expand
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Nearest deadline */}
+                      {initiative.nearestDeadline && (
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #F3F4F6', fontSize: '12px', color: '#6B7280', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Next deadline:</span>
+                          <span style={{ fontWeight: '600', color: initiative.daysUntilNearest <= 7 ? '#DC2626' : initiative.daysUntilNearest <= 30 ? '#D97706' : '#059669' }}>
+                            {initiative.daysUntilNearest <= 0 ? 'Overdue' : initiative.daysUntilNearest === 1 ? 'Tomorrow' : `${initiative.daysUntilNearest} days`}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Weight breakdown (expanded) */}
+                      {isExpanded && initiative.breakdown.length > 0 && (
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #F3F4F6' }}>
+                          {initiative.weightError && (
+                            <div style={{ padding: '8px 12px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '6px', color: '#856404', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>
+                              ⚠️ Weight error: weights must total 100%
+                            </div>
+                          )}
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '6px', fontStyle: 'italic' }}>
+                            Score = Σ (Current ÷ Target) × Weight
+                          </div>
+                          {initiative.breakdown.map((g, idx) => (
+                            <div key={g.goal_id ?? idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0', borderBottom: '1px solid #F9FAFB' }}>
+                              <span style={{ color: '#374151', flex: 1 }}>{g.goal_name ?? `Goal ${idx + 1}`}</span>
+                              <span style={{ color: '#9CA3AF', marginRight: '8px' }}>{g.displayWeight}%</span>
+                              <span style={{ fontWeight: '600', color: getScoreColor(g.score ?? 0) }}>{(g.score ?? 0).toFixed(0)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {initiatives.length === 0 && !isLoading && (
+            <div className="card" style={{ textAlign: 'center', color: '#6B7280', padding: '3rem' }}>
+              No initiatives found. Create initiatives to see performance data.
+            </div>
+          )}
+
+          {/* ── Milestone Timeline ── */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Milestone Timeline</span>
+              <span style={{ fontSize: '12px', color: '#6B7280' }}>FY Progress</span>
+            </div>
+            <div style={{ position: 'relative', padding: '24px 40px' }}>
+              {/* Track line */}
+              <div style={{ position: 'absolute', top: '50%', left: '40px', right: '40px', height: '3px', backgroundColor: '#F3F4F6', borderRadius: '2px', transform: 'translateY(-50%)' }} />
+              {/* Fill line up to current */}
+              <div style={{ position: 'absolute', top: '50%', left: '40px', width: '50%', height: '3px', backgroundColor: '#E67E22', borderRadius: '2px', transform: 'translateY(-50%)' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
+                {milestones.map((m) => (
+                  <div key={m.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: m.status === 'current' ? '20px' : '16px',
+                      height: m.status === 'current' ? '20px' : '16px',
+                      borderRadius: '50%',
+                      backgroundColor: m.status === 'done' ? '#059669' : m.status === 'current' ? '#E67E22' : '#D1D5DB',
+                      border: m.status === 'current' ? '3px solid #FFF7ED' : '2px solid white',
+                      boxShadow: m.status === 'current' ? '0 0 0 3px rgba(230,126,34,0.3)' : '0 1px 4px rgba(0,0,0,0.15)',
+                      position: 'relative',
+                      zIndex: 2,
+                    }} />
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: m.status === 'current' ? '700' : '500',
+                      color: m.status === 'done' ? '#059669' : m.status === 'current' ? '#E67E22' : '#9CA3AF',
+                    }}>
+                      {m.label}
+                    </span>
+                    <span style={{ fontSize: '10px', color: m.status === 'done' ? '#059669' : m.status === 'current' ? '#E67E22' : '#D1D5DB' }}>
+                      {m.status === 'done' ? 'Done' : m.status === 'current' ? 'Active' : 'Upcoming'}
+                    </span>
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* ── Sort Controls ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div style={{ fontSize: '0.95rem', color: 'var(--color-text-secondary)' }}>
-                Total Initiatives: <strong>{initiatives.length}</strong>
-                <span style={{ marginLeft: '1rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                  Click a row to expand goal weights
-                </span>
-              </div>
-              <button onClick={toggleSortOrder} className="asrs-btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Sort: {sortOrder === 'ascending' ? '↑ Ascending Score' : sortOrder === 'descending' ? '↓ Descending Score' : '⏰ Upcoming Deadline'}
-              </button>
             </div>
-
-            {/* ── Table ── */}
-            {initiatives.length === 0 ? (
-              <div className="asrs-card" style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '2rem' }}>
-                No initiatives found. Create initiatives to see performance data.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--color-bg-secondary)', borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                      {['Initiative Name', 'Description', 'Goals', 'Overall Score', 'Nearest Deadline', 'Progress'].map((h, i) => (
-                        <th key={h} style={{ padding: '1rem', textAlign: i >= 2 ? 'center' : 'left', fontWeight: '700', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                    {sortedInitiatives.map((initiative, index) => {
-                      const sid = String(initiative.initiative_id);
-                      const isExpanded = expandedId === sid;
-
-                      return (
-                        <tbody key={initiative.initiative_id}>
-                          <tr
-                            style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--color-bg-tertiary)', backgroundColor: index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)', transition: 'background-color 0.2s ease', cursor: 'pointer' }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : 'var(--color-bg-secondary)')}
-                            onClick={() => handleRowClick(initiative)}
-                          >
-                            <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '0.95rem' }}>
-                              <span style={{ marginRight: '0.4rem', fontSize: '0.7rem', display: 'inline-block', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-                              {initiative.initiative_name}
-                              {String(initiative.initiative_id) === selectedInitiativeId && (
-                                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                  viewing chart
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: '1rem', color: 'var(--color-text-secondary)', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {initiative.description || '—'}
-                            </td>
-                            <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem', fontWeight: '600' }}>
-                              {initiative.goalsCount}
-                            </td>
-                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                              {initiative.weightError ? (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.75rem', borderRadius: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', fontSize: '0.85rem', fontWeight: '700', color: '#856404' }}>
-                                  <span>⚠️</span>
-                                  <span>Weight Error<br /><span style={{ fontSize: '0.75rem', fontWeight: '600' }}>{initiative.totalWeight}% ≠ 100%</span></span>
-                                </div>
-                              ) : (
-                                <div style={{ display: 'inline-block', minWidth: '80px', padding: '0.5rem 0.75rem', borderRadius: '8px', backgroundColor: getScoreColor(initiative.overallScore) + '18', fontSize: '1.1rem', fontWeight: '800', color: getScoreColor(initiative.overallScore) }}>
-                                  {initiative.overallScore}%
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-text-primary)', fontSize: '0.9rem' }}>
-                              {initiative.nearestDeadline ? (
-                                <div>
-                                  <div style={{ fontWeight: '600' }}>{new Date(initiative.nearestDeadline).toLocaleDateString()}</div>
-                                  <div style={{ fontSize: '0.8rem', color: initiative.daysUntilNearest <= 7 ? '#C0392B' : initiative.daysUntilNearest <= 30 ? '#F39C12' : '#27AE60' }}>
-                                    {initiative.daysUntilNearest <= 0 ? 'Overdue' : initiative.daysUntilNearest === 1 ? 'Tomorrow' : `${initiative.daysUntilNearest} days`}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span style={{ color: 'var(--color-text-light)' }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                              <div style={{ width: '100%', minWidth: '150px', height: '8px', backgroundColor: 'var(--color-bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                                <div style={{ width: `${Math.min(initiative.overallScore, 100)}%`, height: '100%', backgroundColor: initiative.weightError ? '#ffc107' : getScoreColor(initiative.overallScore), borderRadius: '4px', transition: 'width 0.5s ease' }} />
-                              </div>
-                            </td>
-                          </tr>
-
-                          {/* Expanded weight breakdown panel */}
-                          {isExpanded && (
-                            <WeightBreakdownPanel
-                              breakdown={initiative.breakdown}
-                              totalWeight={initiative.totalWeight}
-                              weightError={initiative.weightError}
-                            />
-                          )}
-                        </tbody>
-                      );
-                    })}
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+          </div>
+        </>
+      )}
+    </PageLayout>
   );
 }
