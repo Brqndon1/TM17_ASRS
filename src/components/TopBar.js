@@ -1,14 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
 
 export default function TopBar({ title }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const router = useRouter();
   const { user, clearUser } = useAuthStore();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   const userInitials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -58,7 +71,7 @@ export default function TopBar({ title }) {
           </svg>
         </div>
 
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={menuRef}>
           <div
             className="sidebar-user-avatar"
             style={{ width: 32, height: 32, fontSize: 12, cursor: 'pointer' }}
@@ -73,7 +86,7 @@ export default function TopBar({ title }) {
               boxShadow: '0 4px 12px rgba(0,0,0,.1)', minWidth: 160, zIndex: 200,
               padding: '4px 0',
             }}>
-              <a href="/profile" style={{ display: 'block', padding: '8px 16px', fontSize: 13, color: '#374151', textDecoration: 'none' }}>Profile</a>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 16px', fontSize: 13, color: '#374151', textDecoration: 'none' }}>Profile</Link>
               <div style={{ borderTop: '1px solid #F3F4F6', margin: '4px 0' }} />
               <button onClick={handleLogout} style={{ display: 'block', width: '100%', padding: '8px 16px', fontSize: 13, color: '#EF4444', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}>Sign Out</button>
             </div>

@@ -75,30 +75,29 @@ export default function SurveyPage() {
       return;
     }
 
-    fetch('/api/surveys/distributions')
+    fetch('/api/surveys/active')
       .then((res) => {
-        if (!res.ok) throw new Error('Not authorized');
+        if (!res.ok) throw new Error('Failed to load');
         return res.json();
       })
       .then((data) => {
-        const dists = data.distributions || [];
-        const today = new Date().toISOString().split('T')[0];
+        const surveys = data.surveys || [];
 
-        // Find all distributions that are active and whose end_date hasn't passed
-        const activeDists = dists.filter(
-          (d) => d.status === 'active' && d.end_date >= today
-        );
+        // Map to distribution-like shape for compatibility
+        const activeDists = surveys.map((s) => ({
+          distribution_id: s.id,
+          survey_template_id: s.templateId,
+          title: s.title,
+          end_date: s.endDate,
+          initiative_name: s.initiativeName,
+          status: 'active',
+        }));
 
         setActiveDistributions(activeDists);
 
-        if (activeDists.length > 1) {
-          // Multiple active surveys — show picker
+        if (activeDists.length > 0) {
           setSurveyOpen(true);
           setShowSurveyPicker(true);
-        } else if (activeDists.length === 1) {
-          // Single active survey — load it directly
-          setSurveyOpen(true);
-          setActiveDistribution(activeDists[0]);
         } else {
           setSurveyOpen(false);
         }
@@ -656,6 +655,11 @@ export default function SurveyPage() {
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', marginBottom: '4px' }}>
                         {dist.title}
                       </div>
+                      {dist.initiative_name && (
+                        <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginBottom: '2px' }}>
+                          {dist.initiative_name}
+                        </div>
+                      )}
                       <div style={{ fontSize: '0.85rem', color: '#6B7280' }}>
                         Open until {dist.end_date}
                       </div>
