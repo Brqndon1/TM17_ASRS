@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import ReportDashboard from '@/components/ReportDashboard';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
 
@@ -143,6 +142,18 @@ export default function HistoricalReportsPage() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  function formatMonthYear(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  function getMonthKey(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
   function parseReportForDashboard(report) {
     let parsed = null;
     try {
@@ -176,341 +187,295 @@ export default function HistoricalReportsPage() {
     };
   }
 
-  const statusBadgeStyle = (status) => {
-    const colors = {
-      completed: { bg: '#d1fae5', text: '#065f46', border: '#a7f3d0' },
-      generating: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
-      failed: { bg: '#fee2e2', text: '#991b1b', border: '#fecaca' },
-    };
-    const c = colors[status] || colors.completed;
-    return {
-      display: 'inline-block',
-      padding: '0.2rem 0.65rem',
-      borderRadius: '999px',
-      fontSize: '0.75rem',
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: '0.03em',
-      backgroundColor: c.bg,
-      color: c.text,
-      border: `1px solid ${c.border}`,
-    };
-  };
-
-  // ── Access denied for public users ──
-  if (!authChecked) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-            Loading...
-          </p>
-        </main>
-      </div>
-    );
+  // Group reports by month
+  function groupByMonth(reports) {
+    const groups = {};
+    reports.forEach((r) => {
+      const key = getMonthKey(r.created_at);
+      if (!groups[key]) groups[key] = { label: formatMonthYear(r.created_at), reports: [] };
+      groups[key].reports.push(r);
+    });
+    // Sort descending by month key
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([, v]) => v);
   }
 
-  if (authChecked && userRole !== 'staff' && userRole !== 'admin') {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <BackButton />
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--color-asrs-dark)' }}>
-              Access Denied
-            </h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1rem' }}>
-              You do not have permission to view historical reports. Please contact an administrator.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Compute stats
+  const totalReports = reports.length;
+  const now = new Date();
+  const thisMonthReports = reports.filter((r) => {
+    if (!r.created_at) return false;
+    const d = new Date(r.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  const initiativeCount = {};
+  reports.forEach((r) => {
+    const name = r.initiative_name || 'Unknown';
+    initiativeCount[name] = (initiativeCount[name] || 0) + 1;
+  });
+  const mostActiveInitiative = Object.entries(initiativeCount).sort(([, a], [, b]) => b - a)[0]?.[0] || '\u2014';
 
   const comparedReports = showComparison
     ? selectedIds.map((id) => reports.find((r) => r.id === id)).filter(Boolean)
     : [];
 
+  const monthGroups = groupByMonth(reports);
+
+  function getFormatPill(format) {
+    if (!format) return null;
+    const fmt = format.toUpperCase();
+    if (fmt === 'PDF') return { bg: '#FEE2E2', color: '#991B1B', label: 'PDF' };
+    if (fmt === 'CSV') return { bg: '#D1FAE5', color: '#065F46', label: 'CSV' };
+    if (fmt === 'HTML') return { bg: '#DBEAFE', color: '#1E40AF', label: 'HTML' };
+    return { bg: '#F3F4F6', color: '#374151', label: fmt };
+  }
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-
-        <div className="asrs-card">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-            Historical Reports
+    <PageLayout title="Historical">
+      <div style={{ padding: '0' }}>
+        {/* Page heading */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>
+            Report History
           </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-            Browse, filter, compare, and download previously generated reports.
-          </p>
+        </div>
 
-          {/* ── Filter Bar ── */}
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            flexWrap: 'wrap',
-            alignItems: 'flex-end',
-            marginBottom: '1.5rem',
-            padding: '1rem',
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderRadius: '8px',
-            border: '1px solid var(--color-bg-tertiary)',
-          }}>
+        {/* Stats Row */}
+        <div className="stats-row" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div className="stat-card" style={{ flex: '1 1 160px', background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+            <div className="stat-label" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+              Total Reports
+            </div>
+            <div className="stat-value" style={{ fontSize: '2rem', fontWeight: 700, color: '#1F2937' }}>
+              {isLoading ? '—' : totalReports}
+            </div>
+          </div>
+          <div className="stat-card" style={{ flex: '1 1 160px', background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+            <div className="stat-label" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+              This Month
+            </div>
+            <div className="stat-value" style={{ fontSize: '2rem', fontWeight: 700, color: '#1F2937' }}>
+              {isLoading ? '—' : thisMonthReports}
+            </div>
+          </div>
+          <div className="stat-card" style={{ flex: '2 1 260px', background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+            <div className="stat-label" style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+              Most Active Initiative
+            </div>
+            <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {isLoading ? '—' : mostActiveInitiative}
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Start Date
               </label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                style={{
-                  padding: '0.5rem 0.65rem',
-                  fontSize: '0.9rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'var(--color-bg-primary)',
-                }}
+                style={{ padding: '0.5rem 0.65rem', fontSize: '0.9rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
               />
             </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 End Date
               </label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                style={{
-                  padding: '0.5rem 0.65rem',
-                  fontSize: '0.9rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'var(--color-bg-primary)',
-                }}
+                style={{ padding: '0.5rem 0.65rem', fontSize: '0.9rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
               />
             </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Initiative
               </label>
               <select
                 value={selectedInitiativeId}
                 onChange={(e) => setSelectedInitiativeId(e.target.value)}
-                style={{
-                  padding: '0.5rem 0.65rem',
-                  fontSize: '0.9rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'var(--color-bg-primary)',
-                  minWidth: '180px',
-                }}
+                style={{ padding: '0.5rem 0.65rem', fontSize: '0.9rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', minWidth: '180px' }}
               >
                 <option value="">All Initiatives</option>
                 {initiatives.map((init) => (
-                  <option key={init.id} value={init.id}>
-                    {init.name}
-                  </option>
+                  <option key={init.id} value={init.id}>{init.name}</option>
                 ))}
               </select>
             </div>
-
             <button
               onClick={handleClearFilters}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.85rem',
-                fontWeight: 500,
-                borderRadius: '6px',
-                border: '1px solid var(--color-bg-tertiary)',
-                backgroundColor: 'var(--color-bg-primary)',
-                cursor: 'pointer',
-                alignSelf: 'flex-end',
-              }}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 500, borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff', cursor: 'pointer', alignSelf: 'flex-end' }}
             >
               Clear Filters
             </button>
-          </div>
 
-          {/* ── Compare Button ── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-            <button
-              onClick={handleCompare}
-              disabled={selectedIds.length !== 2}
-              style={{
-                padding: '0.6rem 1.5rem',
-                backgroundColor: selectedIds.length === 2 ? 'var(--color-asrs-orange)' : 'var(--color-bg-tertiary)',
-                color: selectedIds.length === 2 ? '#fff' : 'var(--color-text-light)',
-                borderRadius: '8px',
-                fontWeight: 600,
-                border: 'none',
-                cursor: selectedIds.length === 2 ? 'pointer' : 'not-allowed',
-                fontSize: '0.9rem',
-              }}
-            >
-              Compare Selected ({selectedIds.length}/2)
-            </button>
-            {selectedIds.length > 0 && (
+            {/* Compare controls */}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center', alignSelf: 'flex-end' }}>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={() => { setSelectedIds([]); setShowComparison(false); }}
+                  style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff', cursor: 'pointer', color: '#6B7280' }}
+                >
+                  Clear Selection
+                </button>
+              )}
               <button
-                onClick={() => { setSelectedIds([]); setShowComparison(false); }}
+                onClick={handleCompare}
+                disabled={selectedIds.length !== 2}
+                className="btn-primary"
                 style={{
-                  padding: '0.4rem 0.75rem',
-                  fontSize: '0.8rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--color-bg-tertiary)',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  color: 'var(--color-text-secondary)',
+                  padding: '0.5rem 1.25rem',
+                  backgroundColor: selectedIds.length === 2 ? '#E67E22' : '#D1D5DB',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: selectedIds.length === 2 ? 'pointer' : 'not-allowed',
+                  fontSize: '0.88rem',
                 }}
               >
-                Clear Selection
+                Compare ({selectedIds.length}/2)
               </button>
-            )}
+            </div>
           </div>
-
-          {/* ── Reports Table ── */}
-          {isLoading ? (
-            <div style={{
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              padding: '3rem', color: 'var(--color-text-light)',
-            }}>
-              <div style={{
-                width: '36px', height: '36px', border: '4px solid var(--color-bg-tertiary)',
-                borderTop: '4px solid var(--color-asrs-orange)',
-                borderRadius: '50%', animation: 'spin 1s linear infinite',
-              }} />
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              <span style={{ marginLeft: '1rem', fontSize: '1rem' }}>Loading reports...</span>
-            </div>
-          ) : reports.length === 0 ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-              No reports found matching your filters.
-            </p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                    {['', 'Report Name', 'Initiative', 'Created Date', 'Created By', 'Status', ''].map((h, i) => (
-                      <th
-                        key={i}
-                        style={{
-                          textAlign: 'left',
-                          padding: '0.6rem 0.75rem',
-                          fontWeight: '600',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '0.8rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.03em',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((r) => {
-                    const isChecked = selectedIds.includes(r.id);
-                    const isDisabled = !isChecked && selectedIds.length >= 2;
-                    return (
-                      <tr
-                        key={r.id}
-                        style={{
-                          borderBottom: '1px solid var(--color-bg-tertiary)',
-                          backgroundColor: isChecked ? 'rgba(249, 115, 22, 0.06)' : 'transparent',
-                        }}
-                      >
-                        <td style={{ padding: '0.65rem 0.75rem', width: '40px' }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => handleCheckbox(r.id)}
-                            style={{ cursor: isDisabled ? 'not-allowed' : 'pointer', width: '16px', height: '16px' }}
-                          />
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem', fontWeight: '500' }}>
-                          {r.name || '(Untitled)'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                          {r.initiative_name || '\u2014'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                          {formatDate(r.created_at)}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                          {r.created_by || '\u2014'}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem' }}>
-                          <span style={statusBadgeStyle(r.status)}>
-                            {r.status || 'completed'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.65rem 0.75rem' }}>
-                          <button
-                            onClick={() => downloadCsv(r)}
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              fontSize: '0.8rem',
-                              fontWeight: 500,
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-bg-tertiary)',
-                              backgroundColor: 'var(--color-bg-primary)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            CSV
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
-        {/* ── Side-by-Side Comparison ── */}
+        {/* Reports grouped by month */}
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4rem', color: '#9CA3AF' }}>
+            <div style={{ width: '32px', height: '32px', border: '3px solid #E5E7EB', borderTop: '3px solid #E67E22', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <span style={{ marginLeft: '1rem' }}>Loading reports...</span>
+          </div>
+        ) : reports.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>
+            No reports found matching your filters.
+          </div>
+        ) : (
+          monthGroups.map((group) => (
+            <div key={group.label} style={{ marginBottom: '2rem' }}>
+              {/* Month header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#374151', margin: 0 }}>{group.label}</h2>
+                <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
+                <span style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>{group.reports.length} report{group.reports.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Report cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {group.reports.map((r) => {
+                  const isChecked = selectedIds.includes(r.id);
+                  const isDisabled = !isChecked && selectedIds.length >= 2;
+                  const formatPill = getFormatPill(r.format || 'PDF');
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        padding: '16px 20px',
+                        backgroundColor: isChecked ? 'rgba(230, 126, 34, 0.05)' : '#fff',
+                        borderRadius: '10px',
+                        border: `1px solid ${isChecked ? '#E67E22' : '#E5E7EB'}`,
+                        transition: 'box-shadow 0.15s ease',
+                        cursor: 'default',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+                    >
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isDisabled}
+                        onChange={() => handleCheckbox(r.id)}
+                        style={{ cursor: isDisabled ? 'not-allowed' : 'pointer', width: '16px', height: '16px', flexShrink: 0 }}
+                      />
+
+                      {/* Document icon */}
+                      <div style={{ flexShrink: 0, width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#D97706" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+
+                      {/* Report info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: '#1F2937', fontSize: '0.95rem', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.name || '(Untitled)'}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                          {r.initiative_name || '\u2014'} &bull; {formatDate(r.created_at)}
+                          {r.created_by ? ` \u00B7 Generated by ${r.created_by}` : ''}
+                        </div>
+                      </div>
+
+                      {/* Format pill */}
+                      {formatPill && (
+                        <span style={{ padding: '0.2rem 0.65rem', borderRadius: '999px', fontSize: '0.73rem', fontWeight: 700, backgroundColor: formatPill.bg, color: formatPill.color, flexShrink: 0 }}>
+                          {formatPill.label}
+                        </span>
+                      )}
+
+                      {/* File size */}
+                      {r.file_size && (
+                        <span style={{ fontSize: '0.8rem', color: '#9CA3AF', flexShrink: 0 }}>
+                          {r.file_size}
+                        </span>
+                      )}
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                        <button
+                          onClick={() => downloadCsv(r)}
+                          style={{ fontSize: '0.83rem', fontWeight: 500, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                        >
+                          Download
+                        </button>
+                        <button
+                          onClick={() => downloadCsv(r)}
+                          style={{ fontSize: '0.83rem', fontWeight: 600, color: '#E67E22', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Side-by-Side Comparison */}
         {showComparison && comparedReports.length === 2 && (
-          <div className="asrs-card" style={{ marginTop: '2rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--color-asrs-dark)' }}>
-              Report Comparison
-            </h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '1.5rem',
-            }}>
+          <div className="card" style={{ marginTop: '2rem' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>Report Comparison</h2>
+              <button
+                onClick={() => setShowComparison(false)}
+                style={{ fontSize: '0.83rem', color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               {comparedReports.map((report) => {
                 const { reportData, trendData, initiative } = parseReportForDashboard(report);
                 return (
-                  <div key={report.id} style={{
-                    border: '1px solid var(--color-bg-tertiary)',
-                    borderRadius: '10px',
-                    padding: '1rem',
-                    overflow: 'hidden',
-                  }}>
-                    <h3 style={{
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      marginBottom: '0.5rem',
-                      color: 'var(--color-asrs-dark)',
-                      borderBottom: '2px solid var(--color-asrs-orange)',
-                      paddingBottom: '0.5rem',
-                    }}>
+                  <div key={report.id} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '1rem', overflow: 'hidden' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem', color: '#1F2937', borderBottom: '2px solid #E67E22', paddingBottom: '0.5rem' }}>
                       {report.name || '(Untitled)'}
-                      <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--color-text-secondary)', marginLeft: '0.5rem' }}>
-                        {formatDate(report.created_at)}
-                      </span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#6B7280', marginLeft: '0.5rem' }}>{formatDate(report.created_at)}</span>
                     </h3>
                     {reportData ? (
                       <ReportDashboard
@@ -520,9 +485,7 @@ export default function HistoricalReportsPage() {
                         userRole={userRole}
                       />
                     ) : (
-                      <p style={{ color: 'var(--color-text-light)', padding: '1rem', textAlign: 'center' }}>
-                        No report data available.
-                      </p>
+                      <p style={{ color: '#9CA3AF', padding: '1rem', textAlign: 'center' }}>No report data available.</p>
                     )}
                   </div>
                 );
@@ -530,7 +493,7 @@ export default function HistoricalReportsPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

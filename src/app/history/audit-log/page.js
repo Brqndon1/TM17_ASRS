@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { apiFetch } from '@/lib/api/client';
 
 // ── Friendly labels for event names ──
@@ -38,6 +37,15 @@ function getActionColor(event) {
   return { bg: '#f3f4f6', text: '#374151', border: '#e5e7eb' };
 }
 
+// ── Timeline dot color ──
+function getDotColor(event) {
+  if (event.endsWith('.created')) return '#10B981'; // green
+  if (event.endsWith('.updated')) return '#E67E22';  // orange
+  if (event.endsWith('.deleted')) return '#EF4444'; // red
+  if (event === 'user.login' || event.startsWith('auth.')) return '#3B82F6'; // blue
+  return '#9CA3AF';
+}
+
 function ActionBadge({ event }) {
   const c = getActionColor(event);
   return (
@@ -59,38 +67,38 @@ function ActionBadge({ event }) {
 }
 
 function PayloadViewer({ payload }) {
-  if (!payload) return <span style={{ color: 'var(--color-text-light)' }}>—</span>;
+  if (!payload) return <span style={{ color: '#9CA3AF' }}>—</span>;
 
   let parsed;
   try {
     parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
   } catch {
-    return <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{String(payload)}</span>;
+    return <span style={{ fontSize: '0.8rem', color: '#6B7280' }}>{String(payload)}</span>;
   }
 
   // If there's a changes object (from updates), render a diff view
   if (parsed.changes && typeof parsed.changes === 'object') {
     const changeEntries = Object.entries(parsed.changes);
     if (changeEntries.length === 0) {
-      return <span style={{ color: 'var(--color-text-light)', fontSize: '0.8rem' }}>No field changes</span>;
+      return <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>No field changes</span>;
     }
 
     return (
       <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
         {parsed.goal_name && (
-          <div style={{ color: 'var(--color-text-secondary)', marginBottom: '0.15rem' }}>
+          <div style={{ color: '#6B7280', marginBottom: '0.15rem' }}>
             {parsed.goal_name}
           </div>
         )}
         {changeEntries.map(([field, diff]) => (
           <div key={field} style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+            <span style={{ fontWeight: 600, color: '#1F2937' }}>
               {field.replace(/_/g, ' ')}:
             </span>
             <span style={{ color: '#991b1b', textDecoration: 'line-through' }}>
               {String(diff.from ?? '—')}
             </span>
-            <span style={{ color: 'var(--color-text-light)' }}>→</span>
+            <span style={{ color: '#9CA3AF' }}>→</span>
             <span style={{ color: '#065f46', fontWeight: 500 }}>
               {String(diff.to ?? '—')}
             </span>
@@ -102,16 +110,16 @@ function PayloadViewer({ payload }) {
 
   // For creates / deletes, show a compact summary
   const entries = Object.entries(parsed).filter(([k]) => k !== 'changes');
-  if (entries.length === 0) return <span style={{ color: 'var(--color-text-light)' }}>—</span>;
+  if (entries.length === 0) return <span style={{ color: '#9CA3AF' }}>—</span>;
 
   return (
     <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
       {entries.map(([key, val]) => (
         <div key={key} style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          <span style={{ fontWeight: 600, color: '#1F2937' }}>
             {key.replace(/_/g, ' ')}:
           </span>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
+          <span style={{ color: '#6B7280' }}>
             {typeof val === 'object' ? JSON.stringify(val) : String(val ?? '—')}
           </span>
         </div>
@@ -120,8 +128,66 @@ function PayloadViewer({ payload }) {
   );
 }
 
+// ── Filter pills config ──
+const FILTER_PILLS = [
+  { key: '', label: 'All' },
+  { key: 'mine', label: 'My Activity' },
+  { key: 'created', label: 'Creates' },
+  { key: 'updated', label: 'Updates' },
+  { key: 'deleted', label: 'Deletes' },
+];
+
+// ── Group entries by date label ──
+function getDateLabel(dateStr) {
+  if (!dateStr) return 'Unknown';
+  const d = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function getDateKey(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toDateString();
+}
+
+function groupByDate(entries) {
+  const groups = {};
+  entries.forEach((entry) => {
+    const key = getDateKey(entry.created_at);
+    const label = getDateLabel(entry.created_at);
+    if (!groups[key]) groups[key] = { label, entries: [], sortKey: entry.created_at || '' };
+    groups[key].entries.push(entry);
+  });
+  return Object.values(groups).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+}
+
+function formatTime(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function getRelativeTime(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function AuditLogPage() {
   const [userRole, setUserRole] = useState('public');
+  const [userEmail, setUserEmail] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
 
   const [entries, setEntries] = useState([]);
@@ -136,6 +202,9 @@ export default function AuditLogPage() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
+  // Active pill: '', 'mine', 'created', 'updated', 'deleted'
+  const [activePill, setActivePill] = useState('');
+
   // Expanded rows
   const [expandedIds, setExpandedIds] = useState(new Set());
 
@@ -146,6 +215,7 @@ export default function AuditLogPage() {
       try {
         const parsed = JSON.parse(storedUser);
         setUserRole(parsed.user_type || 'public');
+        setUserEmail(parsed.email || '');
       } catch {
         setUserRole('public');
       }
@@ -161,7 +231,10 @@ export default function AuditLogPage() {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('limit', '50');
-      if (actionFilter) params.set('action', actionFilter);
+      // Map pill to filter params
+      const effectiveAction = activePill === 'mine' ? '' : (activePill || actionFilter);
+      if (effectiveAction && effectiveAction !== 'mine') params.set('action', effectiveAction);
+      if (activePill === 'mine' && userEmail) params.set('userEmail', userEmail);
       if (entityFilter) params.set('entity', entityFilter);
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
@@ -177,7 +250,7 @@ export default function AuditLogPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [actionFilter, entityFilter, startDate, endDate, search]);
+  }, [actionFilter, entityFilter, startDate, endDate, search, activePill, userEmail]);
 
   useEffect(() => {
     if (!authChecked || userRole !== 'admin') return;
@@ -196,6 +269,7 @@ export default function AuditLogPage() {
     setEndDate('');
     setSearch('');
     setSearchInput('');
+    setActivePill('');
   }
 
   function toggleExpanded(auditId) {
@@ -216,374 +290,285 @@ export default function AuditLogPage() {
     });
   }
 
-  // ── Loading state ──
-  if (!authChecked) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-            Loading...
-          </p>
-        </main>
-      </div>
-    );
-  }
+  const hasActiveFilters = actionFilter || entityFilter || startDate || endDate || search || activePill;
+
+  const dateGroups = groupByDate(entries);
 
   // ── Access denied ──
   if (authChecked && userRole !== 'admin') {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <BackButton />
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-asrs-dark)', marginBottom: '0.5rem' }}>
-              Access Restricted
-            </h2>
-            <p style={{ color: 'var(--color-text-secondary)' }}>
-              The audit log is only available to administrators.
-            </p>
-          </div>
-        </main>
-      </div>
+      <PageLayout title="Settings">
+        <div style={{ maxWidth: '600px', margin: '2rem auto', textAlign: 'center', padding: '3rem', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937', marginBottom: '0.5rem' }}>
+            Access Restricted
+          </h2>
+          <p style={{ color: '#6B7280' }}>
+            The audit log is only available to administrators.
+          </p>
+        </div>
+      </PageLayout>
     );
   }
 
-  const hasActiveFilters = actionFilter || entityFilter || startDate || endDate || search;
-
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-asrs-dark)', marginBottom: '0.25rem' }}>
-            Audit Log
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-            Complete record of all system changes for compliance tracking.
-          </p>
-        </div>
-
-        <div className="asrs-card" style={{ marginBottom: '1.5rem' }}>
-          {/* ── Filters ── */}
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: '0.75rem',
-            alignItems: 'flex-end', marginBottom: '1rem',
-          }}>
-            {/* Search */}
-            <div style={{ flex: '1 1 220px' }}>
-              <label style={labelStyle}>Search</label>
-              <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.4rem' }}>
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search events, users, reasons..."
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button type="submit" style={filterBtnStyle}>
-                  Search
-                </button>
-              </form>
-            </div>
-
-            {/* Action filter — verb */}
-            <div style={{ flex: '0 1 150px' }}>
-              <label style={labelStyle}>Action</label>
-              <select
-                value={actionFilter}
-                onChange={(e) => setActionFilter(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="">All actions</option>
-                <option value="created">Created</option>
-                <option value="updated">Updated</option>
-                <option value="deleted">Deleted</option>
-              </select>
-            </div>
-
-            {/* Entity filter — noun */}
-            <div style={{ flex: '0 1 150px' }}>
-              <label style={labelStyle}>Entity</label>
-              <select
-                value={entityFilter}
-                onChange={(e) => setEntityFilter(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="">All entities</option>
-                <option value="goal">Goal</option>
-                <option value="initiative">Initiative</option>
-                <option value="report">Report</option>
-                <option value="survey">Survey</option>
-                <option value="performance">Performance</option>
-                <option value="user">User</option>
-              </select>
-            </div>
-
-            {/* Date range */}
-            <div style={{ flex: '0 1 150px' }}>
-              <label style={labelStyle}>From</label>
+    <PageLayout title="Settings">
+      <div>
+        {/* Page heading + date range */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>Activity History</h1>
+            <p style={{ color: '#6B7280', fontSize: '0.88rem', marginTop: '0.25rem' }}>
+              Complete record of all system changes.
+            </p>
+          </div>
+          {/* Date range filter */}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>From</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                style={inputStyle}
+                style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
               />
             </div>
-            <div style={{ flex: '0 1 150px' }}>
-              <label style={labelStyle}>To</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>To</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                style={inputStyle}
+                style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
               />
             </div>
+          </div>
+        </div>
 
+        {/* Filter pills */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {FILTER_PILLS.map((pill) => (
+            <button
+              key={pill.key}
+              onClick={() => setActivePill(pill.key)}
+              style={{
+                padding: '0.4rem 1rem',
+                borderRadius: '999px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: activePill === pill.key ? '#E67E22' : '#F3F4F6',
+                color: activePill === pill.key ? '#fff' : '#374151',
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              {pill.label}
+            </button>
+          ))}
+
+          {/* Additional filters */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.4rem' }}>
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search events, users..."
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', width: '200px' }}
+              />
+              <button
+                type="submit"
+                style={{ padding: '0.4rem 0.9rem', fontSize: '0.83rem', fontWeight: 600, borderRadius: '6px', border: 'none', backgroundColor: '#E67E22', color: '#fff', cursor: 'pointer' }}
+              >
+                Search
+              </button>
+            </form>
+            <select
+              value={entityFilter}
+              onChange={(e) => setEntityFilter(e.target.value)}
+              style={{ padding: '0.4rem 0.65rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
+            >
+              <option value="">All entities</option>
+              <option value="goal">Goal</option>
+              <option value="initiative">Initiative</option>
+              <option value="report">Report</option>
+              <option value="survey">Survey</option>
+              <option value="performance">Performance</option>
+              <option value="user">User</option>
+            </select>
             {hasActiveFilters && (
-              <button onClick={handleClearFilters} style={clearBtnStyle}>
-                Clear Filters
+              <button
+                onClick={handleClearFilters}
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.83rem', fontWeight: 500, borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff', cursor: 'pointer', color: '#6B7280' }}
+              >
+                Clear
               </button>
             )}
           </div>
+        </div>
 
-          {/* ── Summary ── */}
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)',
-          }}>
-            <span>
-              {pagination.total.toLocaleString()} {pagination.total === 1 ? 'entry' : 'entries'}
-              {hasActiveFilters ? ' (filtered)' : ''}
-            </span>
-            {pagination.totalPages > 1 && (
-              <span>
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-            )}
+        {/* Summary line */}
+        <div style={{ fontSize: '0.83rem', color: '#6B7280', marginBottom: '1rem' }}>
+          {pagination.total.toLocaleString()} {pagination.total === 1 ? 'entry' : 'entries'}
+          {hasActiveFilters ? ' (filtered)' : ''}
+          {pagination.totalPages > 1 && ` — Page ${pagination.page} of ${pagination.totalPages}`}
+        </div>
+
+        {/* Activity timeline */}
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4rem', color: '#9CA3AF' }}>
+            <div style={{ width: '32px', height: '32px', border: '3px solid #E5E7EB', borderTop: '3px solid #E67E22', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <span style={{ marginLeft: '1rem' }}>Loading activity...</span>
           </div>
+        ) : entries.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>
+            {hasActiveFilters ? 'No entries match your filters.' : 'No audit log entries yet.'}
+          </div>
+        ) : (
+          <>
+            {dateGroups.map((group) => (
+              <div key={group.label} style={{ marginBottom: '2rem' }}>
+                {/* Date group header */}
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #E5E7EB' }}>
+                  {group.label}
+                </div>
 
-          {/* ── Table ── */}
-          {isLoading ? (
-            <div style={{
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              padding: '3rem', color: 'var(--color-text-light)',
-            }}>
-              <div style={{
-                width: '36px', height: '36px', border: '4px solid var(--color-bg-tertiary)',
-                borderTop: '4px solid var(--color-asrs-orange)',
-                borderRadius: '50%', animation: 'spin 1s linear infinite',
-              }} />
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              <span style={{ marginLeft: '1rem', fontSize: '1rem' }}>Loading audit log...</span>
-            </div>
-          ) : entries.length === 0 ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-              {hasActiveFilters
-                ? 'No entries match your filters.'
-                : 'No audit log entries yet. Actions will appear here as changes are made.'}
-            </p>
-          ) : (
-            <>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                      {['Timestamp', 'Action', 'User', 'Entity', 'ID', 'Details'].map((h) => (
-                        <th key={h} style={thStyle}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry) => {
-                      const isExpanded = expandedIds.has(entry.audit_id);
-                      return (
-                        <tr
-                          key={entry.audit_id}
-                          onClick={() => toggleExpanded(entry.audit_id)}
-                          style={{
-                            borderBottom: '1px solid var(--color-bg-tertiary)',
-                            cursor: 'pointer',
-                            backgroundColor: isExpanded ? 'rgba(249, 115, 22, 0.04)' : 'transparent',
-                            transition: 'background-color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isExpanded) e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary, #f9fafb)';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isExpanded) e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--color-text-secondary)', fontSize: '0.82rem' }}>
-                            {formatDate(entry.created_at)}
-                          </td>
-                          <td style={tdStyle}>
-                            <ActionBadge event={entry.event} />
-                          </td>
-                          <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>
-                            {entry.user_email || '—'}
-                          </td>
-                          <td style={{ ...tdStyle, textTransform: 'capitalize', color: 'var(--color-text-secondary)' }}>
-                            {entry.target_type || '—'}
-                          </td>
-                          <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-                            {entry.target_id || '—'}
-                          </td>
-                          <td style={tdStyle}>
-                            {isExpanded ? (
-                              <PayloadViewer payload={entry.payload} />
-                            ) : (
-                              <span style={{ color: 'var(--color-text-light)', fontSize: '0.8rem' }}>
-                                {entry.payload ? 'Click to expand' : '—'}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                {/* Timeline entries */}
+                <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
+                  {/* Vertical line */}
+                  <div style={{ position: 'absolute', left: '7px', top: '12px', bottom: '12px', width: '2px', backgroundColor: '#E5E7EB' }} />
 
-              {/* ── Pagination ── */}
-              {pagination.totalPages > 1 && (
-                <div style={{
-                  display: 'flex', justifyContent: 'center', alignItems: 'center',
-                  gap: '0.5rem', marginTop: '1.25rem',
-                }}>
-                  <button
-                    disabled={pagination.page <= 1}
-                    onClick={() => fetchEntries(pagination.page - 1)}
-                    style={{
-                      ...pageBtnStyle,
-                      opacity: pagination.page <= 1 ? 0.4 : 1,
-                      cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    ← Previous
-                  </button>
-
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(pagination.totalPages, 7) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 7) {
-                      pageNum = i + 1;
-                    } else if (pagination.page <= 4) {
-                      pageNum = i + 1;
-                    } else if (pagination.page >= pagination.totalPages - 3) {
-                      pageNum = pagination.totalPages - 6 + i;
-                    } else {
-                      pageNum = pagination.page - 3 + i;
-                    }
-
+                  {group.entries.map((entry, idx) => {
+                    const isExpanded = expandedIds.has(entry.audit_id);
+                    const dotColor = getDotColor(entry.event);
                     return (
-                      <button
-                        key={pageNum}
-                        onClick={() => fetchEntries(pageNum)}
-                        style={{
-                          ...pageBtnStyle,
-                          backgroundColor: pageNum === pagination.page ? 'var(--color-asrs-orange)' : 'var(--color-bg-primary)',
-                          color: pageNum === pagination.page ? '#fff' : 'var(--color-text-secondary)',
-                          fontWeight: pageNum === pagination.page ? 700 : 500,
-                          minWidth: '36px',
-                        }}
+                      <div
+                        key={entry.audit_id}
+                        style={{ position: 'relative', marginBottom: idx < group.entries.length - 1 ? '1rem' : 0, cursor: 'pointer' }}
+                        onClick={() => toggleExpanded(entry.audit_id)}
                       >
-                        {pageNum}
-                      </button>
+                        {/* Dot */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '-1.5rem',
+                          top: '6px',
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: dotColor,
+                          border: '2px solid #fff',
+                          boxShadow: '0 0 0 2px ' + dotColor + '33',
+                        }} />
+
+                        <div
+                          style={{
+                            backgroundColor: isExpanded ? 'rgba(230,126,34,0.04)' : '#fff',
+                            border: `1px solid ${isExpanded ? '#E67E22' : '#E5E7EB'}`,
+                            borderRadius: '8px',
+                            padding: '0.75rem 1rem',
+                            transition: 'box-shadow 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+                        >
+                          {/* Top row: time + badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                              {formatTime(entry.created_at)}
+                              <span style={{ color: '#D1D5DB', margin: '0 0.35rem' }}>·</span>
+                              <span style={{ color: '#9CA3AF' }}>{getRelativeTime(entry.created_at)}</span>
+                            </span>
+                            <ActionBadge event={entry.event} />
+                          </div>
+
+                          {/* Description */}
+                          <div style={{ fontSize: '0.88rem', color: '#374151' }}>
+                            <strong>{entry.user_email || 'Unknown user'}</strong>
+                            {' — '}
+                            <span style={{ textTransform: 'capitalize' }}>{entry.target_type || ''}</span>
+                            {entry.target_id && <span style={{ color: '#9CA3AF', fontFamily: 'monospace', fontSize: '0.8rem', marginLeft: '0.35rem' }}>#{entry.target_id}</span>}
+                          </div>
+
+                          {/* Detail line / expanded payload */}
+                          {isExpanded && (
+                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #E5E7EB' }}>
+                              <PayloadViewer payload={entry.payload} />
+                            </div>
+                          )}
+                          {!isExpanded && entry.payload && (
+                            <div style={{ fontSize: '0.78rem', color: '#D1D5DB', marginTop: '0.25rem' }}>Click to expand details</div>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-
-                  <button
-                    disabled={pagination.page >= pagination.totalPages}
-                    onClick={() => fetchEntries(pagination.page + 1)}
-                    style={{
-                      ...pageBtnStyle,
-                      opacity: pagination.page >= pagination.totalPages ? 0.4 : 1,
-                      cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    Next →
-                  </button>
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+              </div>
+            ))}
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
+                <button
+                  disabled={pagination.page <= 1}
+                  onClick={() => fetchEntries(pagination.page - 1)}
+                  style={{ ...pageBtnStyle, opacity: pagination.page <= 1 ? 0.4 : 1, cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  ← Previous
+                </button>
+
+                {Array.from({ length: Math.min(pagination.totalPages, 7) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 4) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 3) {
+                    pageNum = pagination.totalPages - 6 + i;
+                  } else {
+                    pageNum = pagination.page - 3 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => fetchEntries(pageNum)}
+                      style={{
+                        ...pageBtnStyle,
+                        backgroundColor: pageNum === pagination.page ? '#E67E22' : '#fff',
+                        color: pageNum === pagination.page ? '#fff' : '#6B7280',
+                        fontWeight: pageNum === pagination.page ? 700 : 500,
+                        minWidth: '36px',
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => fetchEntries(pagination.page + 1)}
+                  style={{ ...pageBtnStyle, opacity: pagination.page >= pagination.totalPages ? 0.4 : 1, cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer' }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </PageLayout>
   );
 }
-
-// ── Shared styles ──
-const labelStyle = {
-  display: 'block',
-  fontSize: '0.78rem',
-  fontWeight: 600,
-  color: 'var(--color-text-secondary)',
-  marginBottom: '0.25rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '0.5rem 0.75rem',
-  fontSize: '0.85rem',
-  borderRadius: '6px',
-  border: '1px solid var(--color-bg-tertiary)',
-  backgroundColor: 'var(--color-bg-primary)',
-  color: 'var(--color-text-primary)',
-  boxSizing: 'border-box',
-};
-
-const filterBtnStyle = {
-  padding: '0.5rem 1rem',
-  fontSize: '0.85rem',
-  fontWeight: 600,
-  borderRadius: '6px',
-  border: '1px solid var(--color-asrs-orange)',
-  backgroundColor: 'var(--color-asrs-orange)',
-  color: '#fff',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
-
-const clearBtnStyle = {
-  padding: '0.5rem 1rem',
-  fontSize: '0.85rem',
-  fontWeight: 500,
-  borderRadius: '6px',
-  border: '1px solid var(--color-bg-tertiary)',
-  backgroundColor: 'var(--color-bg-primary)',
-  cursor: 'pointer',
-  alignSelf: 'flex-end',
-};
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '0.6rem 0.75rem',
-  fontWeight: '600',
-  color: 'var(--color-text-secondary)',
-  fontSize: '0.8rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-};
-
-const tdStyle = {
-  padding: '0.65rem 0.75rem',
-  verticalAlign: 'top',
-};
 
 const pageBtnStyle = {
   padding: '0.4rem 0.75rem',
   fontSize: '0.83rem',
   fontWeight: 500,
   borderRadius: '6px',
-  border: '1px solid var(--color-bg-tertiary)',
-  backgroundColor: 'var(--color-bg-primary)',
+  border: '1px solid #E5E7EB',
+  backgroundColor: '#fff',
   cursor: 'pointer',
   transition: 'background-color 0.15s ease',
 };

@@ -1,21 +1,8 @@
-/**
- * ============================================================================
- * /profile — Self-service profile page
- * ============================================================================
- * Three tabs:
- *   1. Profile      — view name, email, phone, role, submissions
- *   2. Edit Profile — update any field + optional new password + photo
- *   3. Delete Account — confirmation flow
- *
- * Place this file at:
- *   src/app/profile/page.js
- * ============================================================================
- */
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
 
@@ -24,14 +11,14 @@ function getInitials(first, last) {
   return `${(first || '')[0] || ''}${(last || '')[0] || ''}`.toUpperCase();
 }
 
-function Avatar({ picture, firstName, lastName, size = 72 }) {
+function Avatar({ picture, firstName, lastName, size = 80 }) {
   const base = {
     width: size,
     height: size,
     borderRadius: '50%',
     flexShrink: 0,
-    border: '3px solid rgba(255,255,255,0.2)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    border: '3px solid rgba(255,255,255,0.3)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
   };
   if (picture) {
     return <img src={picture} alt="Profile" style={{ ...base, objectFit: 'cover' }} />;
@@ -40,7 +27,7 @@ function Avatar({ picture, firstName, lastName, size = 72 }) {
     <div
       style={{
         ...base,
-        background: 'linear-gradient(135deg, #C0392B 0%, #E67E22 100%)',
+        background: 'linear-gradient(135deg, #E67E22, #C0392B)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -50,69 +37,6 @@ function Avatar({ picture, firstName, lastName, size = 72 }) {
       }}
     >
       {getInitials(firstName, lastName)}
-    </div>
-  );
-}
-
-function TabButton({ label, active, onClick, danger }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '0.6rem 1.4rem',
-        border: 'none',
-        borderBottom: active
-          ? `3px solid ${danger ? '#C0392B' : '#C0392B'}`
-          : '3px solid transparent',
-        background: 'none',
-        color: active ? (danger ? '#C0392B' : '#2C2C2C') : '#888',
-        fontWeight: active ? '700' : '500',
-        fontSize: '0.95rem',
-        cursor: 'pointer',
-        transition: 'color 0.15s',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function FieldRow({ label, value }) {
-  return (
-    <div style={{ marginBottom: '1.25rem' }}>
-      <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: '1rem', color: '#2C2C2C' }}>{value || '—'}</div>
-    </div>
-  );
-}
-
-function FormField({ label, type = 'text', value, onChange, placeholder, error, hint }) {
-  return (
-    <div style={{ marginBottom: '1.1rem' }}>
-      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
-        {label}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: '100%',
-          padding: '0.6rem 0.85rem',
-          border: `1px solid ${error ? '#C0392B' : '#ddd'}`,
-          borderRadius: '6px',
-          fontSize: '0.95rem',
-          outline: 'none',
-          boxSizing: 'border-box',
-          color: '#2C2C2C',
-        }}
-      />
-      {hint  && !error && <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: '#aaa' }}>{hint}</p>}
-      {error &&           <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: '#C0392B' }}>{error}</p>}
     </div>
   );
 }
@@ -129,7 +53,20 @@ function roleBadgeStyle(role) {
     borderRadius: '999px',
     marginTop: '0.35rem',
     letterSpacing: '0.05em',
+    textTransform: 'uppercase',
   };
+}
+
+// ── Activity icon colors ──
+function getActivityIcon(type) {
+  const icons = {
+    edit:    { bg: '#FEF3C7', color: '#E67E22', symbol: '✏️' },
+    publish: { bg: '#DBEAFE', color: '#1E40AF', symbol: '📢' },
+    create:  { bg: '#D1FAE5', color: '#065F46', symbol: '✚' },
+    delete:  { bg: '#FEE2E2', color: '#991B1B', symbol: '✕' },
+    login:   { bg: '#F3F4F6', color: '#6B7280', symbol: '→' },
+  };
+  return icons[type] || icons.login;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -137,7 +74,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, setUser, clearUser } = useAuthStore();
 
-  const [tab, setTab]           = useState('view');
   const [profile, setProfile]   = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -151,7 +87,7 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [pictureDataUrl,  setPictureDataUrl]  = useState(null); // null = no change
+  const [pictureDataUrl,  setPictureDataUrl]  = useState(null);
   const [editError,  setEditError]  = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [saving, setSaving] = useState(false);
@@ -160,6 +96,9 @@ export default function ProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteError,   setDeleteError]   = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Password change visibility
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -243,186 +182,363 @@ export default function ProfilePage() {
     }
   }
 
+  const displayPicture = pictureDataUrl !== null ? pictureDataUrl : (profile?.profile_picture ?? null);
+
+  // Build recent activity from submissions (placeholder; extend as needed)
+  const recentActivity = submissions.slice(0, 5).map((s) => ({
+    type: 'create',
+    description: `Submitted survey for ${s.initiative_name || 'an initiative'}`,
+    time: s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+  }));
+
   if (!user || loading) {
     return (
-      <>
-        <Header />
-        <main style={pageWrap}><p style={{ color: '#aaa' }}>Loading profile…</p></main>
-      </>
+      <PageLayout title="My Profile">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4rem', color: '#9CA3AF' }}>
+          Loading profile...
+        </div>
+      </PageLayout>
     );
   }
 
   if (pageError) {
     return (
-      <>
-        <Header />
-        <main style={pageWrap}><p style={{ color: '#C0392B' }}>{pageError}</p></main>
-      </>
+      <PageLayout title="My Profile">
+        <div style={{ color: '#C0392B', padding: '2rem' }}>{pageError}</div>
+      </PageLayout>
     );
   }
 
-  const displayPicture = pictureDataUrl !== null ? pictureDataUrl : (profile?.profile_picture ?? null);
+  const inputStyle = {
+    width: '100%',
+    padding: '0.6rem 0.85rem',
+    border: '1px solid #E5E7EB',
+    borderRadius: '8px',
+    fontSize: '0.95rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    color: '#1F2937',
+    backgroundColor: '#fff',
+    transition: 'border-color 0.15s ease',
+  };
+
+  const inputReadonlyStyle = {
+    ...inputStyle,
+    backgroundColor: '#F9FAFB',
+    color: '#6B7280',
+  };
 
   return (
-    <>
-      <Header />
-      <main style={pageWrap}>
-        {/* Hero row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginBottom: '2rem' }}>
-          <Avatar picture={displayPicture} firstName={profile?.first_name} lastName={profile?.last_name} size={72} />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '700', color: '#2C2C2C' }}>
-              {profile?.first_name} {profile?.last_name}
-            </h1>
-            <span style={roleBadgeStyle(profile?.user_type)}>{profile?.user_type?.toUpperCase()}</span>
-          </div>
+    <PageLayout title="My Profile">
+      <div>
+        {/* Page heading */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>My Profile</h1>
         </div>
 
-        {/* Card */}
-        <div style={card}>
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #eee', marginBottom: '1.75rem', overflowX: 'auto' }}>
-            <TabButton label="Profile"        active={tab === 'view'}   onClick={() => setTab('view')} />
-            <TabButton label="Edit Profile"   active={tab === 'edit'}   onClick={() => setTab('edit')} />
-            <TabButton label="Delete Account" active={tab === 'delete'} onClick={() => setTab('delete')} danger />
+        {/* Profile grid — 2 columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', marginBottom: '1.5rem', alignItems: 'start' }}>
+
+          {/* Left: Profile card */}
+          <div className="card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+            {/* Avatar */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+              <div style={{ position: 'relative' }}>
+                <Avatar picture={displayPicture} firstName={profile?.first_name} lastName={profile?.last_name} size={80} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    position: 'absolute', bottom: 0, right: 0,
+                    width: '26px', height: '26px', borderRadius: '50%',
+                    backgroundColor: '#E67E22', border: '2px solid #fff',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.7rem', color: '#fff', fontWeight: 700,
+                  }}
+                  title="Change photo"
+                >
+                  ✏
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePictureChange} />
+              </div>
+            </div>
+
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1F2937', margin: '0 0 0.25rem' }}>
+              {profile?.first_name} {profile?.last_name}
+            </h2>
+            <div style={roleBadgeStyle(profile?.user_type)}>{profile?.user_type}</div>
+            <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0.75rem 0 1.25rem' }}>
+              {profile?.email}
+            </p>
+
+            <button
+              onClick={() => setShowPasswordSection((v) => !v)}
+              className="btn-outline"
+              style={{
+                width: '100%', padding: '0.55rem 1rem',
+                border: '1px solid #E5E7EB', borderRadius: '8px',
+                backgroundColor: '#fff', color: '#374151',
+                fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
+              }}
+            >
+              Edit Profile
+            </button>
+
+            {/* Delete account */}
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F3F4F6' }}>
+              <details>
+                <summary style={{ fontSize: '0.78rem', color: '#EF4444', cursor: 'pointer', fontWeight: 600, listStyle: 'none' }}>
+                  Delete Account
+                </summary>
+                <div style={{ marginTop: '0.75rem', textAlign: 'left' }}>
+                  <p style={{ fontSize: '0.78rem', color: '#6B7280', marginBottom: '0.5rem' }}>
+                    This is permanent and cannot be undone.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder="Type DELETE to confirm"
+                    style={{ ...inputStyle, fontSize: '0.83rem', marginBottom: '0.5rem' }}
+                  />
+                  {deleteError && <p style={{ color: '#C0392B', fontSize: '0.78rem', margin: '0.25rem 0' }}>{deleteError}</p>}
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting || deleteConfirm !== 'DELETE'}
+                    style={{
+                      width: '100%', padding: '0.5rem',
+                      backgroundColor: deleteConfirm === 'DELETE' ? '#EF4444' : '#D1D5DB',
+                      color: '#fff', border: 'none', borderRadius: '8px',
+                      fontWeight: 700, fontSize: '0.83rem',
+                      cursor: deleteConfirm === 'DELETE' ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete My Account'}
+                  </button>
+                </div>
+              </details>
+            </div>
           </div>
 
-          {/* VIEW */}
-          {tab === 'view' && (
-            <div>
-              <FieldRow label="First Name"   value={profile?.first_name} />
-              <FieldRow label="Last Name"    value={profile?.last_name} />
-              <FieldRow label="Email"        value={profile?.email} />
-              <FieldRow label="Phone Number" value={profile?.phone_number} />
-              <FieldRow label="Account Type" value={profile?.user_type} />
+          {/* Right: Account Settings form */}
+          <div className="card">
+            <div className="card-header" style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>Account Settings</h3>
+            </div>
 
-              <div style={{ marginTop: '2rem' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Survey Submissions
-                </h3>
-                {submissions.length === 0 ? (
-                  <p style={{ color: '#aaa', fontSize: '0.9rem' }}>No surveys submitted yet.</p>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #f0f0f0' }}>
-                        <th style={th}>ID</th>
-                        <th style={th}>Initiative</th>
-                        <th style={th}>Submitted</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {submissions.map((s) => (
-                        <tr key={s.submission_id} style={{ borderBottom: '1px solid #f9f9f9' }}>
-                          <td style={td}>#{s.submission_id}</td>
-                          <td style={td}>{s.initiative_name || '—'}</td>
-                          <td style={td}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={labelStyle}>Full Name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
+              </div>
+              <div>
+                <label style={{ ...labelStyle, visibility: 'hidden' }}>Last Name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
               </div>
             </div>
-          )}
 
-          {/* EDIT */}
-          {tab === 'edit' && (
-            <div style={{ maxWidth: 480 }}>
-              {/* Photo picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                <Avatar picture={displayPicture} firstName={firstName} lastName={lastName} size={58} />
-                <div>
-                  <button onClick={() => fileInputRef.current?.click()} style={btnSecondary}>
-                    {displayPicture ? 'Change Photo' : 'Upload Photo'}
-                  </button>
-                  {displayPicture && (
-                    <button onClick={() => setPictureDataUrl('')} style={{ ...btnSecondary, marginLeft: '0.5rem', color: '#C0392B', borderColor: '#C0392B' }}>
-                      Remove
-                    </button>
-                  )}
-                  <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePictureChange} />
-                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.72rem', color: '#aaa' }}>Optional · JPG, PNG · Max 1 MB</p>
-                </div>
-              </div>
-
-              <FormField label="First Name"   value={firstName} onChange={setFirstName} />
-              <FormField label="Last Name"    value={lastName}  onChange={setLastName} />
-              <FormField label="Email"        value={email}     onChange={setEmail} type="email" />
-              <FormField label="Phone Number" value={phone}     onChange={setPhone} placeholder="10-digit number" hint="Optional" />
-
-              <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '1.5rem 0' }} />
-              <p style={{ fontSize: '0.78rem', color: '#aaa', marginBottom: '0.75rem' }}>
-                Leave password fields blank to keep your current password.
-              </p>
-
-              <FormField label="Current Password" type="password" value={currentPassword} onChange={setCurrentPassword} hint="Required only when changing password" />
-              <FormField label="New Password"     type="password" value={newPassword}     onChange={setNewPassword}     hint="Minimum 8 characters" />
-              <FormField label="Confirm Password" type="password" value={confirmPassword} onChange={setConfirmPassword} />
-
-              {editError   && <p style={{ color: '#C0392B', fontSize: '0.85rem', margin: '0.5rem 0' }}>{editError}</p>}
-              {editSuccess && <p style={{ color: '#27AE60', fontSize: '0.85rem', margin: '0.5rem 0' }}>{editSuccess}</p>}
-
-              <button onClick={handleSave} disabled={saving} style={btnPrimary}>
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+              />
             </div>
-          )}
 
-          {/* DELETE */}
-          {tab === 'delete' && (
-            <div style={{ maxWidth: 480 }}>
-              <div style={{ background: '#fff5f5', border: '1px solid #f5c6c6', borderRadius: '8px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 0.5rem', color: '#C0392B', fontSize: '1rem' }}>⚠ Permanently delete your account</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#555', lineHeight: 1.5 }}>
-                  This will permanently remove your account. This action cannot be undone. Existing survey
-                  submissions will remain in the system but will no longer be linked to your account.
-                </p>
-              </div>
-
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#555', marginBottom: '0.5rem' }}>
-                Type <strong>DELETE</strong> to confirm:
-              </label>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>Role</label>
               <input
                 type="text"
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                placeholder="DELETE"
-                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.95rem', marginBottom: '1rem', boxSizing: 'border-box' }}
+                value={profile?.user_type || ''}
+                readOnly
+                style={inputReadonlyStyle}
               />
+            </div>
 
-              {deleteError && <p style={{ color: '#C0392B', fontSize: '0.85rem', margin: '0.5rem 0' }}>{deleteError}</p>}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>Phone Number</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Optional"
+                style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+              />
+            </div>
 
-              <button
-                onClick={handleDelete}
-                disabled={deleting || deleteConfirm !== 'DELETE'}
-                style={{
-                  ...btnPrimary,
-                  background: deleteConfirm === 'DELETE' ? 'linear-gradient(135deg, #C0392B, #96281B)' : '#ccc',
-                  cursor: deleteConfirm === 'DELETE' ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {deleting ? 'Deleting…' : 'Delete My Account'}
-              </button>
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid #E5E7EB', margin: '1.25rem 0' }} />
+
+            {/* Change Password section */}
+            <div>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#374151', margin: '0 0 0.75rem' }}>Change Password</h4>
+              <p style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: '0.75rem' }}>
+                Leave blank to keep your current password.
+              </p>
+
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={labelStyle}>Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
+              </div>
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={labelStyle}>New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
+              </div>
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={labelStyle}>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
+              </div>
+            </div>
+
+            {editError   && <p style={{ color: '#C0392B', fontSize: '0.85rem', margin: '0.5rem 0' }}>{editError}</p>}
+            {editSuccess && <p style={{ color: '#27AE60', fontSize: '0.85rem', margin: '0.5rem 0' }}>{editSuccess}</p>}
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary"
+              style={{
+                padding: '0.65rem 1.75rem', borderRadius: '8px', border: 'none',
+                background: 'linear-gradient(135deg, #E67E22 0%, #C0392B 100%)',
+                color: 'white', fontWeight: '700', fontSize: '0.95rem',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+                marginTop: '0.5rem',
+              }}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Recent Activity card */}
+        <div className="card">
+          <div className="card-header" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>Recent Activity</h3>
+          </div>
+
+          {recentActivity.length === 0 ? (
+            <p style={{ color: '#9CA3AF', fontSize: '0.9rem' }}>No recent activity to show.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {recentActivity.map((item, idx) => {
+                const icon = getActivityIcon(item.type);
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    {/* Icon */}
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '8px',
+                      backgroundColor: icon.bg, color: icon.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.85rem', fontWeight: 700, flexShrink: 0,
+                    }}>
+                      {icon.symbol}
+                    </div>
+                    {/* Text */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.88rem', color: '#374151' }}>{item.description}</div>
+                    </div>
+                    {/* Time */}
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{item.time}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Survey submissions table */}
+          {submissions.length > 0 && (
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.75rem' }}>
+                Survey Submissions
+              </h4>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #F3F4F6' }}>
+                    <th style={th}>ID</th>
+                    <th style={th}>Initiative</th>
+                    <th style={th}>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissions.map((s) => (
+                    <tr key={s.submission_id} style={{ borderBottom: '1px solid #F9FAFB' }}>
+                      <td style={td}>#{s.submission_id}</td>
+                      <td style={td}>{s.initiative_name || '—'}</td>
+                      <td style={td}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </main>
-    </>
+      </div>
+    </PageLayout>
   );
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
-const pageWrap = { maxWidth: 720, margin: '2.5rem auto', padding: '0 1.5rem' };
-const card     = { background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: '0 1px 8px rgba(0,0,0,0.07)', border: '1px solid #eee' };
-const th       = { textAlign: 'left', padding: '0.5rem 0.75rem', fontWeight: '700', color: '#aaa', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' };
-const td       = { padding: '0.55rem 0.75rem', color: '#444' };
-const btnPrimary = {
-  padding: '0.65rem 1.75rem', borderRadius: '8px', border: 'none',
-  background: 'linear-gradient(135deg, #C0392B 0%, #E67E22 100%)',
-  color: 'white', fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer', marginTop: '0.5rem',
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: '#374151',
+  marginBottom: '0.35rem',
+  letterSpacing: '0.01em',
 };
-const btnSecondary = {
-  padding: '0.4rem 0.9rem', borderRadius: '6px', border: '1px solid #ccc',
-  background: 'white', color: '#555', fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer',
+
+const th = {
+  textAlign: 'left',
+  padding: '0.5rem 0.75rem',
+  fontWeight: '700',
+  color: '#9CA3AF',
+  fontSize: '0.75rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
 };
+
+const td = { padding: '0.55rem 0.75rem', color: '#374151' };
