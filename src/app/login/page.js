@@ -1,6 +1,5 @@
 'use client';
 
-import Header from '@/components/Header';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,6 +10,7 @@ export default function LoginPage() {
   const { setUser } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(() => {
     if (typeof window === 'undefined') return '';
     const searchParams = new URLSearchParams(window.location.search);
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage('');
+    setLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -43,166 +44,128 @@ export default function LoginPage() {
       }
     } catch {
       setMessage('Connection error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const isSuccess = message && !message.toLowerCase().includes('error') && !message.toLowerCase().includes('failed');
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+    <div style={{
+      minHeight: '100vh', background: '#F9FAFB',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+    }}>
+      <div style={{
+        background: '#fff', width: '100%', maxWidth: 420,
+        border: '1px solid #E5E7EB', borderRadius: 12, padding: 32
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <img src="/asrs-logo.png" alt="ASRS" style={{ width: 48, height: 48, borderRadius: 8, marginBottom: 16 }} />
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827' }}>ASRS Initiatives</h1>
+          <p style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Reporting System</p>
+        </div>
 
-      <main style={{ maxWidth: '460px', margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <div className="asrs-card">
-          <h1
-            style={{
-              fontSize: '1.75rem',
-              fontWeight: '700',
-              color: 'var(--color-text-primary)',
-              marginBottom: '0.5rem',
-              textAlign: 'center',
-            }}
-          >
-            Login
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem', textAlign: 'center' }}>
-            Sign in to your account.
-          </p>
+        {message && (
+          <div style={{
+            padding: '0.75rem', marginBottom: '1rem',
+            backgroundColor: isSuccess ? '#e8f5e9' : '#ffebee',
+            border: `1px solid ${isSuccess ? '#c8e6c9' : '#ffcdd2'}`,
+            borderRadius: 8,
+            color: isSuccess ? '#2e7d32' : '#c62828',
+            fontSize: '0.9rem',
+          }}>
+            {message}
+          </div>
+        )}
 
-          {message && (
-            <div
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#111827', marginBottom: 6 }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
               style={{
-                padding: '0.75rem',
-                marginBottom: '1rem',
-                backgroundColor: isSuccess ? '#e8f5e9' : '#ffebee',
-                border: `1px solid ${isSuccess ? '#c8e6c9' : '#ffcdd2'}`,
-                borderRadius: '8px',
-                color: isSuccess ? '#2e7d32' : '#c62828',
-                fontSize: '0.9rem',
+                width: '100%', padding: '10px 14px', fontSize: 15,
+                border: '1px solid #E5E7EB', borderRadius: 8, background: '#fff',
+                color: '#111827', outline: 'none', boxSizing: 'border-box',
               }}
-            >
-              {message}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label
-                style={{
-                  display: 'block',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: '0.4rem',
-                  fontWeight: '600',
-                  fontSize: '0.9rem',
-                }}
-              >
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label
-                style={{
-                  display: 'block',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: '0.4rem',
-                  fontWeight: '600',
-                  fontSize: '0.9rem',
-                }}
-              >
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                style={inputStyle}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="asrs-btn-primary"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                fontSize: '1rem',
-              }}
-            >
-              Login
-            </button>
-          </form>
-
-          <div
-            style={{
-              marginTop: '1.5rem',
-              textAlign: 'center',
-              fontSize: '0.9rem',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/signup"
-              style={{
-                color: 'var(--color-primary)',
-                textDecoration: 'none',
-                fontWeight: '600',
-              }}
-            >
-              Sign up
-            </Link>
+              onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+            />
           </div>
 
-          <div
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#111827', marginBottom: 6 }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              required
+              style={{
+                width: '100%', padding: '10px 14px', fontSize: 15,
+                border: '1px solid #E5E7EB', borderRadius: 8, background: '#fff',
+                color: '#111827', outline: 'none', boxSizing: 'border-box',
+              }}
+              onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
             style={{
-              marginTop: '1.5rem',
-              padding: '1rem',
-              backgroundColor: '#f5f5f5',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              lineHeight: '1.6',
+              display: 'block', width: '100%', padding: 12, fontSize: 15, fontWeight: 600,
+              color: '#fff', background: loading ? '#D1D5DB' : '#E67E22',
+              border: 'none', borderRadius: 8, cursor: loading ? 'not-allowed' : 'pointer',
+              marginTop: 4,
             }}
+            onMouseEnter={(e) => { if (!loading) e.target.style.background = '#D35400'; }}
+            onMouseLeave={(e) => { if (!loading) e.target.style.background = '#E67E22'; }}
           >
-            <strong>Test Accounts:</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <div style={testAccountCardStyle}>
-                <div style={{ fontWeight: '600', color: 'var(--color-asrs-red)', marginBottom: '0.25rem' }}>Admin</div>
-                <div>Email: <code style={{ fontSize: '0.8rem' }}>admin@test.com</code></div>
-                <div>Password: <code style={{ fontSize: '0.8rem' }}>admin123</code></div>
-              </div>
-              <div style={testAccountCardStyle}>
-                <div style={{ fontWeight: '600', color: 'var(--color-asrs-orange)', marginBottom: '0.25rem' }}>Staff</div>
-                <div>Email: <code style={{ fontSize: '0.8rem' }}>staff@test.com</code></div>
-                <div>Password: <code style={{ fontSize: '0.8rem' }}>staff123</code></div>
-              </div>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 14, color: '#6B7280' }}>
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" style={{ color: '#E67E22', textDecoration: 'none', fontWeight: 600 }}>
+            Sign up
+          </Link>
+        </div>
+
+        <div style={{
+          marginTop: 24, padding: '1rem',
+          backgroundColor: '#f5f5f5', borderRadius: 8,
+          fontSize: '0.85rem', lineHeight: '1.6',
+        }}>
+          <strong>Test Accounts:</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <div style={testAccountCardStyle}>
+              <div style={{ fontWeight: '600', color: '#c0392b', marginBottom: '0.25rem' }}>Admin</div>
+              <div>Email: <code style={{ fontSize: '0.8rem' }}>admin@test.com</code></div>
+              <div>Password: <code style={{ fontSize: '0.8rem' }}>admin123</code></div>
+            </div>
+            <div style={testAccountCardStyle}>
+              <div style={{ fontWeight: '600', color: '#E67E22', marginBottom: '0.25rem' }}>Staff</div>
+              <div>Email: <code style={{ fontSize: '0.8rem' }}>staff@test.com</code></div>
+              <div>Password: <code style={{ fontSize: '0.8rem' }}>staff123</code></div>
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
-
-const inputStyle = {
-  width: '100%',
-  padding: '0.625rem 0.75rem',
-  border: '1px solid var(--color-bg-tertiary)',
-  borderRadius: '8px',
-  fontSize: '0.95rem',
-  color: 'var(--color-text-primary)',
-  backgroundColor: 'white',
-  outline: 'none',
-  boxSizing: 'border-box',
-};
 
 const testAccountCardStyle = {
   padding: '0.5rem 0.75rem',

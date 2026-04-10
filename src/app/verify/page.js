@@ -63,27 +63,27 @@ function VerifyContent() {
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
-  
+
     if (password.length < 8) {
       setFormError('Password must be at least 8 characters.');
       return;
     }
-  
+
     if (!/[0-9]/.test(password)) {
       setFormError('Password must contain at least 1 number.');
       return;
     }
-  
+
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
       setFormError('Password must contain at least 1 special character.');
       return;
     }
-  
+
     if (password !== confirmPassword) {
       setFormError('Passwords do not match.');
       return;
     }
-  
+
     setSubmitting(true);
 
     try {
@@ -108,84 +108,64 @@ function VerifyContent() {
     }
   }
 
-  // ── Styles ─────────────────────────────────────────────────────────────────
-  const containerStyle = {
-    minHeight: '100vh',
-    backgroundColor: 'var(--color-bg-primary, #f5f5f5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '2rem 1rem',
+  // ── Shared layout ───────────────────────────────────────────────────────────
+  const outerWrapper = {
+    minHeight: '100vh', background: '#F9FAFB',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
   };
 
-  const cardStyle = {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '2.5rem',
-    maxWidth: '420px',
-    width: '100%',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-    textAlign: 'center',
+  const card = {
+    background: '#fff', width: '100%', maxWidth: 420,
+    border: '1px solid #E5E7EB', borderRadius: 12, padding: 32,
   };
 
-  const headingStyle = {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    color: '#1a4a8a',
-    marginBottom: '0.75rem',
+  const logoBlock = (
+    <div style={{ textAlign: 'center', marginBottom: 28 }}>
+      <img src="/asrs-logo.png" alt="ASRS" style={{ width: 48, height: 48, borderRadius: 8, marginBottom: 16 }} />
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827' }}>ASRS Initiatives</h1>
+      <p style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Reporting System</p>
+    </div>
+  );
+
+  const inputFocus = (e) => {
+    e.target.style.borderColor = '#E67E22';
+    e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)';
+  };
+  const inputBlur = (e) => {
+    e.target.style.borderColor = '#E5E7EB';
+    e.target.style.boxShadow = 'none';
   };
 
   const inputStyle = {
-    width: '100%',
-    padding: '0.65rem 0.85rem',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '1rem',
-    marginBottom: '0.75rem',
-    boxSizing: 'border-box',
+    width: '100%', padding: '10px 14px', fontSize: 15,
+    border: '1px solid #E5E7EB', borderRadius: 8, background: '#fff',
+    color: '#111827', outline: 'none', boxSizing: 'border-box',
   };
 
-  const buttonStyle = {
-    width: '100%',
-    padding: '0.75rem',
-    backgroundColor: '#1a4a8a',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '1rem',
-    fontWeight: '600',
-    cursor: submitting ? 'not-allowed' : 'pointer',
-    opacity: submitting ? 0.7 : 1,
-    marginTop: '0.5rem',
+  const labelStyle = {
+    display: 'block', fontSize: 14, fontWeight: 500, color: '#111827', marginBottom: 6,
   };
 
   const errorBoxStyle = {
-    backgroundColor: '#fff0f0',
-    border: '1px solid #ffcccc',
-    borderRadius: '6px',
-    padding: '0.75rem 1rem',
-    color: '#cc0000',
-    fontSize: '0.9rem',
-    marginBottom: '1rem',
-    textAlign: 'left',
+    backgroundColor: '#ffebee', border: '1px solid #ffcdd2',
+    borderRadius: 8, padding: '0.75rem 1rem',
+    color: '#c62828', fontSize: '0.9rem', marginBottom: '1rem',
   };
 
   const successBoxStyle = {
-    backgroundColor: '#f0fff4',
-    border: '1px solid #b2f5c8',
-    borderRadius: '6px',
-    padding: '1rem',
-    color: '#1a7a3a',
-    fontSize: '0.95rem',
+    backgroundColor: '#f0fff4', border: '1px solid #b2f5c8',
+    borderRadius: 8, padding: '1rem',
+    color: '#1a7a3a', fontSize: '0.95rem',
   };
 
   // ── Render states ──────────────────────────────────────────────────────────
 
   if (state === 'loading') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          <p style={{ color: '#666' }}>Validating your link…</p>
+      <div style={outerWrapper}>
+        <div style={card}>
+          {logoBlock}
+          <p style={{ color: '#6B7280', textAlign: 'center' }}>Validating your link…</p>
         </div>
       </div>
     );
@@ -193,12 +173,24 @@ function VerifyContent() {
 
   if (state === 'invalid' || state === 'expired' || state === 'error') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
+      <div style={outerWrapper}>
+        <div style={{ ...card, textAlign: 'center' }}>
+          {logoBlock}
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>❌</div>
-          <h1 style={headingStyle}>Link {state === 'expired' ? 'Expired' : 'Invalid'}</h1>
-          <p style={{ color: '#666', marginBottom: '1.5rem' }}>{errorMessage}</p>
-          <button style={{ ...buttonStyle, opacity: 1, cursor: 'pointer' }} onClick={() => router.push('/login')}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '0.75rem' }}>
+            Link {state === 'expired' ? 'Expired' : 'Invalid'}
+          </h2>
+          <p style={{ color: '#6B7280', marginBottom: '1.5rem', fontSize: 14 }}>{errorMessage}</p>
+          <button
+            style={{
+              display: 'block', width: '100%', padding: 12, fontSize: 15, fontWeight: 600,
+              color: '#fff', background: '#E67E22',
+              border: 'none', borderRadius: 8, cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.target.style.background = '#D35400'; }}
+            onMouseLeave={(e) => { e.target.style.background = '#E67E22'; }}
+            onClick={() => router.push('/login')}
+          >
             Back to Login
           </button>
         </div>
@@ -208,10 +200,13 @@ function VerifyContent() {
 
   if (state === 'success') {
     return (
-      <div style={containerStyle}>
-        <div style={cardStyle}>
+      <div style={outerWrapper}>
+        <div style={{ ...card, textAlign: 'center' }}>
+          {logoBlock}
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>✅</div>
-          <h1 style={headingStyle}>You&apos;re all set, {firstName}!</h1>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '0.75rem' }}>
+            You&apos;re all set, {firstName}!
+          </h2>
           <div style={successBoxStyle}>
             Your account has been verified and your password has been set.<br />
             Redirecting you to the login page…
@@ -223,43 +218,61 @@ function VerifyContent() {
 
   // state === 'valid' — show the set password form
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔐</div>
-        <h1 style={headingStyle}>Hi {firstName}, set your password</h1>
-        <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+    <div style={outerWrapper}>
+      <div style={card}>
+        {logoBlock}
+        <div style={{ fontSize: '2rem', textAlign: 'center', marginBottom: 8 }}>🔐</div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: 8 }}>
+          Hi {firstName}, set your password
+        </h2>
+        <p style={{ color: '#6B7280', textAlign: 'center', marginBottom: 24, fontSize: 14 }}>
           Choose a password to complete your account setup.
         </p>
 
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
+        <form onSubmit={handleSubmit}>
           {formError && <div style={errorBoxStyle}>{formError}</div>}
 
-          <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: '600', fontSize: '0.9rem' }}>
-            Password
-          </label>
-          <input
-            type="password"
-            style={inputStyle}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="> 8 characters, 1 special char, 1 number"
-            required
-            minLength={8}
-          />
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="> 8 characters, 1 special char, 1 number"
+              required
+              minLength={8}
+              style={inputStyle}
+              onFocus={inputFocus}
+              onBlur={inputBlur}
+            />
+          </div>
 
-          <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: '600', fontSize: '0.9rem' }}>
-            Confirm Password
-          </label>
-          <input
-            type="password"
-            style={inputStyle}
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            placeholder="Re-enter your password"
-            required
-          />
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Confirm Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              required
+              style={inputStyle}
+              onFocus={inputFocus}
+              onBlur={inputBlur}
+            />
+          </div>
 
-          <button type="submit" style={buttonStyle} disabled={submitting}>
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{
+              display: 'block', width: '100%', padding: 12, fontSize: 15, fontWeight: 600,
+              color: '#fff', background: submitting ? '#D1D5DB' : '#E67E22',
+              border: 'none', borderRadius: 8, cursor: submitting ? 'not-allowed' : 'pointer',
+              marginTop: 4,
+            }}
+            onMouseEnter={(e) => { if (!submitting) e.target.style.background = '#D35400'; }}
+            onMouseLeave={(e) => { if (!submitting) e.target.style.background = '#E67E22'; }}
+          >
             {submitting ? 'Setting password…' : 'Verify & Set Password'}
           </button>
         </form>
