@@ -1,6 +1,6 @@
 'use client';
 
-import Header from '@/components/Header';
+import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api/client';
@@ -29,6 +29,9 @@ export default function SurveyDistributionPage() {
   // Distributions list
   const [distributions, setDistributions] = useState([]);
   const [loadingDistributions, setLoadingDistributions] = useState(true);
+
+  // QR section state
+  const [qrInitiativeId, setQrInitiativeId] = useState('');
 
   // ── Auth check ───────────────────────────────────────
   useEffect(() => {
@@ -150,9 +153,9 @@ export default function SurveyDistributionPage() {
     width: '100%',
     padding: '0.65rem 0.85rem',
     borderRadius: '8px',
-    border: '1px solid var(--color-bg-tertiary)',
-    backgroundColor: 'var(--color-bg-primary)',
-    color: 'var(--color-text-primary)',
+    border: '1px solid #E5E7EB',
+    backgroundColor: '#fff',
+    color: '#111827',
     fontSize: '0.95rem',
     outline: 'none',
     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
@@ -163,7 +166,7 @@ export default function SurveyDistributionPage() {
     display: 'block',
     fontWeight: '600',
     fontSize: '0.9rem',
-    color: 'var(--color-text-primary)',
+    color: '#111827',
     marginBottom: '0.35rem',
   };
 
@@ -171,25 +174,41 @@ export default function SurveyDistributionPage() {
     marginBottom: '1.25rem',
   };
 
-  const statusBadge = (status) => {
-    const colors = {
-      pending: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
-      active: { bg: '#d1fae5', text: '#065f46', border: '#a7f3d0' },
-      closed: { bg: '#fee2e2', text: '#991b1b', border: '#fecaca' },
-    };
-    const c = colors[status] || colors.pending;
-    return {
-      display: 'inline-block',
-      padding: '0.2rem 0.65rem',
-      borderRadius: '999px',
-      fontSize: '0.75rem',
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: '0.03em',
-      backgroundColor: c.bg,
-      color: c.text,
-      border: `1px solid ${c.border}`,
-    };
+  // ── Stats computed from distributions ────────────────
+  const totalDistributed = distributions.reduce((sum, d) => sum + (d.recipient_emails?.length || 0), 0);
+  const totalResponses = distributions.reduce((sum, d) => sum + (d.response_count || 0), 0);
+  const responseRate = totalDistributed > 0 ? Math.round((totalResponses / totalDistributed) * 100) : 0;
+  const pendingCount = distributions.filter((d) => d.status === 'pending' || d.status === 'active').length;
+
+  // ── Status pill helper ───────────────────────────────
+  const statusPill = (status) => {
+    if (status === 'active') return <span className="pill pill-green">Active</span>;
+    if (status === 'pending') return <span className="pill pill-yellow">Scheduled</span>;
+    if (status === 'closed') return <span className="pill pill-gray">Completed</span>;
+    return <span className="pill pill-gray">{status}</span>;
+  };
+
+  // ── Method pill helper ────────────────────────────────
+  const methodPill = (method) => {
+    if (!method || method === 'email') {
+      return (
+        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 500, background: '#DBEAFE', color: '#1E40AF' }}>
+          Email
+        </span>
+      );
+    }
+    if (method === 'qr') {
+      return (
+        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 500, background: '#F3E8FF', color: '#7C3AED' }}>
+          QR
+        </span>
+      );
+    }
+    return (
+      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 500, background: '#FEF3C7', color: '#92400E' }}>
+        Link
+      </span>
+    );
   };
 
   // ── Render ───────────────────────────────────────────
@@ -197,26 +216,23 @@ export default function SurveyDistributionPage() {
   // Not authorized
   if (authChecked && !user) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '600px', margin: '0 auto', padding: '3rem 1.5rem', textAlign: 'center' }}>
-          <div className="asrs-card">
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
-              Access Restricted
-            </h2>
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-              Only admin and staff users can distribute surveys. Please log in with an authorized account.
-            </p>
-            <button
-              onClick={() => router.push('/login')}
-              className="asrs-btn-primary"
-              style={{ padding: '0.65rem 2rem', fontSize: '0.95rem' }}
-            >
-              Go to Login
-            </button>
-          </div>
-        </main>
+      <div style={{ minHeight: '100vh', backgroundColor: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="card" style={{ maxWidth: '480px', width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', marginBottom: '0.5rem' }}>
+            Access Restricted
+          </h2>
+          <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
+            Only admin and staff users can distribute surveys. Please log in with an authorized account.
+          </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="btn-primary"
+            style={{ padding: '0.65rem 2rem', fontSize: '0.95rem' }}
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
@@ -225,285 +241,294 @@ export default function SurveyDistributionPage() {
   if (!authChecked) return null;
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+    <PageLayout title="Survey Distribution">
+      {/* ── Stats Row ── */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-label">Total Distributed</div>
+          <div className="stat-value">{totalDistributed}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Response Rate</div>
+          <div className="stat-value">{responseRate}%</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Pending</div>
+          <div className="stat-value">{pendingCount}</div>
+        </div>
+      </div>
 
-      <main style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        {/* ── Page Title ── */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--color-text-primary)', margin: 0 }}>
-            Distribute Survey
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
-            Select a survey template, set the distribution window, and add recipients.
-          </p>
+      {/* ── Active Distributions Table ── */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header">
+          <h2 className="card-title">Active Distributions</h2>
+          <button
+            className="btn-primary"
+            onClick={() => document.getElementById('new-distribution-form').scrollIntoView({ behavior: 'smooth' })}
+          >
+            + New Distribution
+          </button>
         </div>
 
-        {/* ── Distribution Form ── */}
-        <div className="asrs-card" style={{ marginBottom: '2rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1.25rem' }}>
-            New Distribution
-          </h2>
+        {loadingDistributions ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1.5rem' }}>
+            Loading distributions…
+          </p>
+        ) : distributions.length === 0 ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem' }}>
+            No distributions yet. Create your first one below.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Initiative</th>
+                  <th>Method</th>
+                  <th>Recipients</th>
+                  <th>Responses</th>
+                  <th>Response Rate</th>
+                  <th>Status</th>
+                  <th>Date Sent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {distributions.map((d) => {
+                  const recipients = d.recipient_emails?.length || 0;
+                  const responses = d.response_count || 0;
+                  const rate = recipients > 0 ? Math.round((responses / recipients) * 100) : 0;
+                  return (
+                    <tr key={d.distribution_id}>
+                      <td style={{ fontWeight: 500, color: '#111827' }}>{d.title}</td>
+                      <td>{methodPill(d.method)}</td>
+                      <td>{recipients}</td>
+                      <td>{responses}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '80px', height: '6px', borderRadius: '3px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                            <div style={{ width: `${rate}%`, height: '100%', backgroundColor: '#059669', borderRadius: '3px' }} />
+                          </div>
+                          <span style={{ fontSize: '12px', color: '#6B7280' }}>{rate}%</span>
+                        </div>
+                      </td>
+                      <td>{statusPill(d.status)}</td>
+                      <td style={{ color: '#6B7280' }}>{d.start_date}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-          {/* Success banner */}
-          {successMessage && (
-            <div style={{
-              backgroundColor: '#d1fae5',
-              border: '1px solid #a7f3d0',
-              borderRadius: '8px',
-              padding: '0.75rem 1rem',
-              marginBottom: '1.25rem',
-              color: '#065f46',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-            }}>
-              ✅ {successMessage}
-            </div>
-          )}
+      {/* ── New Distribution Form ── */}
+      <div id="new-distribution-form" className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header">
+          <h2 className="card-title">New Distribution</h2>
+        </div>
 
-          {/* Error banner */}
-          {error && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '8px',
-              padding: '0.75rem 1rem',
-              marginBottom: '1.25rem',
-              color: '#b91c1c',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-            }}>
-              {error}
-            </div>
-          )}
+        {/* Success banner */}
+        {successMessage && (
+          <div style={{
+            backgroundColor: '#d1fae5', border: '1px solid #a7f3d0', borderRadius: '8px',
+            padding: '0.75rem 1rem', marginBottom: '1.25rem', color: '#065f46',
+            fontSize: '0.9rem', fontWeight: '500',
+          }}>
+            {successMessage}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit}>
-            {/* Survey Template Dropdown */}
-            <div style={fieldGroupStyle}>
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
+            padding: '0.75rem 1rem', marginBottom: '1.25rem', color: '#b91c1c',
+            fontSize: '0.9rem', fontWeight: '500',
+          }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Survey Template Dropdown */}
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>
+              Survey Template <span style={{ color: '#E67E22' }}>*</span>
+            </label>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+              required
+            >
+              <option value="">— Select a template —</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+            {templates.length === 0 && (
+              <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.35rem' }}>
+                No templates found. Create one on the Survey page first.
+              </p>
+            )}
+          </div>
+
+          {/* Distribution Title */}
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>
+              Distribution Title <span style={{ color: '#E67E22' }}>*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Spring 2026 Campus Feedback"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={inputStyle}
+              required
+            />
+          </div>
+
+          {/* Dates – side by side */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
               <label style={labelStyle}>
-                Survey Template <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-              </label>
-              <select
-                value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                style={{ ...inputStyle, cursor: 'pointer' }}
-                required
-              >
-                <option value="">— Select a template —</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-              {templates.length === 0 && (
-                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginTop: '0.35rem' }}>
-                  No templates found. Create one on the Survey page first.
-                </p>
-              )}
-            </div>
-
-            {/* Distribution Title */}
-            <div style={fieldGroupStyle}>
-              <label style={labelStyle}>
-                Distribution Title <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
+                Start Date <span style={{ color: '#E67E22' }}>*</span>
               </label>
               <input
-                type="text"
-                placeholder="e.g. Spring 2026 Campus Feedback"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                type="date"
+                value={startDate}
+                min={todayStr}
+                onChange={(e) => setStartDate(e.target.value)}
                 style={inputStyle}
                 required
               />
             </div>
-
-            {/* Dates – side by side */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
-                <label style={labelStyle}>
-                  Start Date <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  min={todayStr}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
-                <label style={labelStyle}>
-                  End Date <span style={{ color: 'var(--color-asrs-red)' }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate || todayStr}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={inputStyle}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Distribution Emails */}
-            <div style={fieldGroupStyle}>
+            <div style={{ ...fieldGroupStyle, flex: '1 1 45%', minWidth: '200px' }}>
               <label style={labelStyle}>
-                Distribution Emails
+                End Date <span style={{ color: '#E67E22' }}>*</span>
               </label>
-              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>
-                Type an email and press <strong>Enter</strong> or <strong>comma</strong> to add it.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="email"
-                  placeholder="email@example.com"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  onKeyDown={handleEmailKeyDown}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button
-                  type="button"
-                  onClick={addEmail}
-                  className="asrs-btn-secondary"
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  Add
-                </button>
-              </div>
-
-              {/* Email chips */}
-              {recipientEmails.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.65rem' }}>
-                  {recipientEmails.map((em) => (
-                    <span
-                      key={em}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.3rem 0.7rem',
-                        borderRadius: '999px',
-                        backgroundColor: 'var(--color-bg-secondary)',
-                        border: '1px solid var(--color-bg-tertiary)',
-                        fontSize: '0.82rem',
-                        color: 'var(--color-text-primary)',
-                      }}
-                    >
-                      {em}
-                      <button
-                        type="button"
-                        onClick={() => removeEmail(em)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          color: 'var(--color-text-light)',
-                          padding: 0,
-                          lineHeight: 1,
-                        }}
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || todayStr}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={inputStyle}
+                required
+              />
             </div>
+          </div>
 
-            {/* Submit */}
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+          {/* Distribution Emails */}
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Distribution Emails</label>
+            <p style={{ fontSize: '0.82rem', color: '#9CA3AF', marginBottom: '0.5rem' }}>
+              Type an email and press <strong>Enter</strong> or <strong>comma</strong> to add it.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="email"
+                placeholder="email@example.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                onKeyDown={handleEmailKeyDown}
+                style={{ ...inputStyle, flex: 1 }}
+              />
               <button
-                type="submit"
-                className="asrs-btn-primary"
-                disabled={isSubmitting}
-                style={{
-                  padding: '0.65rem 2rem',
-                  fontSize: '0.95rem',
-                  opacity: isSubmitting ? 0.7 : 1,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
+                type="button"
+                onClick={addEmail}
+                className="btn-outline"
+                style={{ whiteSpace: 'nowrap' }}
               >
-                {isSubmitting ? 'Creating…' : 'Create Distribution'}
+                Add
               </button>
             </div>
-          </form>
-        </div>
 
-        {/* ── Existing Distributions (tracking dashboard) ── */}
-        <div className="asrs-card">
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
-            Distribution Tracker
-          </h2>
-
-          {loadingDistributions ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1rem' }}>
-              Loading distributions…
-            </p>
-          ) : distributions.length === 0 ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1.5rem' }}>
-              No distributions yet. Create your first one above.
-            </p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                    {['Title', 'Start', 'End', 'Status', 'Recipients', 'Responses'].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: 'left',
-                          padding: '0.6rem 0.75rem',
-                          fontWeight: '600',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '0.8rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.03em',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {distributions.map((d) => (
-                    <tr
-                      key={d.distribution_id}
-                      style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}
+            {/* Email chips */}
+            {recipientEmails.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.65rem' }}>
+                {recipientEmails.map((em) => (
+                  <span
+                    key={em}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.3rem 0.7rem', borderRadius: '999px',
+                      backgroundColor: '#F3F4F6', border: '1px solid #E5E7EB',
+                      fontSize: '0.82rem', color: '#374151',
+                    }}
+                  >
+                    {em}
+                    <button
+                      type="button"
+                      onClick={() => removeEmail(em)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#9CA3AF', padding: 0, lineHeight: 1 }}
+                      title="Remove"
                     >
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: '500', color: 'var(--color-text-primary)' }}>
-                        {d.title}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {d.start_date}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {d.end_date}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <span style={statusBadge(d.status)}>{d.status}</span>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {d.recipient_emails.length}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {d.response_count}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isSubmitting}
+              style={{
+                padding: '0.65rem 2rem',
+                fontSize: '0.95rem',
+                opacity: isSubmitting ? 0.7 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isSubmitting ? 'Creating…' : 'Create Distribution'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* ── QR Code Section ── */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Generate QR Code</h2>
         </div>
-      </main>
-    </div>
+        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '16px', marginTop: 0 }}>
+          Generate a QR code for a survey initiative to enable quick access.
+        </p>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '20px' }}>
+          <div style={{ flex: '1 1 280px' }}>
+            <label style={labelStyle}>Select Initiative</label>
+            <select
+              value={qrInitiativeId}
+              onChange={(e) => setQrInitiativeId(e.target.value)}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              <option value="">— Select a template —</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn-primary" style={{ padding: '0.65rem 1.5rem' }}>
+            Generate QR
+          </button>
+        </div>
+
+        {/* QR placeholder */}
+        <div style={{
+          width: '160px', height: '160px', border: '2px dashed #E5E7EB', borderRadius: '12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#9CA3AF', fontSize: '13px', textAlign: 'center',
+        }}>
+          QR code will appear here
+        </div>
+      </div>
+    </PageLayout>
   );
 }
