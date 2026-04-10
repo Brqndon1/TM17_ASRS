@@ -124,6 +124,20 @@
         "status": "Active",
         "isPublic": false
       }
+    },
+    {
+      "id": 9,
+      "name": "QA Test Initiative",
+      "description": "Testing initiative creation from admin walkthrough",
+      "attributes": [
+        "Grade",
+        "School"
+      ],
+      "questions": [],
+      "settings": {
+        "status": "Active",
+        "isPublic": false
+      }
     }
   ]
 }

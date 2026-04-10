@@ -10,6 +10,7 @@ import ReasonModal from '@/components/ReasonModal';
 export default function AdminUsersPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const [isMounted, setIsMounted] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
 
   // Check auth
   useEffect(() => {
+    setIsMounted(true);
     if (user === undefined) return;
     if (!user) {
       router.push('/login');
@@ -314,8 +316,8 @@ export default function AdminUsersPage() {
 
   const formatRoleName = (type) => type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
 
-  // Don't render until auth check completes
-  if (!user) {
+  // Don't render until client-side mount + auth check completes
+  if (!isMounted || !user) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
         <Header />
@@ -746,7 +748,12 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
+      <ReasonModal
+        open={showReasonModal}
+        onClose={() => { setShowReasonModal(false); setPendingAction(null); }}
+        onSubmit={handleReasonSubmit}
+        title={pendingAction?.type === 'add' ? 'Why are you adding this user?' : pendingAction?.type === 'delete' ? 'Why are you deleting this user?' : pendingAction?.type === 'roleChange' ? 'Why are you changing this role?' : undefined}
+      />
 
       {/* ── Add User Modal ────────────────────────────────────────────────── */}
       {showAddForm && (

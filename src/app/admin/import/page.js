@@ -12,9 +12,11 @@ export default function AdminImportPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const fileInputRef = useRef(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Auth guard
   useEffect(() => {
+    setIsMounted(true);
     if (user === undefined) return;
     if (!user) { router.push('/login'); return; }
     if (user.user_type !== 'admin') { router.push('/'); }
@@ -140,7 +142,7 @@ export default function AdminImportPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  if (!user || user.user_type !== 'admin') return null;
+  if (!isMounted || !user || user.user_type !== 'admin') return null;
 
   return (
     <>

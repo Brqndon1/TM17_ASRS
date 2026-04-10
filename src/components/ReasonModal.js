@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-export default function ReasonModal({ open, onClose, onSubmit }) {
+export default function ReasonModal({ open, onClose, onSubmit, title, description }) {
   const [reasonType, setReasonType] = useState('manual');
   const [reasonText, setReasonText] = useState('');
 
@@ -20,8 +20,8 @@ export default function ReasonModal({ open, onClose, onSubmit }) {
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
 
       <div style={{ position: 'relative', width: 'min(640px, 95%)', background: 'white', borderRadius: 8, padding: '1rem', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Why are you creating this initiative?</h3>
-        <p style={{ marginTop: 0, color: '#666', marginBottom: '0.75rem' }}>Provide a reason or context for auditing purposes.</p>
+        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>{title || 'Reason for this action'}</h3>
+        <p style={{ marginTop: 0, color: '#666', marginBottom: '0.75rem' }}>{description || 'Provide a reason or context for auditing purposes.'}</p>
 
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Type</label>
@@ -35,7 +35,7 @@ export default function ReasonModal({ open, onClose, onSubmit }) {
 
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Details (optional)</label>
-          <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} rows={4} style={{ width: '100%', padding: '0.5rem', borderRadius: 6 }} placeholder="Optional details about why this initiative is being created." />
+          <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} rows={4} style={{ width: '100%', padding: '0.5rem', borderRadius: 6 }} placeholder="Optional details for the audit trail." />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>

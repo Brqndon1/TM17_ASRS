@@ -476,7 +476,12 @@ export default function ManageReportsPage() {
           {toast.message}
         </div>
       )}
-      <ReasonModal visible={showReasonModal} onClose={() => { setShowReasonModal(false); setPendingAction(null); }} onSubmit={handleReasonSubmit} />
+      <ReasonModal
+        open={showReasonModal}
+        onClose={() => { setShowReasonModal(false); setPendingAction(null); }}
+        onSubmit={handleReasonSubmit}
+        title={pendingAction?.type === 'deleteReport' ? 'Why are you deleting this report?' : pendingAction?.type === 'editReport' ? 'Why are you editing this report?' : undefined}
+      />
     </div>
   );
 }
