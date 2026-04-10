@@ -240,43 +240,6 @@ body {
   flex-wrap: wrap;
 }
 
-/* --- Header: hamburger button -------------------------------------------- */
-/* Hidden on desktop; shown on mobile via media query below */
-.header-hamburger {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.4rem;
-  border-radius: 4px;
-}
-.header-hamburger:hover { background-color: rgba(255,255,255,0.15); }
-.header-hamburger-line {
-  display: block;
-  width: 24px;
-  height: 2px;
-  background-color: white;
-  border-radius: 2px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-/* --- Header: collapsible nav area --------------------------------------- */
-.header-nav-area {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-/* --- Header: nav link list ----------------------------------------------- */
-.header-nav-links {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
 
 /* ===== NEW LAYOUT SYSTEM ===== */
 .page-layout {
@@ -628,32 +591,6 @@ body {
 /* Also handles hamburger: nav has too many links to fit comfortably below this width */
 @media (max-width: 1024px) {
   .chart-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-
-  /* Show hamburger button */
-  .header-hamburger { display: flex; }
-
-  /* Nav becomes absolute dropdown below header */
-  .header-nav-area {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: linear-gradient(135deg, #4A4A4A 0%, #2C2C2C 100%);
-    padding: 1rem 1.5rem 1.25rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    border-top: 1px solid rgba(255,255,255,0.15);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-    z-index: 99;
-  }
-  .header-nav-area.open { display: flex; }
-
-  /* Nav links become vertical list in the dropdown */
-  .header-nav-links { flex-direction: column; gap: 0.35rem; width: 100%; }
-  .header-nav-links a,
-  .header-nav-links button { width: 100%; text-align: left; }
 
   /* Responsive sidebar */
   .sidebar {
