@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import InitiativeSelector from '@/components/InitiativeSelector';
 import ReportDashboard from '@/components/ReportDashboard';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
@@ -805,14 +804,8 @@ export default function ReportingPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
-
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
-        <BackButton />
-      </div>
-
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem' }}>
+    <PageLayout title="Reports">
+      <section style={{ marginBottom: '1.5rem' }}>
         <InitiativeSelector
           initiatives={initiatives}
           selectedInitiative={selectedInitiative}
@@ -820,29 +813,14 @@ export default function ReportingPage() {
         />
       </section>
 
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
-        {reportData && (
-          <>
-            {(userRole === 'staff' || userRole === 'admin') && (
-              <div
-                className="asrs-card"
-                style={{
-                  marginBottom: '1.5rem',
-                  padding: '1rem 1.5rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  flexWrap: 'wrap',
-                  backgroundColor: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-bg-tertiary)'
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>
-                  Download Report
-                </div>
+      {reportData && (
+        <>
+          {(userRole === 'staff' || userRole === 'admin') && (
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 600 }}>Download Report</div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>PDF Content</span>
                     <select
@@ -852,8 +830,9 @@ export default function ReportingPage() {
                         padding: '0.5rem 0.65rem',
                         fontSize: '0.9rem',
                         borderRadius: '6px',
-                        border: '1px solid var(--color-bg-tertiary)',
-                        backgroundColor: 'var(--color-bg-primary)'
+                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#fff',
+                        outline: 'none',
                       }}
                     >
                       {PDF_DISPLAY_OPTIONS.map((option) => (
@@ -872,9 +851,10 @@ export default function ReportingPage() {
                         padding: '0.5rem 0.65rem',
                         fontSize: '0.9rem',
                         borderRadius: '6px',
-                        border: '1px solid var(--color-bg-tertiary)',
-                        backgroundColor: 'var(--color-bg-primary)',
-                        opacity: pdfDisplayMode === 'both' ? 1 : 0.6
+                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#fff',
+                        opacity: pdfDisplayMode === 'both' ? 1 : 0.6,
+                        outline: 'none',
                       }}
                     >
                       {PDF_LAYOUT_OPTIONS.map((option) => (
@@ -884,16 +864,8 @@ export default function ReportingPage() {
                   </div>
 
                   <button
+                    className="btn-primary"
                     onClick={() => handleDownload('pdf')}
-                    style={{
-                      padding: '0.5rem 0.9rem',
-                      fontSize: '0.9rem',
-                      fontWeight: 500,
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-bg-tertiary)',
-                      backgroundColor: 'var(--color-bg-primary)',
-                      cursor: 'pointer'
-                    }}
                   >
                     PDF
                   </button>
@@ -901,49 +873,25 @@ export default function ReportingPage() {
                   {DOWNLOAD_FORMATS.map((format) => (
                     <button
                       key={format}
+                      className="btn-outline"
                       onClick={() => handleDownload(format)}
-                      style={{
-                        padding: '0.5rem 0.9rem',
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        borderRadius: '6px',
-                        border: '1px solid var(--color-bg-tertiary)',
-                        backgroundColor: 'var(--color-bg-primary)',
-                        cursor: 'pointer'
-                      }}
                     >
                       {format.toUpperCase()}
                     </button>
                   ))}
 
                   <button
+                    className="btn-outline"
                     onClick={handleCreateShareableLink}
-                    style={{
-                      padding: '0.5rem 0.9rem',
-                      fontSize: '0.9rem',
-                      fontWeight: 500,
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-bg-tertiary)',
-                      backgroundColor: 'var(--color-bg-primary)',
-                      cursor: 'pointer'
-                    }}
                   >
-                    Create Shareable Link
+                    Share Link
                   </button>
 
                   {userRole === 'admin' && (
                     <div style={{ position: 'relative' }}>
                       <button
+                        className="btn-outline"
                         onClick={() => setShowSocialMenu(!showSocialMenu)}
-                        style={{
-                          padding: '0.4rem 0.75rem',
-                          fontSize: '0.8rem',
-                          borderRadius: '6px',
-                          border: '1px solid var(--color-bg-tertiary)',
-                          backgroundColor: 'transparent',
-                          cursor: 'pointer',
-                          opacity: 0.8
-                        }}
                       >
                         Share ▾
                       </button>
@@ -954,8 +902,8 @@ export default function ReportingPage() {
                             position: 'absolute',
                             top: '110%',
                             right: 0,
-                            backgroundColor: 'var(--color-bg-primary)',
-                            border: '1px solid var(--color-bg-tertiary)',
+                            backgroundColor: '#fff',
+                            border: '1px solid #E5E7EB',
                             borderRadius: '8px',
                             padding: '0.75rem',
                             width: '220px',
@@ -982,31 +930,21 @@ export default function ReportingPage() {
                           ))}
 
                           <button
+                            className="btn-primary"
                             onClick={handlePostToSocialMedia}
                             disabled={isUploading || selectedPlatforms.length === 0}
                             style={{
                               marginTop: '0.5rem',
                               width: '100%',
-                              padding: '0.4rem',
-                              fontSize: '0.8rem',
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-bg-tertiary)',
-                              backgroundColor: 'var(--color-brand-primary)',
-                              color: '#fff',
-                              cursor: isUploading ? 'not-allowed' : 'pointer'
+                              cursor: isUploading ? 'not-allowed' : 'pointer',
+                              opacity: (isUploading || selectedPlatforms.length === 0) ? 0.6 : 1,
                             }}
                           >
                             {isUploading ? 'Posting...' : 'Post'}
                           </button>
 
                           {uploadStatus && (
-                            <div
-                              style={{
-                                marginTop: '0.5rem',
-                                fontSize: '0.75rem',
-                                opacity: 0.8
-                              }}
-                            >
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', opacity: 0.8 }}>
                               {uploadStatus}
                             </div>
                           )}
@@ -1016,62 +954,32 @@ export default function ReportingPage() {
                   )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <ReportDashboard
-              reportData={reportData}
-              trendData={trendData}
-              selectedInitiative={selectedInitiative}
-              userRole={userRole}
-              reportDbId={reportDbId}
-              preloadedInsights={aiInsights}
-            />
-          </>
-        )}
-      </section>
+          <ReportDashboard
+            reportData={reportData}
+            trendData={trendData}
+            selectedInitiative={selectedInitiative}
+            userRole={userRole}
+            reportDbId={reportDbId}
+            preloadedInsights={aiInsights}
+          />
+        </>
+      )}
 
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-          <Link href="/report-creation">
-            <button
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: 'var(--color-asrs-orange)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-            >
-              Report Creation
-            </button>
-          </Link>
-          <Link href="/manage-reports">
-            <button
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: 'var(--color-asrs-orange)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-            >
-              Manage Reports
-            </button>
-          </Link>
-        </div>
-      </section>
-    </main>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
+        <Link href="/report-creation">
+          <button className="btn-primary">
+            Report Creation
+          </button>
+        </Link>
+        <Link href="/manage-reports">
+          <button className="btn-primary">
+            Manage Reports
+          </button>
+        </Link>
+      </div>
+    </PageLayout>
   );
 }
