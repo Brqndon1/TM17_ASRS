@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import { getInitiatives, getReportData } from '@/lib/data-service';
 
 import StepIndicator from '@/components/report-steps/StepIndicator';
@@ -412,205 +411,163 @@ export default function ReportCreationPage() {
 
   if (!authChecked) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '2rem' }}>
-            Loading...
-          </p>
-        </main>
-      </div>
+      <PageLayout title="Create Report">
+        <p style={{ color: '#6B7280', textAlign: 'center', padding: '2rem' }}>
+          Loading...
+        </p>
+      </PageLayout>
     );
   }
 
   if (authChecked && userRole !== 'staff' && userRole !== 'admin') {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-        <Header />
-        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <BackButton />
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--color-asrs-dark)' }}>
-              Access Denied
-            </h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '1rem' }}>
-              You do not have permission to create reports. Please contact an administrator.
-            </p>
-          </div>
-        </main>
-      </div>
+      <PageLayout title="Create Report">
+        <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem', color: '#111827' }}>
+            Access Denied
+          </h1>
+          <p style={{ color: '#6B7280', fontSize: '1rem' }}>
+            You do not have permission to create reports. Please contact an administrator.
+          </p>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header />
+    <PageLayout title="Create Report">
+      {/* Step wizard card */}
+      <div className="card" style={{ padding: '32px', marginBottom: '2rem' }}>
+        {/* Step Indicator */}
+        <StepIndicator currentStep={currentStep} />
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        <BackButton />
-        <div className="asrs-card">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700 }}>
-            Report Creation
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-            Create and publish reports from collected survey data.
-          </p>
+        {/* Active Step Content */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          {renderStep()}
+        </div>
 
-          {/* Step Indicator */}
-          <StepIndicator currentStep={currentStep} />
+        {/* Navigation Buttons (not shown on preview step — it has its own Generate button) */}
+        {currentStep < TOTAL_STEPS - 1 && (
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', paddingTop: '1rem',
+            borderTop: '1px solid #E5E7EB',
+          }}>
+            <button
+              onClick={handleBack}
+              disabled={currentStep === 0}
+              className="btn-outline"
+              style={{
+                opacity: currentStep === 0 ? 0.4 : 1,
+                cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Back
+            </button>
 
-          {/* Active Step Content */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            {renderStep()}
-          </div>
-
-          {/* Navigation Buttons (not shown on preview step — it has its own Generate button) */}
-          {currentStep < TOTAL_STEPS - 1 && (
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', paddingTop: '1rem',
-              borderTop: '1px solid var(--color-bg-tertiary)',
-            }}>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {isOptionalStep && (
+                <button
+                  onClick={handleSkip}
+                  className="btn-outline"
+                  style={{ color: '#6B7280' }}
+                >
+                  Skip
+                </button>
+              )}
               <button
-                onClick={handleBack}
-                disabled={currentStep === 0}
-                className="asrs-btn-secondary"
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="btn-primary"
                 style={{
-                  opacity: currentStep === 0 ? 0.4 : 1,
-                  cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                  opacity: canProceed() ? 1 : 0.5,
+                  cursor: canProceed() ? 'pointer' : 'not-allowed',
                 }}
               >
-                Back
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                {isOptionalStep && (
-                  <button
-                    onClick={handleSkip}
-                    className="asrs-btn-secondary"
-                    style={{ color: 'var(--color-text-light)' }}
-                  >
-                    Skip
-                  </button>
-                )}
-                <button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                  style={{
-                    padding: '0.6rem 1.5rem',
-                    backgroundColor: canProceed() ? 'var(--color-asrs-orange)' : 'var(--color-bg-tertiary)',
-                    color: canProceed() ? '#fff' : 'var(--color-text-light)',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: canProceed() ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Back button on preview step */}
-          {currentStep === TOTAL_STEPS - 1 && (
-            <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-bg-tertiary)' }}>
-              <button onClick={handleBack} className="asrs-btn-secondary">
-                Back
+                Next
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Messages */}
-          {errorMessage && (
-            <p style={{ marginTop: '1rem', color: 'var(--color-error)' }}>
-              {errorMessage}
-            </p>
-          )}
-          {successMessage && (
-            <p style={{ marginTop: '1rem', color: 'var(--color-success)' }}>
-              {successMessage}
-            </p>
-          )}
-        </div>
+        {/* Back button on preview step */}
+        {currentStep === TOTAL_STEPS - 1 && (
+          <div style={{ paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
+            <button onClick={handleBack} className="btn-outline">
+              Back
+            </button>
+          </div>
+        )}
 
-        {/* ── Report History ── */}
-        <div className="asrs-card" style={{ marginTop: '2rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: 'var(--color-asrs-dark)', marginBottom: '1rem' }}>
+        {/* Messages */}
+        {errorMessage && (
+          <p style={{ marginTop: '1rem', color: '#DC2626' }}>
+            {errorMessage}
+          </p>
+        )}
+        {successMessage && (
+          <p style={{ marginTop: '1rem', color: '#059669' }}>
+            {successMessage}
+          </p>
+        )}
+      </div>
+
+      {/* Report History */}
+      <div className="card" style={{ padding: '32px' }}>
+        <div className="card-header">
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '600', color: '#111827' }}>
             Report History
           </h2>
-
-          {loadingReports ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1rem' }}>
-              Loading reports...
-            </p>
-          ) : reports.length === 0 ? (
-            <p style={{ color: 'var(--color-text-light)', textAlign: 'center', padding: '1.5rem' }}>
-              No reports yet. Generate your first one above.
-            </p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-bg-tertiary)' }}>
-                    {['Report Name', 'Initiative', 'Created By', 'Date', 'Status'].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: 'left',
-                          padding: '0.6rem 0.75rem',
-                          fontWeight: '600',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '0.8rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.03em',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((r) => (
-                    <tr
-                      key={r.id}
-                      style={{ borderBottom: '1px solid var(--color-bg-tertiary)' }}
-                    >
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: '500' }}>
-                        <Link
-                          href={`/report-creation/${r.id}`}
-                          style={{
-                            color: 'var(--color-asrs-orange)',
-                            textDecoration: 'none',
-                            fontWeight: '600',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                        >
-                          {r.name || '(Untitled)'}
-                        </Link>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {r.initiative_name || '\u2014'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {r.created_by || '\u2014'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', color: 'var(--color-text-secondary)' }}>
-                        {formatDate(r.created_at)}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem' }}>
-                        <span style={statusBadge(r.status)}>{r.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
-      </main>
-    </div>
+
+        {loadingReports ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1rem' }}>
+            Loading reports...
+          </p>
+        ) : reports.length === 0 ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1.5rem' }}>
+            No reports yet. Generate your first one above.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {['Report Name', 'Initiative', 'Created By', 'Date', 'Status'].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ fontWeight: '500' }}>
+                      <Link
+                        href={`/report-creation/${r.id}`}
+                        style={{
+                          color: '#E67E22',
+                          textDecoration: 'none',
+                          fontWeight: '600',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                      >
+                        {r.name || '(Untitled)'}
+                      </Link>
+                    </td>
+                    <td>{r.initiative_name || '\u2014'}</td>
+                    <td>{r.created_by || '\u2014'}</td>
+                    <td>{formatDate(r.created_at)}</td>
+                    <td>
+                      <span style={statusBadge(r.status)}>{r.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </PageLayout>
   );
 }

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Header from '@/components/Header';
-import BackButton from '@/components/BackButton';
+import PageLayout from '@/components/PageLayout';
 import ReportDashboard from '@/components/ReportDashboard';
 import { getInitiatives, getReportData, getTrendData } from '@/lib/data-service';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
@@ -96,23 +95,24 @@ export default function ReportViewPage() {
     }
 
     return (
-      <div className="asrs-card" style={{
-        borderLeft: '4px solid var(--color-asrs-orange)',
+      <div className="card" style={{
+        borderLeft: '4px solid #E67E22',
         marginBottom: '1rem',
+        padding: '1rem 1.25rem',
       }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: 'var(--color-asrs-dark)' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: '600', margin: '0 0 0.5rem 0', color: '#111827' }}>
           Report Configuration
         </h3>
         <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           {filterEntries.length > 0 && (
             <div>
-              <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Filters: </span>
+              <span style={{ fontWeight: '600', color: '#6B7280' }}>Filters: </span>
               {filterEntries.map(([k, v]) => `${k} = "${v}"`).join(', ')}
             </div>
           )}
           {expressions.length > 0 && (
             <div>
-              <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Expressions: </span>
+              <span style={{ fontWeight: '600', color: '#6B7280' }}>Expressions: </span>
               {expressions.map((e, i) =>
                 `${i > 0 ? (e.connector || 'AND') + ' ' : ''}${e.attribute} ${e.operator} "${e.value}"`
               ).join(' ')}
@@ -120,13 +120,13 @@ export default function ReportViewPage() {
           )}
           {sorts.length > 0 && (
             <div>
-              <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Sort: </span>
+              <span style={{ fontWeight: '600', color: '#6B7280' }}>Sort: </span>
               {sorts.map((s, i) => `${i + 1}. ${s.attribute} (${s.direction === 'desc' ? 'Z\u2192A' : 'A\u2192Z'})`).join(', ')}
             </div>
           )}
           {hasTrendVariables && (
             <div>
-              <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Trends: </span>
+              <span style={{ fontWeight: '600', color: '#6B7280' }}>Trends: </span>
               Variables ({trendConfig.variables.join(', ')}), method {trendConfig.method || 'delta_halves'}, threshold {trendConfig.thresholdPct ?? 2}%,
               display {trendConfig.enabledDisplay === false ? 'off' : 'on'}
             </div>
@@ -137,63 +137,55 @@ export default function ReportViewPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-bg-primary)' }}>
-      <Header userRole={userRole} onRoleChange={setUserRole} />
-
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 1.5rem 0' }}>
-        <BackButton />
-      </div>
-
+    <PageLayout title={report ? (report.name || 'Untitled Report') : 'Create Report'}>
       {/* Report name + description header */}
       {report && (
-        <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 1rem' }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0 }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0, color: '#111827' }}>
             {report.name || 'Untitled Report'}
           </h1>
           {report.description && (
-            <p style={{ color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
+            <p style={{ color: '#6B7280', marginTop: '0.25rem' }}>
               {report.description}
             </p>
           )}
-        </section>
+        </div>
       )}
 
-      <section style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem 2rem' }}>
-        {isLoading ? (
+      {isLoading ? (
+        <div style={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          padding: '4rem', color: '#9CA3AF',
+        }}>
           <div style={{
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            padding: '4rem', color: 'var(--color-text-light)'
-          }}>
-            <div style={{
-              width: '40px', height: '40px', border: '4px solid var(--color-bg-tertiary)',
-              borderTop: '4px solid var(--color-asrs-orange)',
-              borderRadius: '50%', animation: 'spin 1s linear infinite'
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <span style={{ marginLeft: '1rem', fontSize: '1.1rem' }}>Loading report...</span>
-          </div>
-        ) : error ? (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--color-error)', fontSize: '1.1rem' }}>{error}</p>
-          </div>
-        ) : reportData ? (
-          <>
-            {renderConfigSummary()}
-            <ReportDashboard
-              reportData={reportData}
-              trendData={trendData}
-              selectedInitiative={selectedInitiative}
-              userRole={userRole}
-            />
-          </>
-        ) : (
-          <div className="asrs-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--color-text-light)', fontSize: '1.1rem' }}>
-              No report data available for this initiative.
-            </p>
-          </div>
-        )}
-      </section>
-    </div>
+            width: '40px', height: '40px', border: '4px solid #E5E7EB',
+            borderTop: '4px solid #E67E22',
+            borderRadius: '50%', animation: 'spin 1s linear infinite',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <span style={{ marginLeft: '1rem', fontSize: '1.1rem' }}>Loading report...</span>
+        </div>
+      ) : error ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: '#DC2626', fontSize: '1.1rem' }}>{error}</p>
+        </div>
+      ) : reportData ? (
+        <>
+          {renderConfigSummary()}
+          <ReportDashboard
+            reportData={reportData}
+            trendData={trendData}
+            selectedInitiative={selectedInitiative}
+            userRole={userRole}
+          />
+        </>
+      ) : (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: '#9CA3AF', fontSize: '1.1rem' }}>
+            No report data available for this initiative.
+          </p>
+        </div>
+      )}
+    </PageLayout>
   );
 }

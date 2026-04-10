@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import ReportDashboard from '@/components/ReportDashboard';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
@@ -17,6 +18,9 @@ export default function HistoricalReportsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedInitiativeId, setSelectedInitiativeId] = useState('');
+
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState('All');
 
   // Comparison
   const [selectedIds, setSelectedIds] = useState([]);
@@ -99,6 +103,7 @@ export default function HistoricalReportsPage() {
     setStartDate('');
     setEndDate('');
     setSelectedInitiativeId('');
+    setStatusFilter('All');
   }
 
   function downloadCsv(report) {
@@ -221,7 +226,14 @@ export default function HistoricalReportsPage() {
     ? selectedIds.map((id) => reports.find((r) => r.id === id)).filter(Boolean)
     : [];
 
-  const monthGroups = groupByMonth(reports);
+  const STATUS_FILTERS = ['All', 'Published', 'Draft', 'Archived'];
+
+  const visibleReports = reports.filter((r) => {
+    if (statusFilter === 'All') return true;
+    return (r.status || '').toLowerCase() === statusFilter.toLowerCase();
+  });
+
+  const monthGroups = groupByMonth(visibleReports);
 
   function getFormatPill(format) {
     if (!format) return null;
@@ -233,13 +245,16 @@ export default function HistoricalReportsPage() {
   }
 
   return (
-    <PageLayout title="Historical">
+    <PageLayout title="Historical Reports">
       <div style={{ padding: '0' }}>
         {/* Page heading */}
         <div style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>
-            Report History
+            Historical Reports
           </h1>
+          <p style={{ color: '#6B7280', marginTop: '0.25rem', fontSize: '0.9rem' }}>
+            Browse, filter, compare, and download previously generated reports.
+          </p>
         </div>
 
         {/* Stats Row */}
@@ -310,6 +325,35 @@ export default function HistoricalReportsPage() {
                 ))}
               </select>
             </div>
+            {/* Status pill filters */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Status
+              </label>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                {STATUS_FILTERS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '999px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      border: '1px solid',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      backgroundColor: statusFilter === s ? '#E67E22' : '#F9FAFB',
+                      color: statusFilter === s ? '#fff' : '#374151',
+                      borderColor: statusFilter === s ? '#E67E22' : '#E5E7EB',
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={handleClearFilters}
               style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 500, borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff', cursor: 'pointer', alignSelf: 'flex-end' }}
@@ -355,7 +399,7 @@ export default function HistoricalReportsPage() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             <span style={{ marginLeft: '1rem' }}>Loading reports...</span>
           </div>
-        ) : reports.length === 0 ? (
+        ) : visibleReports.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>
             No reports found matching your filters.
           </div>
@@ -441,12 +485,14 @@ export default function HistoricalReportsPage() {
                         >
                           Download
                         </button>
-                        <button
-                          onClick={() => downloadCsv(r)}
-                          style={{ fontSize: '0.83rem', fontWeight: 600, color: '#E67E22', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0' }}
+                        <Link
+                          href={`/report-creation/${r.id}`}
+                          style={{ fontSize: '0.83rem', fontWeight: 600, color: '#E67E22', textDecoration: 'none', padding: '0.25rem 0' }}
+                          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
                         >
-                          View
-                        </button>
+                          View Report
+                        </Link>
                       </div>
                     </div>
                   );
