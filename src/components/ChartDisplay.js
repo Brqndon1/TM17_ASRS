@@ -26,8 +26,10 @@ export default function ChartDisplay({ chartData }) {
   return (
     <div className="chart-grid">
       {entries.map(([label, data]) => {
-        // Decide chart type: use pie for <= 8 items, bar for more
-        const usePie = data.length <= 8;
+        // Use bar chart when values are numeric/ordered or there are many items
+        const allNumeric = data.every(d => !isNaN(Number(d.name)));
+        const looksNumeric = /\b(score|rating|count|size|number|hours|days|amount)\b/i.test(label);
+        const usePie = !allNumeric && !looksNumeric && data.length <= 6;
 
         return (
           <div key={label} className="asrs-card">
@@ -66,12 +68,26 @@ export default function ChartDisplay({ chartData }) {
                   })()}
                 </div>
               </>
+            ) : allNumeric ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Count" radius={[4, 4, 0, 0]} fill="#E67E22">
+                    {data.map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(200, data.length * 35)}>
                 <BarChart data={data} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                   <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />
                   <Tooltip />
                   <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]}>
                     {data.map((_, index) => (
