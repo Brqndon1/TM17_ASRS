@@ -1,10 +1,24 @@
 import OpenAI from 'openai';
 
+function resolveApiKey() {
+  try {
+    const db = require('@/lib/db').default;
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'openai_api_key'").get();
+    if (row?.value) return row.value;
+  } catch {
+    // DB not ready or import cycle
+  }
+  return process.env.OPENAI_API_KEY || null;
+}
+
 let _openai = null;
+let _lastKey = null;
 function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) return null;
-  if (!_openai) {
-    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const key = resolveApiKey();
+  if (!key) return null;
+  if (!_openai || key !== _lastKey) {
+    _openai = new OpenAI({ apiKey: key });
+    _lastKey = key;
   }
   return _openai;
 }

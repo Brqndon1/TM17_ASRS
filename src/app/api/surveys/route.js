@@ -191,6 +191,7 @@ export async function POST(request) {
       submittedAt: submissionInfo?.submittedAt || new Date().toISOString(),
       survey: submissionInfo,
       report: reportData,
+      ai_configured: reportData?.aiGenerated !== false || !reportData?.error,
     });
   } catch (error) {
     const errorMessage = String(error?.message || '');

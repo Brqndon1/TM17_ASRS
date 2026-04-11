@@ -691,6 +691,13 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_distribution_dates ON survey_distribution(start_date, end_date);
     CREATE INDEX IF NOT EXISTS idx_session_user_id ON session(user_id);
     CREATE INDEX IF NOT EXISTS idx_session_expires_at ON session(expires_at);
+
+    -- App settings: key-value store for runtime configuration
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
     `);
 
   // Survey seeding removed — survey templates are managed via the DB directly.

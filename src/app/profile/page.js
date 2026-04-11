@@ -97,6 +97,14 @@ export default function ProfilePage() {
   const [deleteError,   setDeleteError]   = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // API Key state (admin only)
+  const [apiKeyHint, setApiKeyHint]     = useState(null);
+  const [apiKeySource, setApiKeySource] = useState('none');
+  const [newApiKey, setNewApiKey]       = useState('');
+  const [apiKeyError, setApiKeyError]   = useState('');
+  const [apiKeySuccess, setApiKeySuccess] = useState('');
+  const [savingApiKey, setSavingApiKey] = useState(false);
+
   // Password change visibility
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
@@ -120,7 +128,43 @@ export default function ProfilePage() {
       })
       .catch(() => setPageError('Could not load your profile. Please try again.'))
       .finally(() => setLoading(false));
+
+    // Load API key status for admin
+    if (user.user_type === 'admin') {
+      apiFetch('/api/settings')
+        .then((res) => res.json())
+        .then((data) => {
+          setApiKeyHint(data.openai_key_hint || null);
+          setApiKeySource(data.openai_source || 'none');
+        })
+        .catch(() => {});
+    }
   }, [user]);
+
+  async function handleSaveApiKey() {
+    setApiKeyError('');
+    setApiKeySuccess('');
+    setSavingApiKey(true);
+    try {
+      const res = await apiFetch('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ openai_api_key: newApiKey }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to save');
+      setApiKeySuccess(newApiKey ? 'API key saved successfully.' : 'API key removed.');
+      setNewApiKey('');
+      // Refresh the hint
+      const refreshRes = await apiFetch('/api/settings');
+      const refreshData = await refreshRes.json();
+      setApiKeyHint(refreshData.openai_key_hint || null);
+      setApiKeySource(refreshData.openai_source || 'none');
+    } catch (err) {
+      setApiKeyError(err.message || 'Failed to save API key.');
+    } finally {
+      setSavingApiKey(false);
+    }
+  }
 
   function handlePictureChange(e) {
     const file = e.target.files?.[0];
@@ -453,6 +497,64 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+
+        {/* API Key Settings — admin only */}
+        {profile?.user_type === 'admin' && (
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="card-header" style={{ marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1F2937', margin: 0 }}>AI Settings</h3>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#6B7280', marginBottom: '1rem' }}>
+              Configure your OpenAI API key to enable AI-powered survey analysis and report insights.
+            </p>
+
+            {/* Current status */}
+            <div style={{
+              padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem',
+              backgroundColor: apiKeySource !== 'none' ? '#D1FAE5' : '#FEF3C7',
+              border: `1px solid ${apiKeySource !== 'none' ? '#A7F3D0' : '#FDE68A'}`,
+            }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: apiKeySource !== 'none' ? '#065F46' : '#92400E' }}>
+                {apiKeySource !== 'none'
+                  ? `API key configured (${apiKeySource === 'database' ? 'saved in settings' : 'from environment variable'})`
+                  : 'No API key configured — AI features are disabled'}
+              </div>
+              {apiKeyHint && (
+                <div style={{ fontSize: '0.78rem', color: '#6B7280', marginTop: '0.25rem' }}>
+                  Key: {apiKeyHint}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: '0.85rem' }}>
+              <label style={labelStyle}>OpenAI API Key</label>
+              <input
+                type="password"
+                value={newApiKey}
+                onChange={(e) => setNewApiKey(e.target.value)}
+                placeholder={apiKeyHint ? 'Enter new key to replace existing' : 'sk-...'}
+                style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+              />
+              <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.35rem' }}>
+                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" style={{ color: '#E67E22' }}>platform.openai.com</a>. Leave blank and save to remove the key.
+              </p>
+            </div>
+
+            {apiKeyError && <p style={{ color: '#C0392B', fontSize: '0.85rem', margin: '0.5rem 0' }}>{apiKeyError}</p>}
+            {apiKeySuccess && <p style={{ color: '#27AE60', fontSize: '0.85rem', margin: '0.5rem 0' }}>{apiKeySuccess}</p>}
+
+            <button
+              onClick={handleSaveApiKey}
+              disabled={savingApiKey}
+              className="btn-primary"
+              style={{ padding: '0.55rem 1.5rem', fontSize: '0.9rem' }}
+            >
+              {savingApiKey ? 'Saving...' : 'Save API Key'}
+            </button>
+          </div>
+        )}
 
         {/* Recent Activity card */}
         <div className="card">

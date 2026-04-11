@@ -1,11 +1,28 @@
 import OpenAI from 'openai';
 
+// Resolve the API key: check DB app_settings first, then env var
+function resolveApiKey() {
+  // Check DB setting first
+  try {
+    const db = require('@/lib/db').default;
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'openai_api_key'").get();
+    if (row?.value) return row.value;
+  } catch {
+    // DB not ready yet or import cycle — fall through
+  }
+  return process.env.OPENAI_API_KEY || null;
+}
+
 // Lazily initialize OpenAI client (only when an API key is available)
 let _openai = null;
+let _lastKey = null;
 function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) return null;
-  if (!_openai) {
-    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const key = resolveApiKey();
+  if (!key) return null;
+  // Re-create client if the key changed (e.g. user updated it at runtime)
+  if (!_openai || key !== _lastKey) {
+    _openai = new OpenAI({ apiKey: key });
+    _lastKey = key;
   }
   return _openai;
 }
@@ -60,11 +77,11 @@ Format your response as a JSON object with the following structure:
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
-          content: 'You are an expert data analyst specializing in survey analysis. Provide clear, actionable insights based on survey responses.',
+          content: 'You are an expert data analyst specializing in survey analysis. Provide clear, actionable insights based on survey responses. Always respond with valid JSON.',
         },
         {
           role: 'user',
