@@ -1,5 +1,13 @@
 import { initializeDatabase, db } from '@/lib/db';
 
+function getPivotValueColumn(fieldType) {
+  if (fieldType === 'number' || fieldType === 'rating') return 'sv.value_number';
+  if (fieldType === 'date') return 'sv.value_date';
+  if (fieldType === 'boolean' || fieldType === 'yesno') return 'sv.value_bool';
+  if (fieldType === 'json') return 'sv.value_json';
+  return 'sv.value_text';
+}
+
 /**
  * queryTableData — Pivots EAV submission_value rows into flat table rows
  * for a given initiative.
@@ -23,7 +31,7 @@ export function queryTableData(database, initiativeId) {
   // Fall back to field_key if label is empty; deduplicate by appending index
   const usedLabels = new Set();
   const pivotCols = fields.map(f => {
-    const valCol = f.field_type === 'number' ? 'sv.value_number' : 'sv.value_text';
+    const valCol = getPivotValueColumn(f.field_type);
     let label = f.field_label || f.field_key;
     if (usedLabels.has(label)) {
       label = `${label} (${f.field_id})`;

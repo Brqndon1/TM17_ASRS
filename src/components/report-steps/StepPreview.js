@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import DataTable from '@/components/DataTable';
 import { computeTrendData, processReportData, validateTrendConfig } from '@/lib/report-engine';
+import { derivePreviewAttributes } from '@/lib/report-preview';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
@@ -17,10 +18,14 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
   const reportName = reportConfig.reportName;
 
   const [viewMode, setViewMode] = useState('table');
+  const previewAttributes = useMemo(
+    () => derivePreviewAttributes(selectedAttributes || [], tableData || []),
+    [selectedAttributes, tableData]
+  );
 
   // Run the full pipeline client-side for preview
   const { filteredData, metrics, trendData, explainability } = useMemo(() => {
-    const attributes = selectedAttributes || [];
+    const attributes = previewAttributes;
     const trendConfig = rawTrendConfig || { variables: [], enabledCalc: true, enabledDisplay: true };
 
     if (!tableData || tableData.length === 0) {
@@ -54,7 +59,7 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
         })
         : [],
     };
-  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, selectedAttributes, rawTrendConfig, selectedInitiativeId, reportName]);
+  }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, previewAttributes, rawTrendConfig, selectedInitiativeId, reportName]);
 
   // Build human-readable config summary
   const activeFilterEntries = Object.entries(reportConfig.filters || {}).filter(([, v]) => v && v !== 'All');

@@ -100,7 +100,10 @@ export default function Home() {
             </h2>
             <p style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>{dateStr}</p>
           </div>
-          <Link href="/survey" className="btn-primary">Take Survey</Link>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href="/survey" className="btn-primary">Take Survey</Link>
+            <Link href="/reporting" className="btn-outline">View Reports</Link>
+          </div>
         </div>
 
         {/* ── Available Surveys ── */}
@@ -164,8 +167,8 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {publishedReports.map((report) => (
-                    <tr key={report.id || report.report_id}>
-                      <td style={{ fontWeight: 500, color: '#111827' }}>{report.title || report.name || 'Report'}</td>
+                    <tr key={report.id || report.report_id} style={{ cursor: 'pointer' }} onClick={() => router.push('/reporting')}>
+                      <td style={{ fontWeight: 500, color: '#E67E22' }}>{report.title || report.name || 'Report'}</td>
                       <td>{report.initiative_name || '—'}</td>
                       <td style={{ color: '#6B7280' }}>{formatDate(report.published_at || report.created_at)}</td>
                     </tr>

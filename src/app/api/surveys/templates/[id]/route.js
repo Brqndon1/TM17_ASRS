@@ -149,6 +149,57 @@ export async function GET(request, context) {
   }
 }
 
+export async function PUT(request, context) {
+  try {
+    const auth = requirePermission(request, db, 'forms.create');
+    if (auth.error) return auth.error;
+
+    const params = await context.params;
+    const templateId = Number(params.id);
+    if (!templateId || Number.isNaN(templateId)) {
+      return new Response(JSON.stringify({ error: 'Invalid template ID' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const existing = db.prepare('SELECT * FROM form WHERE form_id = ?').get(templateId);
+    if (!existing) {
+      return new Response(JSON.stringify({ error: 'Template not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const body = await request.json();
+    const now = new Date().toISOString();
+
+    // Update basic fields
+    if (body.title !== undefined) {
+      db.prepare('UPDATE form SET form_name = ?, updated_at = ? WHERE form_id = ?').run(String(body.title).trim(), now, templateId);
+    }
+    if (body.description !== undefined) {
+      db.prepare('UPDATE form SET description = ?, updated_at = ? WHERE form_id = ?').run(String(body.description).trim(), now, templateId);
+    }
+    if (body.published !== undefined) {
+      db.prepare('UPDATE form SET is_published = ?, updated_at = ? WHERE form_id = ?').run(body.published ? 1 : 0, now, templateId);
+    }
+    if (body.status !== undefined) {
+      // Map status to is_published: 'active' = published, 'draft'/'archived' = unpublished
+      const isPublished = body.status === 'active' ? 1 : 0;
+      db.prepare('UPDATE form SET is_published = ?, updated_at = ? WHERE form_id = ?').run(isPublished, now, templateId);
+    }
+
+    logAudit(db, {
+      event: 'survey.updated',
+      userEmail: auth.user.email,
+      targetType: 'survey',
+      targetId: String(templateId),
+      payload: { title: body.title, status: body.status },
+    });
+
+    const updated = db.prepare('SELECT form_id AS id, form_name AS title, description, is_published AS published, updated_at FROM form WHERE form_id = ?').get(templateId);
+    return new Response(JSON.stringify({ success: true, template: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  } catch (err) {
+    console.error('Error updating survey template:', err);
+    return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
 export async function DELETE(request, context) {
   try {
     const auth = requirePermission(request, db, 'forms.create');

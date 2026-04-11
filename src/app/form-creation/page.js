@@ -113,7 +113,7 @@ export default function FormCreationPage() {
       field_label: field.field_label,
       field_type: field.field_type,
       scope: field.scope,
-      required: !!field.is_required_default,
+      required: true,
       help_text: '',
       validation_rules: null,
       options: needsOptions ? (field.options || ['Option 1', 'Option 2']) : [],
@@ -127,9 +127,11 @@ export default function FormCreationPage() {
   };
 
   const updateFieldConfig = (fieldId, key, value) => {
-    setSelectedFields(selectedFields.map(f =>
-      f.field_id === fieldId ? { ...f, [key]: value } : f
-    ));
+    setSelectedFields(selectedFields.map(f => {
+      // Prevent toggling required off on locked fields
+      if (f.field_id === fieldId && key === 'required' && f._locked) return f;
+      return f.field_id === fieldId ? { ...f, [key]: value } : f;
+    }));
   };
 
   const moveField = (index, direction) => {
@@ -145,6 +147,17 @@ export default function FormCreationPage() {
     if (!formName.trim()) return alert('Please enter a form name');
     if (!selectedInitiative) return alert('Please select an initiative');
     if (selectedFields.length === 0) return alert('Please add at least one field');
+
+    const customFields = selectedFields.filter(f => !f._locked);
+    if (customFields.length === 0) return alert('Please add at least one custom question beyond the required information fields.');
+
+    // Check for fields with empty labels
+    const emptyLabel = selectedFields.find(f => !f._locked && !f.field_label.trim());
+    if (emptyLabel) return alert('Please enter text for all questions before saving.');
+
+    // Check for select/radio/checkbox fields with no options
+    const emptyOptions = selectedFields.find(f => ['select', 'radio', 'checkbox'].includes(f.field_type) && (!f.options || f.options.length === 0 || f.options.every(o => !o.trim())));
+    if (emptyOptions) return alert(`Please add options for "${emptyOptions.field_label || 'untitled question'}" before saving.`);
 
     setSaving(true);
     try {
@@ -426,13 +439,15 @@ export default function FormCreationPage() {
 
                   {/* Config row */}
                   <div style={{ display: 'flex', gap: '12px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#6B7280', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: sf.required ? '#DC2626' : '#6B7280', cursor: sf._locked ? 'not-allowed' : 'pointer', fontWeight: sf.required ? 600 : 400 }}>
                       <input
                         type="checkbox"
                         checked={sf.required}
                         onChange={e => updateFieldConfig(sf.field_id, 'required', e.target.checked)}
+                        disabled={sf._locked}
+                        style={{ accentColor: '#E67E22' }}
                       />
-                      Required
+                      Required {sf._locked && '(locked)'}
                     </label>
                     <input
                       placeholder="Help text (optional)"
@@ -522,11 +537,34 @@ export default function FormCreationPage() {
               />
             </div>
 
-            {selectedFields.length > 0 && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6', fontSize: '12px', color: '#6B7280' }}>
-                <strong style={{ color: '#111827' }}>{selectedFields.length}</strong> question{selectedFields.length !== 1 ? 's' : ''} added
-              </div>
-            )}
+            {selectedFields.length > 0 && (() => {
+              const requiredCount = selectedFields.filter(f => f.required).length;
+              const optionalCount = selectedFields.length - requiredCount;
+              return (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #F3F4F6', fontSize: '12px' }}>
+                  <div style={{ color: '#6B7280', marginBottom: optionalCount > 0 ? '8px' : 0 }}>
+                    <strong style={{ color: '#111827' }}>{selectedFields.length}</strong> question{selectedFields.length !== 1 ? 's' : ''} &middot;{' '}
+                    <span style={{ color: '#16A34A', fontWeight: 600 }}>{requiredCount} required</span>
+                    {optionalCount > 0 && (
+                      <span style={{ color: '#D97706', fontWeight: 600 }}> &middot; {optionalCount} optional</span>
+                    )}
+                  </div>
+                  {optionalCount > 0 && (
+                    <div style={{
+                      padding: '6px 10px',
+                      backgroundColor: '#FFFBEB',
+                      border: '1px solid #FDE68A',
+                      borderRadius: '6px',
+                      color: '#92400E',
+                      fontSize: '11px',
+                      lineHeight: 1.4,
+                    }}>
+                      {optionalCount} field{optionalCount !== 1 ? 's are' : ' is'} optional. Users can skip {optionalCount !== 1 ? 'them' : 'it'} when filling out the survey.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Add a Question — tabbed interface */}
@@ -589,7 +627,7 @@ export default function FormCreationPage() {
                             field_label: t.label,
                             field_type: t.type,
                             scope: 'common',
-                            required: false,
+                            required: true,
                             help_text: '',
                             validation_rules: null,
                             options: needsOptions ? ['Option 1', 'Option 2'] : [],

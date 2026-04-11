@@ -35,7 +35,8 @@ export async function GET(request) {
       SELECT
         i.*,
         c.category_name,
-        (SELECT COUNT(*) FROM submission s WHERE s.initiative_id = i.initiative_id) AS participant_count,
+        (SELECT COUNT(*) FROM submission s WHERE s.initiative_id = i.initiative_id) AS submission_count,
+        (SELECT COUNT(DISTINCT s.submitted_by_user_id) FROM submission s WHERE s.initiative_id = i.initiative_id AND s.submitted_by_user_id IS NOT NULL) AS participant_count,
         (SELECT ROUND(AVG(
           CASE WHEN g.target_value > 0 THEN (g.current_value / g.target_value) * 100 ELSE 0 END
         ), 1) FROM initiative_goal g WHERE g.initiative_id = i.initiative_id) AS avg_score

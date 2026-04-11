@@ -33,7 +33,10 @@
         "Attendance Rate"
       ],
       "questions": [],
-      "settings": {}
+      "settings": {
+        "status": "Active",
+        "isPublic": false
+      }
     },
     {
       "id": 3,
@@ -143,17 +146,19 @@
       }
     },
     {
-      "id": 10,
-      "name": "g",
+      "id": 11,
+      "name": "Track and field",
       "description": "",
       "attributes": [
-        "Attendance Rate",
-        "Donation Value"
+        "Families Helped",
+        "Bags Collected",
+        "Team Placement",
+        "Semester"
       ],
       "questions": [],
       "settings": {
         "status": "Active",
-        "isPublic": false
+        "isPublic": true
       }
     }
   ]

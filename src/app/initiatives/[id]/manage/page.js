@@ -54,6 +54,8 @@ export default function InitiativeManagePage({ params }) {
   const [initiative, setInitiative] = useState(null);
   const [members, setMembers] = useState([]);
   const [participants, setParticipants] = useState([]);
+  const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [anonymousSubmissions, setAnonymousSubmissions] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -141,6 +143,8 @@ export default function InitiativeManagePage({ params }) {
       if (membersRes.ok && membersData.success) {
         setMembers(membersData.members || []);
         setParticipants(membersData.participants || []);
+        setTotalSubmissions(membersData.totalSubmissions || 0);
+        setAnonymousSubmissions(membersData.anonymousSubmissions || 0);
       }
 
       if (catData.relationships && catData.relationships.length > 0) {
@@ -410,7 +414,11 @@ export default function InitiativeManagePage({ params }) {
           <div className="stat-value">{members.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Survey Participants</div>
+          <div className="stat-label">Total Submissions</div>
+          <div className="stat-value">{totalSubmissions}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Known Participants</div>
           <div className="stat-value">{participants.length}</div>
         </div>
         <div className="stat-card">
@@ -440,7 +448,7 @@ export default function InitiativeManagePage({ params }) {
           Members ({members.length})
         </button>
         <button onClick={() => setActiveTab('participants')} style={tabStyle(activeTab === 'participants')}>
-          Survey Participants ({participants.length})
+          Submissions ({totalSubmissions})
         </button>
       </div>
 
@@ -793,14 +801,23 @@ export default function InitiativeManagePage({ params }) {
       {activeTab === 'participants' && (
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Survey Participants</h3>
+            <h3 className="card-title">Survey Submissions</h3>
           </div>
-          <p style={{ color: '#6B7280', fontSize: '0.85rem', marginTop: 0, marginBottom: '1rem' }}>
-            Users who have submitted surveys for this initiative.
+          <p style={{ color: '#6B7280', fontSize: '0.85rem', marginTop: 0, marginBottom: '0.5rem' }}>
+            {totalSubmissions} total submission{totalSubmissions !== 1 ? 's' : ''} for this initiative.
           </p>
-          {participants.length === 0 ? (
+          {anonymousSubmissions > 0 && (
+            <p style={{ color: '#D97706', fontSize: '0.82rem', margin: '0 0 1rem', padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px' }}>
+              {anonymousSubmissions} submission{anonymousSubmissions !== 1 ? 's' : ''} {anonymousSubmissions !== 1 ? 'are' : 'is'} not linked to a user account (anonymous or imported without user IDs).
+            </p>
+          )}
+          {participants.length === 0 && totalSubmissions === 0 ? (
             <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem', fontSize: '0.9rem' }}>
               No survey submissions yet for this initiative.
+            </p>
+          ) : participants.length === 0 && totalSubmissions > 0 ? (
+            <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem', fontSize: '0.9rem' }}>
+              All {totalSubmissions} submission{totalSubmissions !== 1 ? 's are' : ' is'} anonymous (no linked user accounts).
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>

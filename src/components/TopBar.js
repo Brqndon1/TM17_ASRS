@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
+import {
+  countUnreadNotifications,
+  getReadTimestampForOpenedNotifications,
+} from '@/lib/notifications';
 
 function timeAgo(timestamp) {
   if (!timestamp) return '';
@@ -80,21 +84,24 @@ export default function TopBar({ title }) {
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
+    const timeoutId = setTimeout(() => {
+      fetchNotifications();
+    }, 0);
     const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [fetchNotifications]);
 
-  const unreadCount = lastCheckedAt
-    ? notifications.filter(n => n.timestamp && new Date(n.timestamp) > new Date(lastCheckedAt)).length
-    : notifications.length;
+  const unreadCount = countUnreadNotifications(notifications, lastCheckedAt);
 
   function handleBellClick() {
     setShowNotifications(prev => {
       if (!prev) {
-        const now = new Date().toISOString();
-        setLastCheckedAt(now);
-        localStorage.setItem('notifications_last_checked', now);
+        const readTimestamp = getReadTimestampForOpenedNotifications(notifications, new Date().toISOString());
+        setLastCheckedAt(readTimestamp);
+        localStorage.setItem('notifications_last_checked', readTimestamp);
       }
       return !prev;
     });

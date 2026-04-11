@@ -414,8 +414,8 @@ function InitiativeCreationContent() {
                   <th>Initiative</th>
                   <th>Category</th>
                   <th>Created</th>
+                  <th>Submissions</th>
                   <th>Participants</th>
-                  <th>Surveys</th>
                   <th>Status</th>
                   {canCreate && <th>Actions</th>}
                 </tr>
@@ -428,8 +428,8 @@ function InitiativeCreationContent() {
                       <td style={{ fontWeight: 600, color: '#111827' }}>{initiative.name}</td>
                       <td style={{ color: '#6B7280' }}>{initiative.category || '—'}</td>
                       <td style={{ color: '#6B7280' }}>{formatDate(initiative.created_at)}</td>
+                      <td style={{ color: '#6B7280' }}>{initiative.submission_count ?? '—'}</td>
                       <td style={{ color: '#6B7280' }}>{initiative.participant_count ?? '—'}</td>
-                      <td style={{ color: '#6B7280' }}>{initiative.survey_count ?? '—'}</td>
                       <td>{statusPill(s)}</td>
                       {canCreate && (
                         <td>

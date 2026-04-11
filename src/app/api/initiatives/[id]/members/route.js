@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
       ORDER BY im.joined_at DESC
     `).all(initiativeId);
 
-    // Get participants who submitted surveys for this initiative
+    // Get participants who submitted surveys for this initiative (linked users)
     const participants = db.prepare(`
       SELECT DISTINCT u.user_id, u.first_name, u.last_name, u.email, u.phone_number,
              ut.type AS user_type,
@@ -38,12 +38,23 @@ export async function GET(request, { params }) {
       ORDER BY MIN(s.submitted_at) DESC
     `).all(initiativeId);
 
+    // Get total submission count and anonymous count for this initiative
+    const submissionStats = db.prepare(`
+      SELECT
+        COUNT(*) AS total_submissions,
+        COUNT(CASE WHEN submitted_by_user_id IS NULL THEN 1 END) AS anonymous_submissions
+      FROM submission
+      WHERE initiative_id = ?
+    `).get(initiativeId);
+
     return NextResponse.json({
       success: true,
       members,
       participants,
       totalMembers: members.length,
       totalParticipants: participants.length,
+      totalSubmissions: submissionStats?.total_submissions || 0,
+      anonymousSubmissions: submissionStats?.anonymous_submissions || 0,
     });
   } catch (error) {
     console.error('GET /api/initiatives/[id]/members error:', error);

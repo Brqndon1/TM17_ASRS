@@ -299,6 +299,27 @@ function initializeDatabase() {
       )
     `);
 
+    // Migration: ensure public users have reporting.view permission
+    try {
+      const publicHasReporting = db.prepare(`
+        SELECT 1 FROM role_permission rp
+        JOIN user_type ut ON ut.user_type_id = rp.user_type_id
+        JOIN permission p ON p.permission_id = rp.permission_id
+        WHERE ut.type = 'public' AND p.key = 'reporting.view'
+      `).get();
+      if (!publicHasReporting) {
+        db.prepare(`
+          INSERT OR IGNORE INTO role_permission (user_type_id, permission_id)
+          SELECT ut.user_type_id, p.permission_id
+          FROM user_type ut, permission p
+          WHERE ut.type = 'public' AND p.key = 'reporting.view'
+        `).run();
+        console.log('[db] Added reporting.view permission for public users');
+      }
+    } catch (e) {
+      console.warn('[db] public reporting permission migration:', e.message);
+    }
+
     // ── Design-doc tables ──────────────────────────────────
 
   db.exec(`
@@ -827,6 +848,7 @@ function initializeDatabase() {
   for (const key of staffPermKeys) seedRolePermission('staff', key);
 
   seedRolePermission('public', 'surveys.take');
+  seedRolePermission('public', 'reporting.view');
 
   // ── Seed initiative data from JSON files ──────────────
   function toCamelKey(displayName) {
