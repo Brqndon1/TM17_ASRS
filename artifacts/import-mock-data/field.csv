@@ -1,0 +1,7 @@
+field_key,field_label,field_type,scope,initiative_id,is_filterable,is_required_default
+attendanceConfidence,How confident are you in attending the next session?,rating,common,,1,0
+caregiverParticipation,Caregiver Participation Count,number,common,,1,0
+resourceRequestDate,Date Resources Were Requested,date,staff_only,,0,0
+consentReceived,Consent Received,boolean,common,,1,1
+preferredWorkshopTrack,Preferred Workshop Track,select,common,,1,0
+esportsMentorInterest,Interest in Esports Mentorship,text,initiative_specific,1,1,0

@@ -1,0 +1,38 @@
+[
+  {
+    "field_id": 7773,
+    "option_value": "option_a",
+    "display_label": "Option A",
+    "display_order": 0
+  },
+  {
+    "field_id": 7773,
+    "option_value": "option_b",
+    "display_label": "Option B",
+    "display_order": 1
+  },
+  {
+    "field_id": 7775,
+    "option_value": "photo_release",
+    "display_label": "Photo Release",
+    "display_order": 0
+  },
+  {
+    "field_id": 7775,
+    "option_value": "media_consent",
+    "display_label": "Media Consent",
+    "display_order": 1
+  },
+  {
+    "field_id": 9520,
+    "option_value": "science_track",
+    "display_label": "Science Track",
+    "display_order": 0
+  },
+  {
+    "field_id": 9520,
+    "option_value": "arts_track",
+    "display_label": "Arts Track",
+    "display_order": 1
+  }
+]

@@ -8,6 +8,7 @@ import ReportDashboard from '@/components/ReportDashboard';
 import ReasonModal from '@/components/ReasonModal';
 import { normalizeSnapshot } from '@/lib/report-snapshot';
 import { apiFetch } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/auth/use-auth-store';
 
 const PDF_DISPLAY_OPTIONS = [
   { value: 'charts', label: 'Charts only' },
@@ -27,6 +28,7 @@ const CHART_POINT_LIMIT = 12;
 const STATUS_FILTERS = ['All', 'Published', 'Draft', 'Archived', 'Completed'];
 
 export default function ReportingPage() {
+  const { user: authUser, hydrated } = useAuthStore();
   const [userRole, setUserRole] = useState('public');
   const [activeTab, setActiveTab] = useState('published');
 
@@ -81,12 +83,16 @@ export default function ReportingPage() {
   }, []);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setUserRole(parsed.user_type || 'public');
+    if (hydrated && authUser) {
+      setUserRole(authUser.user_type || 'public');
+    } else {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setUserRole(parsed.user_type || 'public');
+      }
     }
-  }, []);
+  }, [hydrated, authUser]);
 
   useEffect(() => {
     loadInitialData();
@@ -132,7 +138,7 @@ export default function ReportingPage() {
         }
       } catch {}
       const isStaff = role === 'staff' || role === 'admin';
-      const activeMap = pubMap;
+      const activeMap = isStaff ? map : pubMap;
 
       // For public users, filter initiatives to only those with published reports
       const visibleInitiatives = isStaff

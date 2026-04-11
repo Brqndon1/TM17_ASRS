@@ -435,12 +435,18 @@ function InitiativeCreationContent() {
                         <td>
                           <span
                             style={{ color: '#E67E22', cursor: 'pointer', fontSize: 13, fontWeight: 500, marginRight: 12 }}
-                            onClick={() => router.push(`/initiative-creation?edit=${initiative.id}`)}
+                            onClick={() => router.push(`/initiatives/${initiative.id}/manage`)}
+                          >
+                            Manage
+                          </span>
+                          <span
+                            style={{ color: '#E67E22', cursor: 'pointer', fontSize: 13, fontWeight: 500, marginRight: 12 }}
+                            onClick={() => router.push(`/initiatives/${initiative.id}/manage?tab=edit`)}
                           >
                             Edit
                           </span>
                           <span
-                            style={{ color: '#6B7280', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                            style={{ color: '#6B7280', cursor: 'pointer', fontSize: 13, fontWeight: 500, marginRight: 12 }}
                             onClick={async () => {
                               if (!confirm(`Archive "${initiative.name}"? This will mark it as archived.`)) return;
                               try {
@@ -462,6 +468,27 @@ function InitiativeCreationContent() {
                             }}
                           >
                             Archive
+                          </span>
+                          <span
+                            style={{ color: '#DC2626', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                            onClick={async () => {
+                              if (!confirm(`Delete "${initiative.name}"? This will permanently remove the initiative and all associated data.`)) return;
+                              try {
+                                const resp = await apiFetch(`/api/initiatives/${initiative.id}`, {
+                                  method: 'DELETE',
+                                });
+                                if (resp.ok) {
+                                  fetchInitiatives();
+                                } else {
+                                  const data = await resp.json();
+                                  alert(data.error || 'Failed to delete initiative');
+                                }
+                              } catch {
+                                alert('Connection error. Please try again.');
+                              }
+                            }}
+                          >
+                            Delete
                           </span>
                         </td>
                       )}

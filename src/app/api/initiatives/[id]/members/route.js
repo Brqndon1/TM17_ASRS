@@ -1,0 +1,134 @@
+import { NextResponse } from 'next/server';
+import { getServiceContainer } from '@/lib/container/service-container';
+import { requirePermission } from '@/lib/auth/server-auth';
+
+export async function GET(request, { params }) {
+  try {
+    const { db } = getServiceContainer();
+    const auth = requirePermission(request, db, 'initiatives.manage', { requireCsrf: false });
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const initiativeId = Number(id);
+
+    // Get explicit members from initiative_member table
+    const members = db.prepare(`
+      SELECT im.member_id, im.role, im.joined_at,
+             u.user_id, u.first_name, u.last_name, u.email, u.phone_number,
+             ut.type AS user_type
+      FROM initiative_member im
+      JOIN user u ON u.user_id = im.user_id
+      LEFT JOIN user_type ut ON ut.user_type_id = u.user_type_id
+      WHERE im.initiative_id = ?
+      ORDER BY im.joined_at DESC
+    `).all(initiativeId);
+
+    // Get participants who submitted surveys for this initiative
+    const participants = db.prepare(`
+      SELECT DISTINCT u.user_id, u.first_name, u.last_name, u.email, u.phone_number,
+             ut.type AS user_type,
+             MIN(s.submitted_at) AS first_submission,
+             COUNT(s.submission_id) AS submission_count
+      FROM submission s
+      JOIN user u ON u.user_id = s.submitted_by_user_id
+      LEFT JOIN user_type ut ON ut.user_type_id = u.user_type_id
+      WHERE s.initiative_id = ?
+        AND s.submitted_by_user_id IS NOT NULL
+      GROUP BY u.user_id
+      ORDER BY MIN(s.submitted_at) DESC
+    `).all(initiativeId);
+
+    return NextResponse.json({
+      success: true,
+      members,
+      participants,
+      totalMembers: members.length,
+      totalParticipants: participants.length,
+    });
+  } catch (error) {
+    console.error('GET /api/initiatives/[id]/members error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request, { params }) {
+  try {
+    const { db } = getServiceContainer();
+    const auth = requirePermission(request, db, 'initiatives.manage');
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const initiativeId = Number(id);
+    const body = await request.json();
+    const { email, role } = body;
+
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+
+    // Find user by email
+    const user = db.prepare('SELECT user_id, first_name, last_name, email FROM user WHERE email = ?').get(email.trim().toLowerCase());
+    if (!user) {
+      return NextResponse.json({ error: `No user found with email "${email}"` }, { status: 404 });
+    }
+
+    // Check if already a member
+    const existing = db.prepare(
+      'SELECT member_id FROM initiative_member WHERE initiative_id = ? AND user_id = ?'
+    ).get(initiativeId, user.user_id);
+
+    if (existing) {
+      return NextResponse.json({ error: 'User is already a member of this initiative' }, { status: 409 });
+    }
+
+    const memberRole = role || 'participant';
+    const result = db.prepare(
+      'INSERT INTO initiative_member (initiative_id, user_id, role) VALUES (?, ?, ?)'
+    ).run(initiativeId, user.user_id, memberRole);
+
+    return NextResponse.json({
+      success: true,
+      member: {
+        member_id: result.lastInsertRowid,
+        user_id: user.user_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: memberRole,
+      },
+    });
+  } catch (error) {
+    console.error('POST /api/initiatives/[id]/members error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    const { db } = getServiceContainer();
+    const auth = requirePermission(request, db, 'initiatives.manage');
+    if (auth.error) return auth.error;
+
+    const { id } = await params;
+    const initiativeId = Number(id);
+    const url = new URL(request.url);
+    const memberId = url.searchParams.get('memberId');
+
+    if (!memberId) {
+      return NextResponse.json({ error: 'memberId is required' }, { status: 400 });
+    }
+
+    const result = db.prepare(
+      'DELETE FROM initiative_member WHERE member_id = ? AND initiative_id = ?'
+    ).run(Number(memberId), initiativeId);
+
+    if (result.changes === 0) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/initiatives/[id]/members error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

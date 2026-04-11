@@ -1,0 +1,18 @@
+[
+  {
+    "category_name": "community engagement",
+    "description": "Programs focused on outreach and family/community participation."
+  },
+  {
+    "category_name": "technology",
+    "description": "Programs centered on digital tools, STEM, or technical skill-building."
+  },
+  {
+    "category_name": "wellness",
+    "description": "Programs supporting student wellbeing and school climate."
+  },
+  {
+    "category_name": "student leadership",
+    "description": "Programs that develop voice, ownership, and peer leadership."
+  }
+]

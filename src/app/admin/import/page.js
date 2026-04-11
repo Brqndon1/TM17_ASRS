@@ -5,8 +5,82 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
+import {
+  DEFAULT_IMPORT_ORDER,
+  getImportFileType,
+  inferImportTable,
+  sortBatchFilesForExecution,
+  summarizeBatchResults,
+} from '@/lib/import-batch';
 
-const STEPS = ['upload', 'preview', 'result'];
+const STEPS = ['upload', 'review', 'result'];
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => resolve(event.target?.result ?? '');
+    reader.onerror = () => reject(new Error(`Failed to read "${file.name}"`));
+    reader.readAsText(file);
+  });
+}
+
+function readDirectoryEntries(reader) {
+  return new Promise((resolve, reject) => {
+    reader.readEntries(resolve, reject);
+  });
+}
+
+async function collectEntryFiles(entry) {
+  if (!entry) return [];
+
+  if (entry.isFile) {
+    return new Promise((resolve, reject) => {
+      entry.file((file) => resolve([file]), reject);
+    });
+  }
+
+  if (!entry.isDirectory) {
+    return [];
+  }
+
+  const reader = entry.createReader();
+  const collected = [];
+
+  while (true) {
+    const entries = await readDirectoryEntries(reader);
+    if (!entries.length) break;
+
+    for (const child of entries) {
+      const nestedFiles = await collectEntryFiles(child);
+      collected.push(...nestedFiles);
+    }
+  }
+
+  return collected;
+}
+
+async function collectDroppedFiles(dataTransfer) {
+  const items = Array.from(dataTransfer?.items ?? []);
+  if (!items.length) {
+    return Array.from(dataTransfer?.files ?? []);
+  }
+
+  const batches = await Promise.all(items.map(async (item) => {
+    const entry = typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
+    if (entry) {
+      return collectEntryFiles(entry);
+    }
+
+    const file = item.getAsFile?.();
+    return file ? [file] : [];
+  }));
+
+  return batches.flat();
+}
+
+function buildFileId(file, index) {
+  return `${file.name}-${file.lastModified}-${index}`;
+}
 
 export default function AdminImportPage() {
   const router = useRouter();
@@ -14,7 +88,6 @@ export default function AdminImportPage() {
   const fileInputRef = useRef(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Auth guard
   useEffect(() => {
     setIsMounted(true);
     if (!hydrated) return;
@@ -22,123 +95,327 @@ export default function AdminImportPage() {
     if (user.user_type !== 'admin') { router.push('/'); }
   }, [router, user, hydrated]);
 
-  // State
   const [tables, setTables] = useState([]);
   const [step, setStep] = useState('upload');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Upload step
-  const [selectedTable, setSelectedTable] = useState('');
   const [conflictMode, setConflictMode] = useState('skip');
-  const [fileName, setFileName] = useState('');
-  const [fileContent, setFileContent] = useState('');
-  const [fileType, setFileType] = useState('');
+  const [stagedFiles, setStagedFiles] = useState([]);
+  const [reviewItems, setReviewItems] = useState([]);
+  const [batchResult, setBatchResult] = useState(null);
+  const [dropActive, setDropActive] = useState(false);
 
-  // Preview step
-  const [previewData, setPreviewData] = useState(null);
-  const [columnMapping, setColumnMapping] = useState({});
-
-  // Result step
-  const [result, setResult] = useState(null);
-
-  // Fetch available tables
   useEffect(() => {
     if (!user || user.user_type !== 'admin') return;
     apiFetch('/api/admin/import')
       .then((r) => r.json())
-      .then((data) => { if (data.success) setTables(data.tables); })
-      .catch(() => {});
+      .then((data) => {
+        if (data.success) {
+          setTables(data.tables);
+        } else {
+          setError(data.error || 'Failed to load available tables');
+        }
+      })
+      .catch((err) => setError('Failed to connect to import API: ' + err.message));
   }, [user]);
 
-  function handleFileSelect(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const tableOptions = tables.length ? tables.map((table) => table.name) : DEFAULT_IMPORT_ORDER;
+  const tableMeta = new Map(tables.map((table) => [table.name, table]));
 
-    const name = file.name.toLowerCase();
-    let type = '';
-    if (name.endsWith('.csv')) type = 'csv';
-    else if (name.endsWith('.json')) type = 'json';
-    else {
-      setError('Please select a .csv or .json file');
+  async function stageFiles(fileList) {
+    if (!fileList?.length) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const nextFiles = await Promise.all(fileList.map(async (file, index) => {
+        const fileType = getImportFileType(file.name);
+        const inferredTable = inferImportTable(file.name, tableOptions);
+        const id = buildFileId(file, index);
+
+        if (!fileType) {
+          return {
+            id,
+            fileName: file.name,
+            fileType: null,
+            fileContent: '',
+            inferredTable,
+            targetTable: inferredTable ?? '',
+            stagingError: 'Unsupported file type. Use .csv or .json.',
+          };
+        }
+
+        try {
+          const fileContent = await readFileAsText(file);
+          return {
+            id,
+            fileName: file.name,
+            fileType,
+            fileContent,
+            inferredTable,
+            targetTable: inferredTable ?? '',
+            stagingError: '',
+          };
+        } catch (readError) {
+          return {
+            id,
+            fileName: file.name,
+            fileType,
+            fileContent: '',
+            inferredTable,
+            targetTable: inferredTable ?? '',
+            stagingError: readError.message,
+          };
+        }
+      }));
+
+      setStagedFiles(nextFiles);
+      setReviewItems([]);
+      setBatchResult(null);
+      setStep('upload');
+    } catch (stageError) {
+      setError(stageError.message);
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function handleFileSelect(event) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    stageFiles(selectedFiles);
+  }
+
+  async function handleDrop(event) {
+    event.preventDefault();
+    setDropActive(false);
+    const droppedFiles = await collectDroppedFiles(event.dataTransfer);
+    stageFiles(droppedFiles);
+  }
+
+  function updateStagedFile(fileId, updates) {
+    setStagedFiles((current) => current.map((file) => (
+      file.id === fileId ? { ...file, ...updates } : file
+    )));
+  }
+
+  function updateReviewItem(fileId, updater) {
+    setReviewItems((current) => current.map((item) => (
+      item.id === fileId ? updater(item) : item
+    )));
+  }
+
+  async function handlePreviewBatch() {
+    if (!stagedFiles.length) {
+      setError('Please add at least one file.');
       return;
     }
 
-    setError('');
-    setFileName(file.name);
-    setFileType(type);
-
-    const reader = new FileReader();
-    reader.onload = (evt) => setFileContent(evt.target.result);
-    reader.onerror = () => setError('Failed to read file');
-    reader.readAsText(file);
-  }
-
-  async function handlePreview() {
-    if (!selectedTable) { setError('Please select a target table'); return; }
-    if (!fileContent) { setError('Please select a file'); return; }
-
-    setLoading(true);
-    setError('');
-    try {
-      const res = await apiFetch('/api/admin/import?action=preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: selectedTable, fileContent, fileType, conflictMode }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Preview failed'); setLoading(false); return; }
-
-      setPreviewData(data);
-      setColumnMapping(data.autoMapping || {});
-      setStep('preview');
-    } catch (err) {
-      setError(err.message);
+    const blockingStagedFile = stagedFiles.find((file) => file.stagingError || !file.targetTable);
+    if (blockingStagedFile) {
+      setError(blockingStagedFile.stagingError || `Choose a target table for "${blockingStagedFile.fileName}".`);
+      return;
     }
-    setLoading(false);
-  }
 
-  async function handleExecute() {
     setLoading(true);
     setError('');
+
     try {
-      const res = await apiFetch('/api/admin/import?action=execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          table: selectedTable,
-          fileContent,
-          fileType,
-          conflictMode,
-          columnMapping,
-          previewToken: previewData.previewToken,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok && !data.validationErrors) {
-        setError(data.error || 'Import failed');
-        setLoading(false);
-        return;
+      const previewPlan = sortBatchFilesForExecution(stagedFiles, DEFAULT_IMPORT_ORDER);
+      const nextReviewItems = [];
+
+      for (const file of previewPlan) {
+        try {
+          const response = await apiFetch('/api/admin/import?action=preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              table: file.targetTable,
+              fileContent: file.fileContent,
+              fileType: file.fileType,
+              conflictMode,
+            }),
+          });
+          const data = await response.json();
+
+          if (!response.ok) {
+            nextReviewItems.push({
+              id: file.id,
+              fileName: file.fileName,
+              fileType: file.fileType,
+              fileContent: file.fileContent,
+              table: file.targetTable,
+              status: 'error',
+              error: data.error || 'Preview failed',
+              previewRows: [],
+              fileColumns: [],
+              dbColumns: [],
+              columnMapping: {},
+              totalRows: 0,
+            });
+            continue;
+          }
+
+          nextReviewItems.push({
+            id: file.id,
+            fileName: file.fileName,
+            fileType: file.fileType,
+            fileContent: file.fileContent,
+            table: file.targetTable,
+            status: 'ready',
+            error: '',
+            previewRows: data.previewRows ?? [],
+            fileColumns: data.fileColumns ?? [],
+            dbColumns: data.dbColumns ?? [],
+            columnMapping: data.autoMapping ?? {},
+            totalRows: data.totalRows ?? 0,
+            previewToken: data.previewToken,
+          });
+        } catch (requestError) {
+          nextReviewItems.push({
+            id: file.id,
+            fileName: file.fileName,
+            fileType: file.fileType,
+            fileContent: file.fileContent,
+            table: file.targetTable,
+            status: 'error',
+            error: requestError.message,
+            previewRows: [],
+            fileColumns: [],
+            dbColumns: [],
+            columnMapping: {},
+            totalRows: 0,
+          });
+        }
       }
-      setResult(data);
-      setStep('result');
-    } catch (err) {
-      setError(err.message);
+
+      setReviewItems(nextReviewItems);
+      setStep('review');
+
+      if (nextReviewItems.some((item) => item.status !== 'ready')) {
+        setError('Some files could not be previewed. Fix them before running the batch import.');
+      }
+    } finally {
+      setLoading(false);
     }
+  }
+
+  async function handleExecuteBatch() {
+    const executableItems = reviewItems.filter((item) => item.status === 'ready');
+    if (!executableItems.length) {
+      setError('No previewed files are ready to import.');
+      return;
+    }
+
+    if (reviewItems.some((item) => item.status !== 'ready')) {
+      setError('Resolve all preview errors before executing the batch import.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    const orderedItems = sortBatchFilesForExecution(executableItems, DEFAULT_IMPORT_ORDER);
+    const fileResults = [];
+    let halted = false;
+
+    for (const item of orderedItems) {
+      if (halted) {
+        fileResults.push({
+          id: item.id,
+          fileName: item.fileName,
+          table: item.table,
+          state: 'not_run',
+          success: false,
+          totalRows: item.totalRows ?? 0,
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          validationErrors: ['Not run because a previous file failed.'],
+        });
+        continue;
+      }
+
+      try {
+        const response = await apiFetch('/api/admin/import?action=execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: item.table,
+            fileContent: item.fileContent,
+            fileType: item.fileType,
+            conflictMode,
+            columnMapping: item.columnMapping,
+            previewToken: item.previewToken,
+          }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          fileResults.push({
+            id: item.id,
+            fileName: item.fileName,
+            table: item.table,
+            state: 'failed',
+            success: false,
+            totalRows: data.totalRows ?? item.totalRows ?? 0,
+            inserted: data.inserted ?? 0,
+            updated: data.updated ?? 0,
+            skipped: data.skipped ?? 0,
+            validationErrors: data.validationErrors ?? (data.error ? [data.error] : ['Import failed']),
+          });
+          halted = true;
+          continue;
+        }
+
+        fileResults.push({
+          id: item.id,
+          fileName: item.fileName,
+          table: item.table,
+          state: 'completed',
+          success: true,
+          totalRows: data.totalRows ?? item.totalRows ?? 0,
+          inserted: data.inserted ?? 0,
+          updated: data.updated ?? 0,
+          skipped: data.skipped ?? 0,
+          validationErrors: data.validationErrors ?? [],
+        });
+      } catch (requestError) {
+        fileResults.push({
+          id: item.id,
+          fileName: item.fileName,
+          table: item.table,
+          state: 'failed',
+          success: false,
+          totalRows: item.totalRows ?? 0,
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          validationErrors: [requestError.message],
+        });
+        halted = true;
+      }
+    }
+
+    const summary = summarizeBatchResults(fileResults.filter((item) => item.state !== 'not_run'));
+    setBatchResult({
+      success: fileResults.every((item) => item.state === 'completed'),
+      summary,
+      files: fileResults,
+    });
+    setStep('result');
     setLoading(false);
   }
 
   function handleReset() {
     setStep('upload');
     setError('');
-    setFileName('');
-    setFileContent('');
-    setFileType('');
-    setPreviewData(null);
-    setColumnMapping({});
-    setResult(null);
-    setSelectedTable('');
     setConflictMode('skip');
+    setStagedFiles([]);
+    setReviewItems([]);
+    setBatchResult(null);
+    setDropActive(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -163,23 +440,25 @@ export default function AdminImportPage() {
     color: '#374151',
   };
 
+  const hasBlockingStagedFiles = stagedFiles.some((file) => file.stagingError || !file.targetTable);
+  const readyReviewCount = reviewItems.filter((item) => item.status === 'ready').length;
+
   return (
     <PageLayout title="Data Import">
-      {/* Step indicator */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        {STEPS.map((s, i) => (
+        {STEPS.map((stepName, index) => (
           <div
-            key={s}
+            key={stepName}
             style={{
               padding: '0.4rem 1rem',
               borderRadius: '20px',
               fontSize: '0.8rem',
-              fontWeight: step === s ? 700 : 500,
-              backgroundColor: step === s ? '#E67E22' : '#F3F4F6',
-              color: step === s ? 'white' : '#6B7280',
+              fontWeight: step === stepName ? 700 : 500,
+              backgroundColor: step === stepName ? '#E67E22' : '#F3F4F6',
+              color: step === stepName ? 'white' : '#6B7280',
             }}
           >
-            {i + 1}. {s.charAt(0).toUpperCase() + s.slice(1)}
+            {index + 1}. {stepName.charAt(0).toUpperCase() + stepName.slice(1)}
           </div>
         ))}
       </div>
@@ -198,52 +477,18 @@ export default function AdminImportPage() {
         </div>
       )}
 
-      {/* UPLOAD STEP */}
       {step === 'upload' && (
         <div className="card" style={{ padding: '1.5rem' }}>
           <div className="card-header">
             <h2 className="card-title">Upload Configuration</h2>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
-            {/* Table selection */}
-            <div>
-              <label style={labelSt}>Target Table</label>
-              <select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-                style={inputSt}
-              >
-                <option value="">-- Select a table --</option>
-                {tables.map((t) => (
-                  <option key={t.name} value={t.name}>{t.label} ({t.name})</option>
-                ))}
-              </select>
-              {selectedTable && tables.find((t) => t.name === selectedTable) && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#6B7280' }}>
-                  Columns:{' '}
-                  {tables.find((t) => t.name === selectedTable).columns.map((c) => (
-                    <span key={c.name} style={{
-                      display: 'inline-block',
-                      padding: '0.15rem 0.5rem',
-                      margin: '0.15rem',
-                      backgroundColor: c.required ? '#DBEAFE' : '#F3F4F6',
-                      border: `1px solid ${c.required ? '#93C5FD' : '#D1D5DB'}`,
-                      borderRadius: '4px',
-                      fontSize: '0.75rem',
-                    }}>
-                      {c.name}{c.required ? '*' : ''} <span style={{ opacity: 0.6 }}>({c.type})</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Conflict mode */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
             <div>
               <label style={labelSt}>Conflict Mode</label>
               <select
                 value={conflictMode}
-                onChange={(e) => setConflictMode(e.target.value)}
+                onChange={(event) => setConflictMode(event.target.value)}
                 style={inputSt}
               >
                 <option value="skip">Skip duplicates</option>
@@ -257,88 +502,246 @@ export default function AdminImportPage() {
               </p>
             </div>
 
-            {/* File upload drag-and-drop zone */}
             <div>
-              <label style={labelSt}>File (CSV or JSON)</label>
+              <label style={labelSt}>Files or Folder</label>
               <div
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDropActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setDropActive(false);
+                }}
+                onDrop={handleDrop}
                 style={{
-                  border: '2px dashed #E5E7EB',
+                  border: `2px dashed ${dropActive ? '#E67E22' : '#E5E7EB'}`,
                   borderRadius: '12px',
                   padding: '2.5rem 2rem',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  backgroundColor: '#F9FAFB',
+                  backgroundColor: dropActive ? '#FEF9F0' : '#F9FAFB',
                   transition: 'border-color 0.2s, background-color 0.2s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.backgroundColor = '#FEF9F0'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.backgroundColor = '#FEF9F0'; }}
-                onDragLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.style.borderColor = '#E5E7EB';
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) {
-                    const fakeEvent = { target: { files: [file] } };
-                    handleFileSelect(fakeEvent);
-                  }
                 }}
               >
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".csv,.json"
+                  multiple
                   onChange={handleFileSelect}
                   style={{ display: 'none' }}
                 />
-                {fileName ? (
-                  <div>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>&#128196;</div>
-                    <p style={{ margin: '0', fontWeight: '600', color: '#111827' }}>{fileName}</p>
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#6B7280' }}>
-                      {fileType.toUpperCase()} file loaded. Click to change.
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#9CA3AF' }}>&#8679;</div>
-                    <p style={{ margin: 0, fontWeight: '600', color: '#374151' }}>
-                      Click to select or drag & drop a file
-                    </p>
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#9CA3AF' }}>
-                      Supports .csv and .json (max 500 rows)
-                    </p>
-                  </div>
-                )}
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: stagedFiles.length ? '#E67E22' : '#9CA3AF' }}>
+                  &#8679;
+                </div>
+                <p style={{ margin: 0, fontWeight: '600', color: '#374151' }}>
+                  {stagedFiles.length
+                    ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''} staged`
+                    : 'Click to select or drag & drop multiple import files'}
+                </p>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#9CA3AF' }}>
+                  Supports .csv and .json. You can also drop a folder of import files.
+                </p>
               </div>
             </div>
 
-            <div>
+            <div className="card" style={{ padding: '1rem' }}>
+              <div className="card-header">
+                <h3 className="card-title" style={{ fontSize: '0.95rem' }}>Import Format Guide</h3>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
+                    How files should look
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#4B5563', lineHeight: 1.55 }}>
+                    <div>1. Use one file per table.</div>
+                    <div>2. Name files after the table when possible, like <code>initiative.csv</code> or <code>submission_value.json</code>.</div>
+                    <div>3. CSV files must use the first row as exact column headers.</div>
+                    <div>4. JSON files must be an array of objects whose keys match importer column names.</div>
+                    <div>5. If a filename does not match a table, choose the table manually before review.</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
+                    Recommended batch order
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#4B5563', lineHeight: 1.55 }}>
+                    {DEFAULT_IMPORT_ORDER.map((tableName, index) => (
+                      <div key={`order-${tableName}`}>
+                        {index + 1}. <code>{tableName}</code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
+                    CSV example
+                  </div>
+                  <pre style={{
+                    margin: 0,
+                    padding: '0.85rem',
+                    backgroundColor: '#111827',
+                    color: '#F9FAFB',
+                    borderRadius: '10px',
+                    fontSize: '0.76rem',
+                    lineHeight: 1.45,
+                    overflowX: 'auto',
+                  }}>
+{`initiative_name,description
+Community Wellness Dashboard Pilot,"Tracks workshop participation and referrals."
+STEM Family Night Expansion,"Measures event attendance and family engagement."`}
+                  </pre>
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
+                    JSON example
+                  </div>
+                  <pre style={{
+                    margin: 0,
+                    padding: '0.85rem',
+                    backgroundColor: '#111827',
+                    color: '#F9FAFB',
+                    borderRadius: '10px',
+                    fontSize: '0.76rem',
+                    lineHeight: 1.45,
+                    overflowX: 'auto',
+                  }}>
+{`[
+  {
+    "category_name": "community engagement",
+    "description": "Programs focused on outreach."
+  }
+]`}
+                  </pre>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
+                  Supported tables and required columns
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  {tables.map((table) => {
+                    const requiredColumns = table.columns.filter((column) => column.required).map((column) => column.name);
+
+                    return (
+                      <div
+                        key={`schema-${table.name}`}
+                        style={{
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '8px',
+                          padding: '0.7rem 0.85rem',
+                          backgroundColor: '#FAFAFA',
+                        }}
+                      >
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>
+                          {table.label} (<code>{table.name}</code>)
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#6B7280', marginTop: '0.2rem' }}>
+                          Required: {requiredColumns.length ? requiredColumns.map((name) => <code key={`${table.name}-${name}`} style={{ marginRight: '0.35rem' }}>{name}</code>) : 'none'}
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: '#6B7280', marginTop: '0.25rem', lineHeight: 1.5 }}>
+                          All columns: {table.columns.map((column) => (
+                            <code key={`${table.name}-all-${column.name}`} style={{ marginRight: '0.35rem' }}>
+                              {column.name}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {stagedFiles.length > 0 && (
+              <div className="card" style={{ padding: '1rem' }}>
+                <div className="card-header">
+                  <h3 className="card-title" style={{ fontSize: '0.95rem' }}>Staged Files</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
+                  {stagedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      style={{
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '10px',
+                        padding: '0.85rem 1rem',
+                        backgroundColor: file.stagingError ? '#FEF2F2' : 'white',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#111827' }}>{file.fileName}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                            {file.fileType ? file.fileType.toUpperCase() : 'Unsupported'} file
+                            {file.inferredTable ? ` • inferred table: ${file.inferredTable}` : ' • table not inferred from filename'}
+                          </div>
+                        </div>
+                        <div style={{ minWidth: '220px', flex: '1 1 220px' }}>
+                          <select
+                            value={file.targetTable}
+                            onChange={(event) => updateStagedFile(file.id, { targetTable: event.target.value })}
+                            style={inputSt}
+                            disabled={!!file.stagingError}
+                          >
+                            <option value="">-- Select a table --</option>
+                            {tables.map((table) => (
+                              <option key={table.name} value={table.name}>
+                                {table.label} ({table.name})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {file.stagingError && (
+                        <div style={{ color: '#DC2626', fontSize: '0.8rem' }}>{file.stagingError}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
-                onClick={handlePreview}
-                disabled={loading || !selectedTable || !fileContent}
+                onClick={handlePreviewBatch}
+                disabled={loading || !stagedFiles.length || hasBlockingStagedFiles}
                 className="btn-primary"
-                style={{ opacity: (loading || !selectedTable || !fileContent) ? 0.5 : 1, cursor: (loading || !selectedTable || !fileContent) ? 'not-allowed' : 'pointer' }}
+                style={{ opacity: (loading || !stagedFiles.length || hasBlockingStagedFiles) ? 0.5 : 1 }}
               >
-                {loading ? 'Processing...' : 'Preview Import'}
+                {loading ? 'Preparing Review...' : `Review ${stagedFiles.length || ''} Import${stagedFiles.length === 1 ? '' : 's'}`}
               </button>
+
+              {stagedFiles.length > 0 && (
+                <button onClick={handleReset} className="btn-outline" disabled={loading}>
+                  Clear Files
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* PREVIEW STEP */}
-      {step === 'preview' && previewData && (
+      {step === 'review' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <span style={{ fontWeight: 600, color: '#111827' }}>
-                {previewData.totalRows} row{previewData.totalRows !== 1 ? 's' : ''} found
+                {reviewItems.length} file{reviewItems.length !== 1 ? 's' : ''} reviewed
               </span>
               <span style={{ color: '#6B7280', marginLeft: '0.5rem', fontSize: '0.85rem' }}>
-                (showing first {Math.min(previewData.previewRows.length, 10)})
+                {readyReviewCount} ready for import
               </span>
             </div>
             <button onClick={() => setStep('upload')} className="btn-outline">
@@ -346,142 +749,228 @@ export default function AdminImportPage() {
             </button>
           </div>
 
-          {/* Column mapping */}
-          <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-            <div className="card-header">
-              <h3 className="card-title" style={{ fontSize: '0.95rem' }}>Column Mapping</h3>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.5rem', marginTop: '0.75rem' }}>
-              {previewData.fileColumns.map((fileCol) => (
-                <div key={fileCol} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>
-                    {fileCol}
-                  </span>
-                  <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>&rarr;</span>
-                  <select
-                    value={columnMapping[fileCol] || '__skip__'}
-                    onChange={(e) => setColumnMapping((prev) => ({ ...prev, [fileCol]: e.target.value }))}
-                    style={{ border: '1px solid #E5E7EB', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', flex: 1, outline: 'none', backgroundColor: 'white' }}
-                  >
-                    <option value="__skip__">(skip this column)</option>
-                    {previewData.dbColumns.map((dbCol) => (
-                      <option key={dbCol.name} value={dbCol.name}>
-                        {dbCol.name}{dbCol.required ? ' *' : ''} ({dbCol.type})
-                      </option>
-                    ))}
-                  </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {reviewItems.map((item) => (
+              <div key={item.id} className="card" style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#111827' }}>{item.fileName}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                      {tableMeta.get(item.table)?.label || item.table} ({item.table}) • {item.totalRows} row{item.totalRows !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '0.3rem 0.7rem',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    backgroundColor: item.status === 'ready' ? '#DCFCE7' : '#FEE2E2',
+                    color: item.status === 'ready' ? '#166534' : '#B91C1C',
+                    alignSelf: 'flex-start',
+                  }}>
+                    {item.status === 'ready' ? 'Ready' : 'Needs attention'}
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                {item.status !== 'ready' && (
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '8px',
+                    color: '#DC2626',
+                    fontSize: '0.85rem',
+                  }}>
+                    {item.error}
+                  </div>
+                )}
+
+                {item.status === 'ready' && (
+                  <>
+                    <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+                      <div className="card-header">
+                        <h3 className="card-title" style={{ fontSize: '0.95rem' }}>Column Mapping</h3>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        {item.fileColumns.map((fileColumn) => (
+                          <div key={`${item.id}-${fileColumn}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>
+                              {fileColumn}
+                            </span>
+                            <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>&rarr;</span>
+                            <select
+                              value={item.columnMapping[fileColumn] || '__skip__'}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                updateReviewItem(item.id, (current) => ({
+                                  ...current,
+                                  columnMapping: {
+                                    ...current.columnMapping,
+                                    [fileColumn]: value,
+                                  },
+                                }));
+                              }}
+                              style={{ border: '1px solid #E5E7EB', borderRadius: '6px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', flex: 1, outline: 'none', backgroundColor: 'white' }}
+                            >
+                              <option value="__skip__">(skip this column)</option>
+                              {item.dbColumns.map((dbColumn) => (
+                                <option key={`${item.id}-${dbColumn.name}`} value={dbColumn.name}>
+                                  {dbColumn.name}{dbColumn.required ? ' *' : ''} ({dbColumn.type})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="data-table" style={{ fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              {item.fileColumns.map((column) => (
+                                <th key={`${item.id}-${column}`}>{column}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {item.previewRows.map((row, index) => (
+                              <tr key={`${item.id}-row-${index}`}>
+                                <td style={{ color: '#9CA3AF' }}>{index + 1}</td>
+                                {item.fileColumns.map((column) => (
+                                  <td key={`${item.id}-${column}-${index}`} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {row[column] !== null && row[column] !== undefined ? String(row[column]) : ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Preview table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ fontSize: '0.8rem' }}>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    {previewData.fileColumns.map((col) => (
-                      <th key={col}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.previewRows.map((row, i) => (
-                    <tr key={i}>
-                      <td style={{ color: '#9CA3AF' }}>{i + 1}</td>
-                      {previewData.fileColumns.map((col) => (
-                        <td key={col} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {row[col] !== null && row[col] !== undefined ? String(row[col]) : ''}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             <button
-              onClick={handleExecute}
-              disabled={loading}
+              onClick={handleExecuteBatch}
+              disabled={loading || reviewItems.some((item) => item.status !== 'ready')}
               className="btn-primary"
-              style={{ opacity: loading ? 0.5 : 1 }}
+              style={{ opacity: (loading || reviewItems.some((item) => item.status !== 'ready')) ? 0.5 : 1 }}
             >
-              {loading ? 'Importing...' : `Import ${previewData.totalRows} Rows`}
+              {loading ? 'Importing Batch...' : `Import ${readyReviewCount} File${readyReviewCount === 1 ? '' : 's'}`}
             </button>
-            <button onClick={() => setStep('upload')} className="btn-outline">
+            <button onClick={() => setStep('upload')} className="btn-outline" disabled={loading}>
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* RESULT STEP */}
-      {step === 'result' && result && (
+      {step === 'result' && batchResult && (
         <div>
           <div style={{
             padding: '1.5rem',
             borderRadius: '12px',
-            backgroundColor: result.success ? '#F0FDF4' : '#FEF2F2',
-            border: `1px solid ${result.success ? '#BBF7D0' : '#FECACA'}`,
+            backgroundColor: batchResult.success ? '#F0FDF4' : '#FEF2F2',
+            border: `1px solid ${batchResult.success ? '#BBF7D0' : '#FECACA'}`,
             marginBottom: '1rem',
           }}>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700, color: result.success ? '#166534' : '#DC2626' }}>
-              {result.success ? 'Import Complete' : 'Import Failed'}
+            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700, color: batchResult.success ? '#166534' : '#DC2626' }}>
+              {batchResult.success ? 'Batch Import Complete' : 'Batch Import Finished With Errors'}
             </h3>
             <div className="stats-row">
               <div className="stat-card" style={{ background: 'white' }}>
-                <div className="stat-label">Total Rows</div>
-                <div className="stat-value" style={{ fontSize: '1.5rem' }}>{result.totalRows ?? 0}</div>
+                <div className="stat-label">Files Run</div>
+                <div className="stat-value" style={{ fontSize: '1.5rem' }}>{batchResult.summary.totalFiles}</div>
+              </div>
+              <div className="stat-card" style={{ background: 'white' }}>
+                <div className="stat-label">Rows Seen</div>
+                <div className="stat-value" style={{ fontSize: '1.5rem' }}>{batchResult.summary.totalRows}</div>
               </div>
               <div className="stat-card" style={{ background: 'white' }}>
                 <div className="stat-label">Inserted</div>
-                <div className="stat-value" style={{ fontSize: '1.5rem', color: '#16A34A' }}>{result.inserted ?? 0}</div>
+                <div className="stat-value" style={{ fontSize: '1.5rem', color: '#16A34A' }}>{batchResult.summary.inserted}</div>
               </div>
-              {result.updated > 0 && (
-                <div className="stat-card" style={{ background: 'white' }}>
-                  <div className="stat-label">Updated</div>
-                  <div className="stat-value" style={{ fontSize: '1.5rem', color: '#2563EB' }}>{result.updated ?? 0}</div>
-                </div>
-              )}
               <div className="stat-card" style={{ background: 'white' }}>
                 <div className="stat-label">Skipped</div>
-                <div className="stat-value" style={{ fontSize: '1.5rem', color: '#D97706' }}>{result.skipped ?? 0}</div>
+                <div className="stat-value" style={{ fontSize: '1.5rem', color: '#D97706' }}>{batchResult.summary.skipped}</div>
               </div>
             </div>
           </div>
 
-          {result.validationErrors && result.validationErrors.length > 0 && (
-            <div style={{
-              padding: '1rem',
-              backgroundColor: '#FFFBEB',
-              border: '1px solid #FDE68A',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-              maxHeight: '200px',
-              overflowY: 'auto',
-            }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 600, color: '#92400E' }}>
-                Errors ({result.validationErrors.length})
-              </h4>
-              {result.validationErrors.slice(0, 50).map((err, i) => (
-                <div key={i} style={{ fontSize: '0.8rem', color: '#92400E', padding: '0.15rem 0' }}>
-                  {err}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1rem' }}>
+            {batchResult.files.map((file) => (
+              <div
+                key={file.id}
+                style={{
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '10px',
+                  padding: '0.9rem 1rem',
+                  backgroundColor: file.state === 'completed' ? '#F9FAFB' : '#FFF7ED',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#111827' }}>{file.fileName}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                      {tableMeta.get(file.table)?.label || file.table} ({file.table})
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '0.3rem 0.7rem',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    backgroundColor: file.state === 'completed' ? '#DCFCE7' : file.state === 'not_run' ? '#E5E7EB' : '#FEE2E2',
+                    color: file.state === 'completed' ? '#166534' : file.state === 'not_run' ? '#4B5563' : '#B91C1C',
+                    alignSelf: 'flex-start',
+                  }}>
+                    {file.state === 'completed' ? 'Completed' : file.state === 'not_run' ? 'Not run' : 'Failed'}
+                  </div>
                 </div>
-              ))}
-              {result.validationErrors.length > 50 && (
-                <div style={{ fontSize: '0.8rem', color: '#92400E', fontStyle: 'italic', marginTop: '0.25rem' }}>
-                  ...and {result.validationErrors.length - 50} more
+
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.82rem', color: '#374151' }}>
+                  <span>Total rows: {file.totalRows ?? 0}</span>
+                  <span>Inserted: {file.inserted ?? 0}</span>
+                  <span>Updated: {file.updated ?? 0}</span>
+                  <span>Skipped: {file.skipped ?? 0}</span>
                 </div>
-              )}
-            </div>
-          )}
+
+                {file.validationErrors?.length > 0 && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#FFFBEB',
+                    border: '1px solid #FDE68A',
+                    borderRadius: '8px',
+                  }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', marginBottom: '0.35rem' }}>
+                      Messages ({file.validationErrors.length})
+                    </div>
+                    {file.validationErrors.slice(0, 10).map((message, index) => (
+                      <div key={`${file.id}-err-${index}`} style={{ fontSize: '0.78rem', color: '#92400E', padding: '0.1rem 0' }}>
+                        {message}
+                      </div>
+                    ))}
+                    {file.validationErrors.length > 10 && (
+                      <div style={{ fontSize: '0.78rem', color: '#92400E', fontStyle: 'italic', marginTop: '0.2rem' }}>
+                        ...and {file.validationErrors.length - 10} more
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
 
           <button onClick={handleReset} className="btn-primary">
-            Import Another File
+            Start Another Batch Import
           </button>
         </div>
       )}

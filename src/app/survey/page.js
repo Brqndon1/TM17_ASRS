@@ -1,8 +1,5 @@
 'use client';
 
-import SurveyForm from '@/components/SurveyForm';
-import QRCodeManager from '@/components/QRCodeManager';
-import PageLayout from '@/components/PageLayout';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
@@ -18,7 +15,11 @@ export default function SurveyPage() {
     return Boolean(new URLSearchParams(window.location.search).get('qr'));
   });
   const userRole = user?.user_type || 'public';
-  const isPublicView = isQrAccess || userRole === 'public';
+  const [isPreviewMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(new URLSearchParams(window.location.search).get('template'));
+  });
+  const isPublicView = isQrAccess || userRole === 'public' || isPreviewMode;
 
   // Form fields
   const [firstName, setFirstName] = useState('');
@@ -50,11 +51,6 @@ export default function SurveyPage() {
   const [surveyTemplate, setSurveyTemplate] = useState(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateResponses, setTemplateResponses] = useState({});
-  const [staffTemplates, setStaffTemplates] = useState([]);
-  const [staffQrCodes, setStaffQrCodes] = useState([]);
-  const [staffLoading, setStaffLoading] = useState(false);
-  const [staffError, setStaffError] = useState('');
-  const [copiedQrKey, setCopiedQrKey] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -169,48 +165,6 @@ export default function SurveyPage() {
         console.error('Error recording QR scan:', err);
       });
   }, []);
-
-  useEffect(() => {
-    if (isPublicView) return;
-
-    let isCancelled = false;
-    setStaffLoading(true);
-    setStaffError('');
-
-    Promise.all([
-      fetch('/api/surveys/templates').then((res) => (res.ok ? res.json() : [])),
-      fetch('/api/qr-codes?scope=survey').then((res) => (res.ok ? res.json() : { qrCodes: [] })),
-    ])
-      .then(([templatesData, qrCodesData]) => {
-        if (isCancelled) return;
-        setStaffTemplates(Array.isArray(templatesData) ? templatesData : []);
-        setStaffQrCodes(Array.isArray(qrCodesData?.qrCodes) ? qrCodesData.qrCodes : []);
-      })
-      .catch(() => {
-        if (isCancelled) return;
-        setStaffTemplates([]);
-        setStaffQrCodes([]);
-        setStaffError('Unable to load survey QR inventory right now.');
-      })
-      .finally(() => {
-        if (isCancelled) return;
-        setStaffLoading(false);
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [isPublicView]);
-
-  const handleCopyQrUrl = async (qrCode) => {
-    try {
-      await navigator.clipboard.writeText(qrCode.targetUrl);
-      setCopiedQrKey(qrCode.qrCodeKey);
-      setTimeout(() => setCopiedQrKey(''), 1500);
-    } catch {
-      setStaffError('Copy failed. Please copy the URL manually.');
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -468,126 +422,10 @@ export default function SurveyPage() {
     return null;
   }
 
-  // Staff/Admin view
+  // Staff/Admin view — redirect to manage-surveys
   if (!isPublicView) {
-    return (
-      <PageLayout title="Survey Management">
-        <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn-outline"
-            onClick={() => router.push('/manage-surveys')}
-          >
-            Manage Surveys
-          </button>
-        </div>
-
-        {/* Survey Management Stats Card */}
-        <div className="card" style={{ marginBottom: '20px' }}>
-          <div className="card-header">
-            <h2 className="card-title">Survey Management</h2>
-          </div>
-          <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '16px', marginTop: 0 }}>
-            Manage templates and your saved survey QR distributors in one place.
-          </p>
-          <div className="stats-row" style={{ marginBottom: '16px' }}>
-            <div className="stat-card">
-              <div className="stat-label">Templates</div>
-              <div className="stat-value">{staffLoading ? '…' : staffTemplates.length}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Saved Survey QR Codes</div>
-              <div className="stat-value">{staffLoading ? '…' : staffQrCodes.length}</div>
-            </div>
-          </div>
-          {staffError && (
-            <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.85rem' }}>{staffError}</p>
-          )}
-          {!staffLoading && !staffError && (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    {['Survey', 'QR Key', 'Status', 'Scans', 'Submissions', 'Created', 'Actions'].map((h) => (
-                      <th key={h}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffQrCodes.map((qr) => {
-                    const isExpired = Boolean(qr.isExpired);
-                    const isActive = Boolean(qr.isActive) && !isExpired;
-                    return (
-                      <tr key={qr.qrCodeKey}>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#111827' }}>{qr.templateTitle || 'General Survey'}</div>
-                          <div style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>
-                            {qr.description || 'No description'}
-                          </div>
-                        </td>
-                        <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{qr.qrCodeKey}</td>
-                        <td>
-                          <span className={`pill ${isActive ? 'pill-green' : 'pill-red'}`}>
-                            {isActive ? 'active' : 'inactive'}
-                          </span>
-                        </td>
-                        <td>{qr.stats.totalScans}</td>
-                        <td>{qr.stats.conversions}</td>
-                        <td>{new Date(qr.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <a href={qr.targetUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ textDecoration: 'none', padding: '4px 10px', fontSize: '12px' }}>
-                              Open
-                            </a>
-                            <button
-                              type="button"
-                              className="btn-outline"
-                              style={{ padding: '4px 10px', fontSize: '12px' }}
-                              onClick={() => handleCopyQrUrl(qr)}
-                            >
-                              {copiedQrKey === qr.qrCodeKey ? 'Copied' : 'Copy URL'}
-                            </button>
-                            <a
-                              href={`/api/qr-codes/download?qrCodeKey=${encodeURIComponent(qr.qrCodeKey)}&format=png&size=400&download=true`}
-                              className="btn-outline"
-                              style={{ textDecoration: 'none', padding: '4px 10px', fontSize: '12px' }}
-                            >
-                              PNG
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {staffQrCodes.length === 0 && (
-                    <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', color: '#9CA3AF' }}>
-                        No survey QR codes yet. Generate your first one below.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Create Survey */}
-        <div className="card" style={{ marginBottom: '20px' }}>
-          <div className="card-header">
-            <h2 className="card-title">Create Survey</h2>
-          </div>
-          <p style={{ color: '#6B7280', fontSize: '0.9rem', marginTop: 0, marginBottom: '16px' }}>
-            Create a survey to send out to the public!
-          </p>
-          <SurveyForm />
-        </div>
-
-        {/* QR Code Generator */}
-        <div className="card">
-          <QRCodeManager qrType="survey" showStats={true} />
-        </div>
-      </PageLayout>
-    );
+    router.push('/manage-surveys');
+    return null;
   }
 
   // Public view
@@ -681,7 +519,29 @@ export default function SurveyPage() {
                 </div>
               ) : (
                 <>
-                  {userRole !== 'public' && (
+                  {isPreviewMode && userRole !== 'public' && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <button
+                        onClick={() => router.push('/manage-surveys')}
+                        className="btn-outline"
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        &larr; Back to Manage Surveys
+                      </button>
+                      <div style={{
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#FEF3C7',
+                        border: '1px solid #FDE68A',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        color: '#92400E',
+                        fontWeight: 500,
+                      }}>
+                        Preview Mode — This is how the survey appears to participants.
+                      </div>
+                    </div>
+                  )}
+                  {userRole !== 'public' && !isPreviewMode && (
                     <button
                       onClick={() => router.push('/manage-surveys')}
                       className="btn-outline"

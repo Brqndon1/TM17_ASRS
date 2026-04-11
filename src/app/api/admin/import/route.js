@@ -126,9 +126,9 @@ function parseFileContent(text, fileType) {
   return result.data;
 }
 
-function computePreviewToken(table, conflictMode, columnMapping, rows) {
+function computePreviewToken(table, conflictMode, rows) {
   const hash = createHash('sha256');
-  hash.update(JSON.stringify({ table, conflictMode, columnMapping, rowCount: rows.length, sample: rows.slice(0, 5) }));
+  hash.update(JSON.stringify({ table, conflictMode, rowCount: rows.length, sample: rows.slice(0, 5) }));
   return hash.digest('hex');
 }
 
@@ -352,7 +352,7 @@ export async function POST(request) {
       }
 
       const previewRows = rows.slice(0, 10);
-      const token = computePreviewToken(table, conflictMode, autoMapping, rows);
+      const token = computePreviewToken(table, conflictMode, rows);
 
       logAudit(db, {
         event: 'import.previewed',
@@ -382,7 +382,7 @@ export async function POST(request) {
     }
 
     // Verify preview token matches
-    const expectedToken = computePreviewToken(table, conflictMode, columnMapping, rows);
+    const expectedToken = computePreviewToken(table, conflictMode, rows);
     if (body.previewToken !== expectedToken) {
       return NextResponse.json(
         { error: 'Preview token mismatch. The file or settings changed since preview. Please re-preview.' },

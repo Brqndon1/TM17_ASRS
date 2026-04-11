@@ -3,6 +3,7 @@
 import PageLayout from '@/components/PageLayout';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/client';
 
 export default function ManageSurveysPage() {
   const router = useRouter();
@@ -14,6 +15,11 @@ export default function ManageSurveysPage() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  // QR code state
+  const [qrCodes, setQrCodes] = useState([]);
+  const [qrCodesLoading, setQrCodesLoading] = useState(false);
+  const [copiedQrKey, setCopiedQrKey] = useState('');
 
   const formatEasternDateTime = (timestamp) => {
     if (!timestamp) return '—';
@@ -73,9 +79,33 @@ export default function ManageSurveysPage() {
     }
   };
 
+  const fetchQrCodes = () => {
+    setQrCodesLoading(true);
+    apiFetch('/api/qr-codes?scope=survey')
+      .then((res) => res.json())
+      .then((data) => setQrCodes(data.qrCodes || []))
+      .catch(() => setQrCodes([]))
+      .finally(() => setQrCodesLoading(false));
+  };
+
+  const handleCopyQrUrl = async (qr) => {
+    try {
+      await navigator.clipboard.writeText(qr.targetUrl);
+      setCopiedQrKey(qr.qrCodeKey);
+      setTimeout(() => setCopiedQrKey(''), 1500);
+    } catch {
+      setError('Copy failed. Please copy the URL manually.');
+    }
+  };
+
+  const handleDownloadQR = (qrCodeKey, format = 'png') => {
+    window.open(`/api/qr-codes/download?qrCodeKey=${encodeURIComponent(qrCodeKey)}&format=${format}&size=400&download=true`, '_blank');
+  };
+
   useEffect(() => {
     fetchTemplates();
     fetchSurveys();
+    fetchQrCodes();
   }, []);
 
   const selectedSurvey = surveys.find((s) => String(s.id) === String(selectedSurveyId));
@@ -459,6 +489,75 @@ export default function ManageSurveysPage() {
           </pre>
         </div>
       )}
+
+      {/* QR Code Inventory */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header">
+          <h2 className="card-title">Survey QR Codes</h2>
+          <span style={{ fontSize: '13px', color: '#6B7280' }}>
+            {qrCodes.length} code{qrCodes.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginTop: 0, marginBottom: '16px' }}>
+          Manage survey QR distributors in one place.
+        </p>
+        {qrCodesLoading ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1.5rem' }}>Loading QR codes...</p>
+        ) : qrCodes.length === 0 ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1rem' }}>
+            No survey QR codes yet. Generate one below.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {['Survey', 'QR Key', 'Status', 'Scans', 'Submissions', 'Created', 'Actions'].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {qrCodes.map((qr) => {
+                  const isExpired = Boolean(qr.isExpired);
+                  const isActive = Boolean(qr.isActive) && !isExpired;
+                  return (
+                    <tr key={qr.qrCodeKey}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: '#111827' }}>{qr.templateTitle || 'General Survey'}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>{qr.description || 'No description'}</div>
+                      </td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{qr.qrCodeKey}</td>
+                      <td>
+                        <span className={`pill ${isActive ? 'pill-green' : 'pill-red'}`}>
+                          {isActive ? 'active' : 'inactive'}
+                        </span>
+                      </td>
+                      <td>{qr.stats.totalScans}</td>
+                      <td>{qr.stats.conversions}</td>
+                      <td>{new Date(qr.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <a href={qr.targetUrl} target="_blank" rel="noreferrer" className="btn-outline" style={{ textDecoration: 'none', padding: '4px 10px', fontSize: '12px' }}>
+                            Open
+                          </a>
+                          <button type="button" className="btn-outline" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => handleCopyQrUrl(qr)}>
+                            {copiedQrKey === qr.qrCodeKey ? 'Copied' : 'Copy URL'}
+                          </button>
+                          <button type="button" className="btn-outline" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => handleDownloadQR(qr.qrCodeKey, 'png')}>
+                            PNG
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
 
     </PageLayout>
   );
