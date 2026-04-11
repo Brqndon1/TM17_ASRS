@@ -291,7 +291,10 @@ export default function ManageSurveysPage() {
                 >
                   {/* Header row */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                    <h3
+                      style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#E67E22', cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/manage-surveys/${template.id}`); }}
+                    >
                       {template.title}
                     </h3>
                     {statusPill(status)}
@@ -315,22 +318,19 @@ export default function ManageSurveysPage() {
                   {/* Action links */}
                   <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid #F3F4F6', paddingTop: '12px' }}>
                     <button
-                      onClick={() => router.push(`/survey?template=${template.id}`)}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/manage-surveys/${template.id}`); }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#E67E22', padding: 0 }}
+                    >
+                      Manage
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/survey?template=${template.id}`); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#6B7280', padding: 0 }}
                     >
                       Preview
                     </button>
                     <button
-                      onClick={() => {
-                        setSelectedTemplateId(String(template.id));
-                        setSelectedSurveyId('');
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#E67E22', padding: 0 }}
-                    >
-                      View Submissions
-                    </button>
-                    <button
-                      onClick={() => deleteTemplate(template.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteTemplate(template.id); }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#DC2626', padding: 0, marginLeft: 'auto' }}
                     >
                       Delete
