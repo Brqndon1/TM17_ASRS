@@ -47,10 +47,49 @@ export async function GET(request, { params }) {
       WHERE initiative_id = ?
     `).get(initiativeId);
 
+    // Get all submissions with their field values for this initiative
+    const submissions = db.prepare(`
+      SELECT s.submission_id, s.submitted_at, s.submitted_by_user_id,
+             u.first_name, u.last_name, u.email
+      FROM submission s
+      LEFT JOIN user u ON u.user_id = s.submitted_by_user_id
+      WHERE s.initiative_id = ?
+      ORDER BY s.submitted_at DESC
+    `).all(initiativeId);
+
+    // Get field values for all submissions in one query
+    const submissionIds = submissions.map(s => s.submission_id);
+    let submissionValues = [];
+    if (submissionIds.length > 0) {
+      submissionValues = db.prepare(`
+        SELECT sv.submission_id, sv.field_id, f.field_label,
+               COALESCE(sv.value_text, CAST(sv.value_number AS TEXT), sv.value_date,
+                 CASE WHEN sv.value_bool IS NOT NULL THEN CASE sv.value_bool WHEN 1 THEN 'Yes' ELSE 'No' END END,
+                 sv.value_json) AS display_value
+        FROM submission_value sv
+        JOIN field f ON f.field_id = sv.field_id
+        WHERE sv.submission_id IN (${submissionIds.map(() => '?').join(',')})
+        ORDER BY sv.field_id
+      `).all(...submissionIds);
+    }
+
+    // Group values by submission_id
+    const valuesBySubmission = {};
+    for (const v of submissionValues) {
+      if (!valuesBySubmission[v.submission_id]) valuesBySubmission[v.submission_id] = [];
+      valuesBySubmission[v.submission_id].push({ field_label: v.field_label, value: v.display_value });
+    }
+
+    const submissionsWithValues = submissions.map(s => ({
+      ...s,
+      values: valuesBySubmission[s.submission_id] || [],
+    }));
+
     return NextResponse.json({
       success: true,
       members,
       participants,
+      submissions: submissionsWithValues,
       totalMembers: members.length,
       totalParticipants: participants.length,
       totalSubmissions: submissionStats?.total_submissions || 0,

@@ -58,7 +58,10 @@ export async function GET(request, { params }) {
     `).all(initiativeId);
 
     const chartData = {};
+    const MAX_CATEGORICAL_VALUES = 15;
     for (const field of chartFields) {
+      const key = field.field_key || field.field_label;
+
       if (['select', 'choice', 'multiselect', 'yesno', 'boolean'].includes(field.field_type)) {
         const distribution = db.prepare(`
           SELECT sv.value_text as name, COUNT(*) as value
@@ -69,10 +72,9 @@ export async function GET(request, { params }) {
           ORDER BY value DESC
         `).all(initiativeId, field.field_id);
         if (distribution.length > 0) {
-          chartData[field.field_key || field.field_label] = distribution;
+          chartData[key] = distribution;
         }
-      }
-      if (field.field_type === 'rating') {
+      } else if (field.field_type === 'rating') {
         const distribution = db.prepare(`
           SELECT CAST(sv.value_number AS INTEGER) as name, COUNT(*) as value
           FROM submission_value sv
@@ -82,10 +84,34 @@ export async function GET(request, { params }) {
           ORDER BY name
         `).all(initiativeId, field.field_id);
         if (distribution.length > 0) {
-          chartData[field.field_key || field.field_label] = distribution.map(d => ({
+          chartData[key] = distribution.map(d => ({
             name: `Rating ${d.name}`,
             value: d.value,
           }));
+        }
+      } else if (field.field_type === 'text') {
+        const distribution = db.prepare(`
+          SELECT sv.value_text as name, COUNT(*) as value
+          FROM submission_value sv
+          JOIN submission s ON s.submission_id = sv.submission_id
+          WHERE s.initiative_id = ? AND sv.field_id = ? AND sv.value_text IS NOT NULL
+          GROUP BY sv.value_text
+          ORDER BY value DESC
+        `).all(initiativeId, field.field_id);
+        if (distribution.length > 1 && distribution.length <= MAX_CATEGORICAL_VALUES) {
+          chartData[key] = distribution;
+        }
+      } else if (field.field_type === 'number') {
+        const distribution = db.prepare(`
+          SELECT CAST(sv.value_number AS INTEGER) as name, COUNT(*) as value
+          FROM submission_value sv
+          JOIN submission s ON s.submission_id = sv.submission_id
+          WHERE s.initiative_id = ? AND sv.field_id = ? AND sv.value_number IS NOT NULL
+          GROUP BY CAST(sv.value_number AS INTEGER)
+          ORDER BY name
+        `).all(initiativeId, field.field_id);
+        if (distribution.length > 1 && distribution.length <= 10) {
+          chartData[key] = distribution.map(d => ({ name: String(d.name), value: d.value }));
         }
       }
     }

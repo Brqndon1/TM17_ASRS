@@ -5,7 +5,7 @@ import { getServiceContainer } from '@/lib/container/service-container';
 import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
-const MAX_ROWS = 500;
+const MAX_ROWS = 5000;
 
 const TABLE_SCHEMAS = {
   initiative: {
@@ -97,6 +97,30 @@ const TABLE_SCHEMAS = {
       travel_spent: { type: 'number', default: 0 },
     },
     autoId: 'budget_id',
+  },
+  surveys: {
+    label: 'Survey Responses',
+    columns: {
+      name: { type: 'text', required: true },
+      email: { type: 'text', required: true },
+      responses: { type: 'text', required: true },
+      submitted_at: { type: 'text' },
+    },
+    autoId: 'id',
+  },
+  user: {
+    label: 'Users',
+    columns: {
+      first_name: { type: 'text', required: true },
+      last_name: { type: 'text', required: true },
+      email: { type: 'text', required: true },
+      password: { type: 'text', required: true },
+      phone_number: { type: 'text' },
+      user_type_id: { type: 'integer', default: 1 },
+      verified: { type: 'boolean', default: 1 },
+    },
+    uniqueKey: 'email',
+    autoId: 'user_id',
   },
 };
 

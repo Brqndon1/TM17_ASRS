@@ -2,7 +2,7 @@
 
 import PageLayout from '@/components/PageLayout';
 import ReasonModal from '@/components/ReasonModal';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, Fragment } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
@@ -56,6 +56,8 @@ export default function InitiativeManagePage({ params }) {
   const [participants, setParticipants] = useState([]);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [anonymousSubmissions, setAnonymousSubmissions] = useState(0);
+  const [submissions, setSubmissions] = useState([]);
+  const [expandedSubmission, setExpandedSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -143,6 +145,7 @@ export default function InitiativeManagePage({ params }) {
       if (membersRes.ok && membersData.success) {
         setMembers(membersData.members || []);
         setParticipants(membersData.participants || []);
+        setSubmissions(membersData.submissions || []);
         setTotalSubmissions(membersData.totalSubmissions || 0);
         setAnonymousSubmissions(membersData.anonymousSubmissions || 0);
       }
@@ -797,52 +800,76 @@ export default function InitiativeManagePage({ params }) {
         </>
       )}
 
-      {/* ── Participants Tab ── */}
+      {/* ── Submissions Tab ── */}
       {activeTab === 'participants' && (
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Survey Submissions</h3>
+            <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>{totalSubmissions} total</span>
           </div>
-          <p style={{ color: '#6B7280', fontSize: '0.85rem', marginTop: 0, marginBottom: '0.5rem' }}>
-            {totalSubmissions} total submission{totalSubmissions !== 1 ? 's' : ''} for this initiative.
-          </p>
-          {anonymousSubmissions > 0 && (
-            <p style={{ color: '#D97706', fontSize: '0.82rem', margin: '0 0 1rem', padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px' }}>
-              {anonymousSubmissions} submission{anonymousSubmissions !== 1 ? 's' : ''} {anonymousSubmissions !== 1 ? 'are' : 'is'} not linked to a user account (anonymous or imported without user IDs).
-            </p>
-          )}
-          {participants.length === 0 && totalSubmissions === 0 ? (
+
+          {submissions.length === 0 ? (
             <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem', fontSize: '0.9rem' }}>
               No survey submissions yet for this initiative.
-            </p>
-          ) : participants.length === 0 && totalSubmissions > 0 ? (
-            <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '2rem', fontSize: '0.9rem' }}>
-              All {totalSubmissions} submission{totalSubmissions !== 1 ? 's are' : ' is'} anonymous (no linked user accounts).
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>User Type</th>
-                    <th>Submissions</th>
-                    <th>First Submission</th>
+                    <th style={{ width: '40px' }}>#</th>
+                    <th>Submitted By</th>
+                    <th>Date</th>
+                    <th>Fields</th>
+                    <th style={{ width: '60px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {participants.map((p) => (
-                    <tr key={p.user_id}>
-                      <td style={{ fontWeight: 600, color: '#111827' }}>{p.first_name} {p.last_name}</td>
-                      <td style={{ color: '#6B7280' }}>{p.email}</td>
-                      <td style={{ color: '#6B7280' }}>{p.phone_number || '\u2014'}</td>
-                      <td style={{ color: '#6B7280', textTransform: 'capitalize' }}>{p.user_type || '\u2014'}</td>
-                      <td style={{ fontWeight: 600 }}>{p.submission_count}</td>
-                      <td style={{ color: '#6B7280' }}>{formatDate(p.first_submission)}</td>
-                    </tr>
-                  ))}
+                  {submissions.map((s, idx) => {
+                    const isExpanded = expandedSubmission === s.submission_id;
+                    const submitter = s.first_name
+                      ? `${s.first_name} ${s.last_name}`
+                      : 'Anonymous';
+                    return (
+                      <Fragment key={s.submission_id}>
+                        <tr
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setExpandedSubmission(isExpanded ? null : s.submission_id)}
+                        >
+                          <td style={{ fontWeight: 500, color: '#9CA3AF' }}>{idx + 1}</td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#111827' }}>{submitter}</div>
+                            {s.email && <div style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>{s.email}</div>}
+                          </td>
+                          <td style={{ color: '#6B7280' }}>{formatDate(s.submitted_at)}</td>
+                          <td style={{ color: '#6B7280' }}>{s.values.length} field{s.values.length !== 1 ? 's' : ''}</td>
+                          <td style={{ textAlign: 'center', color: '#E67E22', fontWeight: 600, fontSize: '0.85rem' }}>
+                            {isExpanded ? '\u25B2' : '\u25BC'}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={5} style={{ padding: 0, border: 'none' }}>
+                              <div style={{ padding: '0.75rem 1rem 1rem 2.5rem', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                                {s.values.length === 0 ? (
+                                  <p style={{ color: '#9CA3AF', fontSize: '0.85rem', margin: 0 }}>No field data recorded.</p>
+                                ) : (
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.5rem' }}>
+                                    {s.values.map((v, vIdx) => (
+                                      <div key={vIdx} style={{ fontSize: '0.85rem' }}>
+                                        <span style={{ color: '#6B7280', fontWeight: 600 }}>{v.field_label}:</span>{' '}
+                                        <span style={{ color: '#111827' }}>{v.value || '\u2014'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
