@@ -82,6 +82,183 @@ function buildFileId(file, index) {
   return `${file.name}-${file.lastModified}-${index}`;
 }
 
+function FormatGuide({ tables }) {
+  const [open, setOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('instructions');
+
+  const sectionBtn = (key, label) => ({
+    padding: '0.4rem 0.85rem',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: '6px',
+    backgroundColor: activeSection === key ? '#E67E22' : '#F3F4F6',
+    color: activeSection === key ? '#fff' : '#6B7280',
+    transition: 'all 0.15s ease',
+  });
+
+  return (
+    <div style={{
+      border: '1px solid #E5E7EB',
+      borderRadius: '10px',
+      backgroundColor: '#FAFBFC',
+      overflow: 'hidden',
+    }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.75rem 1rem',
+          border: 'none',
+          cursor: 'pointer',
+          backgroundColor: 'transparent',
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          color: '#111827',
+        }}
+      >
+        <span>Import Format Guide</span>
+        <span style={{ color: '#9CA3AF', fontSize: '0.85rem', fontWeight: 400 }}>
+          {open ? '\u25B2' : '\u25BC'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ padding: '0 1rem 1rem' }}>
+          {/* Section tabs */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <button style={sectionBtn('instructions')} onClick={() => setActiveSection('instructions')}>Instructions</button>
+            <button style={sectionBtn('examples')} onClick={() => setActiveSection('examples')}>Examples</button>
+            <button style={sectionBtn('tables')} onClick={() => setActiveSection('tables')}>Table Schemas</button>
+            <button style={sectionBtn('order')} onClick={() => setActiveSection('order')}>Import Order</button>
+          </div>
+
+          {/* Instructions */}
+          {activeSection === 'instructions' && (
+            <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: 1.7 }}>
+              <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                <li>Use <strong>one file per table</strong>.</li>
+                <li>Name files after the target table when possible (e.g. <code style={{ backgroundColor: '#F3F4F6', padding: '1px 5px', borderRadius: 4 }}>initiative.csv</code>).</li>
+                <li>CSV files must have the <strong>first row as column headers</strong>.</li>
+                <li>JSON files must be an <strong>array of objects</strong> whose keys match column names.</li>
+                <li>If a filename does not match a table, select the table manually before review.</li>
+              </ol>
+            </div>
+          )}
+
+          {/* Examples */}
+          {activeSection === 'examples' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>CSV</div>
+                <pre style={{
+                  margin: 0,
+                  padding: '0.85rem',
+                  backgroundColor: '#1E293B',
+                  color: '#E2E8F0',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.5,
+                  overflowX: 'auto',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                }}>
+{`initiative_name,description
+Community Wellness,"Tracks workshop participation."
+STEM Family Night,"Measures event attendance."`}
+                </pre>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151', marginBottom: '0.35rem' }}>JSON</div>
+                <pre style={{
+                  margin: 0,
+                  padding: '0.85rem',
+                  backgroundColor: '#1E293B',
+                  color: '#E2E8F0',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.5,
+                  overflowX: 'auto',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                }}>
+{`[
+  {
+    "category_name": "community engagement",
+    "description": "Programs focused on outreach."
+  }
+]`}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {/* Table Schemas */}
+          {activeSection === 'tables' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {tables.map((table) => {
+                const requiredCols = table.columns.filter(c => c.required).map(c => c.name);
+                return (
+                  <div key={`schema-${table.name}`} style={{
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    padding: '0.65rem 0.85rem',
+                    backgroundColor: '#fff',
+                  }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#111827' }}>
+                      {table.label} <code style={{ fontWeight: 400, color: '#6B7280', fontSize: '0.8rem' }}>({table.name})</code>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '0.25rem' }}>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>Required:</span>{' '}
+                      {requiredCols.length
+                        ? requiredCols.map(n => <code key={`${table.name}-${n}`} style={{ backgroundColor: '#FEF3C7', padding: '1px 4px', borderRadius: 3, marginRight: 4, fontSize: '0.78rem' }}>{n}</code>)
+                        : <span style={{ fontStyle: 'italic' }}>none</span>}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginTop: '0.2rem', lineHeight: 1.5 }}>
+                      All: {table.columns.map(c => (
+                        <code key={`${table.name}-all-${c.name}`} style={{ marginRight: 4 }}>{c.name}</code>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Import Order */}
+          {activeSection === 'order' && (
+            <div>
+              <p style={{ fontSize: '0.82rem', color: '#6B7280', margin: '0 0 0.5rem' }}>
+                Import tables in this order to satisfy foreign key constraints:
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {DEFAULT_IMPORT_ORDER.map((tableName, index) => (
+                  <span key={`order-${tableName}`} style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.3rem 0.65rem',
+                    backgroundColor: '#fff',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    color: '#374151',
+                  }}>
+                    <span style={{ fontWeight: 700, color: '#E67E22', fontSize: '0.75rem' }}>{index + 1}</span>
+                    <code>{tableName}</code>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminImportPage() {
   const router = useRouter();
   const { user, hydrated } = useAuthStore();
@@ -547,121 +724,7 @@ export default function AdminImportPage() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '1rem' }}>
-              <div className="card-header">
-                <h3 className="card-title" style={{ fontSize: '0.95rem' }}>Import Format Guide</h3>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
-                    How files should look
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#4B5563', lineHeight: 1.55 }}>
-                    <div>1. Use one file per table.</div>
-                    <div>2. Name files after the table when possible, like <code>initiative.csv</code> or <code>submission_value.json</code>.</div>
-                    <div>3. CSV files must use the first row as exact column headers.</div>
-                    <div>4. JSON files must be an array of objects whose keys match importer column names.</div>
-                    <div>5. If a filename does not match a table, choose the table manually before review.</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
-                    Recommended batch order
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#4B5563', lineHeight: 1.55 }}>
-                    {DEFAULT_IMPORT_ORDER.map((tableName, index) => (
-                      <div key={`order-${tableName}`}>
-                        {index + 1}. <code>{tableName}</code>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
-                    CSV example
-                  </div>
-                  <pre style={{
-                    margin: 0,
-                    padding: '0.85rem',
-                    backgroundColor: '#111827',
-                    color: '#F9FAFB',
-                    borderRadius: '10px',
-                    fontSize: '0.76rem',
-                    lineHeight: 1.45,
-                    overflowX: 'auto',
-                  }}>
-{`initiative_name,description
-Community Wellness Dashboard Pilot,"Tracks workshop participation and referrals."
-STEM Family Night Expansion,"Measures event attendance and family engagement."`}
-                  </pre>
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
-                    JSON example
-                  </div>
-                  <pre style={{
-                    margin: 0,
-                    padding: '0.85rem',
-                    backgroundColor: '#111827',
-                    color: '#F9FAFB',
-                    borderRadius: '10px',
-                    fontSize: '0.76rem',
-                    lineHeight: 1.45,
-                    overflowX: 'auto',
-                  }}>
-{`[
-  {
-    "category_name": "community engagement",
-    "description": "Programs focused on outreach."
-  }
-]`}
-                  </pre>
-                </div>
-              </div>
-
-              <div style={{ marginTop: '1rem' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#111827', marginBottom: '0.4rem' }}>
-                  Supported tables and required columns
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                  {tables.map((table) => {
-                    const requiredColumns = table.columns.filter((column) => column.required).map((column) => column.name);
-
-                    return (
-                      <div
-                        key={`schema-${table.name}`}
-                        style={{
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '8px',
-                          padding: '0.7rem 0.85rem',
-                          backgroundColor: '#FAFAFA',
-                        }}
-                      >
-                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>
-                          {table.label} (<code>{table.name}</code>)
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#6B7280', marginTop: '0.2rem' }}>
-                          Required: {requiredColumns.length ? requiredColumns.map((name) => <code key={`${table.name}-${name}`} style={{ marginRight: '0.35rem' }}>{name}</code>) : 'none'}
-                        </div>
-                        <div style={{ fontSize: '0.76rem', color: '#6B7280', marginTop: '0.25rem', lineHeight: 1.5 }}>
-                          All columns: {table.columns.map((column) => (
-                            <code key={`${table.name}-all-${column.name}`} style={{ marginRight: '0.35rem' }}>
-                              {column.name}
-                            </code>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <FormatGuide tables={tables} />
 
             {stagedFiles.length > 0 && (
               <div className="card" style={{ padding: '1rem' }}>

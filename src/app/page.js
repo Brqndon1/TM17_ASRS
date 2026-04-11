@@ -197,10 +197,15 @@ export default function Home() {
           </h2>
           <p style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>{dateStr}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link href="/report-creation" className="btn-primary">+ Create Report</Link>
-          <Link href="/survey" className="btn-outline">Take Survey</Link>
-        </div>
+      </div>
+
+      {/* ── Quick Actions ── */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        {QUICK_ACTIONS.map((action, i) => (
+          <Link key={action.href} href={action.href} className={i === 0 ? 'btn-primary' : 'btn-outline'}>
+            {action.title}
+          </Link>
+        ))}
       </div>
 
       {/* ── Stats Row ── */}
@@ -270,37 +275,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* ── Quick Actions ── */}
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Quick Actions</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          {QUICK_ACTIONS.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              style={{ textDecoration: 'none' }}
-            >
-              <div style={{
-                border: '1px solid #E5E7EB',
-                borderRadius: 10,
-                padding: '14px 16px',
-                cursor: 'pointer',
-                transition: 'border-color 150ms ease, box-shadow 150ms ease',
-                background: '#fff',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,.15)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{action.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 3 }}>{action.title}</div>
-                <div style={{ fontSize: 11, color: '#9CA3AF', lineHeight: 1.4 }}>{action.description}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
     </PageLayout>
   );
 }
