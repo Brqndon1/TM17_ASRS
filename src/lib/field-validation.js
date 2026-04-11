@@ -21,11 +21,24 @@ export function validateFieldValue(value, field, rules) {
       return `Must be at most ${rules.maxLength} characters`;
     }
     if (rules.pattern) {
-      try {
-        if (!new RegExp(rules.pattern).test(str)) {
+      // Handle named patterns (e.g. "email", "phone") vs raw regex
+      const NAMED_PATTERNS = {
+        email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        phone: /^[\d\s\-\+\(\)\.]{7,20}$/,
+        url: /^https?:\/\/.+/i,
+      };
+      const namedRe = NAMED_PATTERNS[rules.pattern.toLowerCase()];
+      if (namedRe) {
+        if (!namedRe.test(str)) {
           return 'Does not match required format';
         }
-      } catch { /* skip invalid regex */ }
+      } else {
+        try {
+          if (!new RegExp(rules.pattern).test(str)) {
+            return 'Does not match required format';
+          }
+        } catch { /* skip invalid regex */ }
+      }
     }
   }
   if (field_type === 'number' || field_type === 'rating') {
