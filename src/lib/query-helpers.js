@@ -9,7 +9,7 @@ import { initializeDatabase, db } from '@/lib/db';
 export function queryTableData(database, initiativeId) {
   // Look up the fields linked to this initiative's form
   const fields = database.prepare(`
-    SELECT f.field_id, f.field_key, f.field_type
+    SELECT f.field_id, f.field_key, f.field_label, f.field_type
     FROM field f
     JOIN form_field ff ON ff.field_id = f.field_id
     JOIN form fm ON fm.form_id = ff.form_id
@@ -19,10 +19,17 @@ export function queryTableData(database, initiativeId) {
 
   if (fields.length === 0) return [];
 
-  // Build dynamic pivot columns: MAX(CASE WHEN sv.field_id = ? THEN ... END) AS key
+  // Build dynamic pivot columns using field_label for readable column names
+  // Fall back to field_key if label is empty; deduplicate by appending index
+  const usedLabels = new Set();
   const pivotCols = fields.map(f => {
     const valCol = f.field_type === 'number' ? 'sv.value_number' : 'sv.value_text';
-    return `MAX(CASE WHEN sv.field_id = ${f.field_id} THEN ${valCol} END) AS [${f.field_key}]`;
+    let label = f.field_label || f.field_key;
+    if (usedLabels.has(label)) {
+      label = `${label} (${f.field_id})`;
+    }
+    usedLabels.add(label);
+    return `MAX(CASE WHEN sv.field_id = ${f.field_id} THEN ${valCol} END) AS [${label}]`;
   }).join(',\n    ');
 
   const sql = `

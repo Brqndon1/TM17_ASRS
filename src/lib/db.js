@@ -252,6 +252,11 @@ function initializeDatabase() {
     migrationFixFieldTableConstraint();
     migrationRepairFieldBackupForeignKeys();
 
+    // Migration: add created_at / updated_at to initiative table
+    try { db.exec('ALTER TABLE initiative ADD COLUMN created_at TEXT'); } catch (e) { /* already exists */ }
+    try { db.exec('ALTER TABLE initiative ADD COLUMN updated_at TEXT'); } catch (e) { /* already exists */ }
+    try { db.exec("UPDATE initiative SET created_at = datetime('now'), updated_at = datetime('now') WHERE created_at IS NULL"); } catch (e) { /* ignore */ }
+
     // ── Design-doc tables ──────────────────────────────────
 
   db.exec(`
@@ -645,6 +650,8 @@ function initializeDatabase() {
   addColumnIfNotExists('initiative', "settings TEXT DEFAULT '{}'");
   addColumnIfNotExists('initiative', 'summary_json TEXT');
   addColumnIfNotExists('initiative', 'chart_data_json TEXT');
+  addColumnIfNotExists('initiative', "created_at TEXT DEFAULT (datetime('now'))");
+  addColumnIfNotExists('initiative', "updated_at TEXT DEFAULT (datetime('now'))");
 
   // User columns
   addColumnIfNotExists('user', 'verified INTEGER NOT NULL DEFAULT 0');

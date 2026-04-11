@@ -7,9 +7,6 @@ import { getInitiatives, getReportData } from '@/lib/data-service';
 
 import StepIndicator from '@/components/report-steps/StepIndicator';
 import StepConfig from '@/components/report-steps/StepConfig';
-import StepFilters from '@/components/report-steps/StepFilters';
-import StepExpressions from '@/components/report-steps/StepExpressions';
-import StepSorting from '@/components/report-steps/StepSorting';
 import StepTrends from '@/components/report-steps/StepTrends';
 import StepPreview from '@/components/report-steps/StepPreview';
 import { validateTrendConfig } from '@/lib/report-engine';
@@ -17,7 +14,7 @@ import { getUiEventBus } from '@/lib/events/ui-event-bus';
 import EVENTS from '@/lib/events/event-types';
 import { apiFetch } from '@/lib/api/client';
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 3;
 
 function getDefaultTrendConfig() {
   return {
@@ -29,7 +26,6 @@ function getDefaultTrendConfig() {
   };
 }
 
-const DRAFT_KEY_PREFIX = 'reportDraft';
 
 export default function ReportCreationPage() {
   const [userRole, setUserRole] = useState('public');
@@ -45,9 +41,6 @@ export default function ReportCreationPage() {
     selectedInitiative: null,
     reportName: '',
     description: '',
-    filters: {},
-    expressions: [],
-    sorts: [],
     trendConfig: getDefaultTrendConfig(),
     selectedAttributes: [],
     startDate: '',
@@ -86,60 +79,7 @@ export default function ReportCreationPage() {
       const data = await getInitiatives();
       setInitiatives(data);
       if (data.length > 0) {
-        const defaultInitiative = data[0];
-        const draftKey = `${DRAFT_KEY_PREFIX}:${defaultInitiative.id}`;
-        const rawDraft = localStorage.getItem(draftKey);
-        if (!rawDraft) {
-          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
-          setDraftLoaded(true);
-          return;
-        }
-
-        let parsedDraft = null;
-        try {
-          parsedDraft = JSON.parse(rawDraft);
-        } catch {
-          parsedDraft = null;
-        }
-
-        if (!parsedDraft || typeof parsedDraft !== 'object') {
-          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
-          setDraftLoaded(true);
-          return;
-        }
-
-        const shouldRestore = window.confirm('A saved report draft was found. Restore it?');
-        if (!shouldRestore) {
-          setReportConfig(prev => ({ ...prev, selectedInitiative: defaultInitiative }));
-          localStorage.removeItem(draftKey);
-          setDraftLoaded(true);
-          return;
-        }
-
-        const restoredInitiative = data.find((i) => i.id === parsedDraft.selectedInitiativeId) || defaultInitiative;
-        const availableAttrs = restoredInitiative.attributes || [];
-        const restoredTrend = {
-          ...getDefaultTrendConfig(),
-          ...(parsedDraft.trendConfig || {}),
-          variables: Array.isArray(parsedDraft?.trendConfig?.variables)
-            ? parsedDraft.trendConfig.variables.filter((v) => availableAttrs.includes(v)).slice(0, 5)
-            : [],
-        };
-
-        setReportConfig((prev) => ({
-          ...prev,
-          selectedInitiative: restoredInitiative,
-          reportName: parsedDraft.reportName || '',
-          description: parsedDraft.description || '',
-          filters: parsedDraft.filters || {},
-          expressions: Array.isArray(parsedDraft.expressions) ? parsedDraft.expressions : [],
-          sorts: Array.isArray(parsedDraft.sorts) ? parsedDraft.sorts : [],
-          trendConfig: restoredTrend,
-          selectedAttributes: Array.isArray(parsedDraft.selectedAttributes) ? parsedDraft.selectedAttributes : [],
-          startDate: parsedDraft.startDate || '',
-          endDate: parsedDraft.endDate || '',
-        }));
-        setCurrentStep(Number.isFinite(parsedDraft.currentStep) ? Math.max(0, Math.min(TOTAL_STEPS - 1, parsedDraft.currentStep)) : 0);
+        setReportConfig(prev => ({ ...prev, selectedInitiative: data[0] }));
       }
       setDraftLoaded(true);
     }
@@ -176,28 +116,6 @@ export default function ReportCreationPage() {
     });
   }, [reportConfig.selectedInitiative]);
 
-  useEffect(() => {
-    if (!draftLoaded || !reportConfig.selectedInitiative) return;
-    const handle = setTimeout(() => {
-      const key = `${DRAFT_KEY_PREFIX}:${reportConfig.selectedInitiative.id}`;
-      const payload = {
-        selectedInitiativeId: reportConfig.selectedInitiative.id,
-        reportName: reportConfig.reportName,
-        description: reportConfig.description,
-        filters: reportConfig.filters,
-        expressions: reportConfig.expressions,
-        sorts: reportConfig.sorts,
-        trendConfig: reportConfig.trendConfig,
-        selectedAttributes: reportConfig.selectedAttributes,
-        startDate: reportConfig.startDate,
-        endDate: reportConfig.endDate,
-        currentStep,
-        savedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(key, JSON.stringify(payload));
-    }, 800);
-    return () => clearTimeout(handle);
-  }, [draftLoaded, reportConfig, currentStep]);
 
   async function fetchReports() {
     setLoadingReports(true);
@@ -221,12 +139,9 @@ export default function ReportCreationPage() {
     if (currentStep === 0) {
       return reportConfig.selectedInitiative && reportConfig.reportName.trim().length > 0;
     }
-    if (currentStep === 4) {
-      const validation = validateTrendConfig(
-        reportConfig.trendConfig,
-        reportConfig.selectedInitiative?.attributes || []
-      );
-      return validation.valid;
+    if (currentStep === 1) {
+      // Trends step is always optional — user can proceed with or without trends
+      return true;
     }
     return true;
   }
@@ -246,17 +161,15 @@ export default function ReportCreationPage() {
   }
 
   function handleSkip() {
-    // Steps 2-5 can be skipped
-    if (currentStep >= 1 && currentStep <= 4) {
-      if (currentStep === 4) {
-        setReportConfig((prev) => ({
-          ...prev,
-          trendConfig: {
-            ...(prev.trendConfig || getDefaultTrendConfig()),
-            enabledCalc: false,
-          },
-        }));
-      }
+    // Only the Trends step (step 1) can be skipped
+    if (currentStep === 1) {
+      setReportConfig((prev) => ({
+        ...prev,
+        trendConfig: {
+          ...(prev.trendConfig || getDefaultTrendConfig()),
+          enabledCalc: false,
+        },
+      }));
       handleNext();
     }
   }
@@ -276,9 +189,9 @@ export default function ReportCreationPage() {
           name: reportConfig.reportName,
           description: reportConfig.description,
           createdBy: userRole,
-          filters: reportConfig.filters,
-          expressions: reportConfig.expressions,
-          sorts: reportConfig.sorts,
+          filters: {},
+          expressions: [],
+          sorts: [],
           selectedAttributes: reportConfig.selectedAttributes,
           trendConfig: reportConfig.trendConfig,
           includeAiInsights: reportConfig.includeAiInsights || false,
@@ -293,17 +206,11 @@ export default function ReportCreationPage() {
       const successPayload = await res.json().catch(() => ({}));
 
       // Reset form
-      if (reportConfig.selectedInitiative) {
-        localStorage.removeItem(`${DRAFT_KEY_PREFIX}:${reportConfig.selectedInitiative.id}`);
-      }
       setCurrentStep(0);
       setReportConfig({
         selectedInitiative: initiatives.length > 0 ? initiatives[0] : null,
         reportName: '',
         description: '',
-        filters: {},
-        expressions: [],
-        sorts: [],
         trendConfig: getDefaultTrendConfig(),
         selectedAttributes: [],
         startDate: '',
@@ -365,35 +272,13 @@ export default function ReportCreationPage() {
         );
       case 1:
         return (
-          <StepFilters
+          <StepTrends
             reportConfig={reportConfig}
             onChange={updateConfig}
             tableData={tableData}
           />
         );
       case 2:
-        return (
-          <StepExpressions
-            reportConfig={reportConfig}
-            onChange={updateConfig}
-            tableData={tableData}
-          />
-        );
-      case 3:
-        return (
-          <StepSorting
-            reportConfig={reportConfig}
-            onChange={updateConfig}
-          />
-        );
-      case 4:
-        return (
-          <StepTrends
-            reportConfig={reportConfig}
-            onChange={updateConfig}
-          />
-        );
-      case 5:
         return (
           <StepPreview
             reportConfig={reportConfig}
@@ -407,7 +292,7 @@ export default function ReportCreationPage() {
     }
   }
 
-  const isOptionalStep = currentStep >= 1 && currentStep <= 4;
+  const isOptionalStep = currentStep === 1;
 
   if (!authChecked) {
     return (

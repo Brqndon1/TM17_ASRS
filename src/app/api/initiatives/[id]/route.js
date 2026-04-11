@@ -32,7 +32,20 @@ export async function GET(request, { params }) {
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const row = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(id));
+    const row = db.prepare(`
+      SELECT
+        i.*,
+        c.category_name,
+        (SELECT COUNT(*) FROM submission s WHERE s.initiative_id = i.initiative_id) AS participant_count,
+        (SELECT ROUND(AVG(
+          CASE WHEN g.target_value > 0 THEN (g.current_value / g.target_value) * 100 ELSE 0 END
+        ), 1) FROM initiative_goal g WHERE g.initiative_id = i.initiative_id) AS avg_score
+      FROM initiative i
+      LEFT JOIN initiative_category ic ON ic.initiative_id = i.initiative_id
+      LEFT JOIN category c ON c.category_id = ic.category_id
+      WHERE i.initiative_id = ?
+      GROUP BY i.initiative_id
+    `).get(Number(id));
     if (!row) {
       return NextResponse.json({ error: 'Initiative not found' }, { status: 404 });
     }
@@ -66,9 +79,10 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
 
+    const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
     db.prepare(
-      'UPDATE initiative SET initiative_name = ?, description = ?, attributes = ?, questions = ?, settings = ? WHERE initiative_id = ?'
-    ).run(name, description, JSON.stringify(attributes), JSON.stringify(questions), JSON.stringify(settings), Number(id));
+      'UPDATE initiative SET initiative_name = ?, description = ?, attributes = ?, questions = ?, settings = ?, updated_at = ? WHERE initiative_id = ?'
+    ).run(name, description, JSON.stringify(attributes), JSON.stringify(questions), JSON.stringify(settings), now, Number(id));
 
     const updated = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(id));
     await syncInitiativesToJson(db);

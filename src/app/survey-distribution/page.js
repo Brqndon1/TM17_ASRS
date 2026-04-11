@@ -290,6 +290,14 @@ export default function SurveyDistributionPage() {
 
   return (
     <PageLayout title="Survey Distribution">
+      <button
+        className="btn-outline"
+        style={{ padding: '6px 12px', fontSize: 12, marginBottom: '16px' }}
+        onClick={() => router.push('/manage-surveys')}
+      >
+        &larr; Back
+      </button>
+
       {/* ── Stats Row ── */}
       <div className="stats-row">
         <div className="stat-card">

@@ -13,6 +13,7 @@ export default function ManageSurveysPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const formatEasternDateTime = (timestamp) => {
     if (!timestamp) return '—';
@@ -81,7 +82,10 @@ export default function ManageSurveysPage() {
   const selectedTemplate = templates.find((t) => String(t.id) === String(selectedTemplateId));
 
   const filteredSurveys = selectedTemplateId
-    ? surveys.filter((s) => String(s.responses?.templateId || '') === String(selectedTemplateId))
+    ? surveys.filter((s) => {
+        const tid = s.responses?.templateId;
+        return tid != null && String(tid) === String(selectedTemplateId);
+      })
     : surveys;
 
   const deleteSurvey = async (surveyId) => {
@@ -143,7 +147,10 @@ export default function ManageSurveysPage() {
 
   // Compute per-template response counts
   const responseCountByTemplate = (templateId) =>
-    surveys.filter((s) => String(s.responses?.templateId || '') === String(templateId)).length;
+    surveys.filter((s) => {
+      const tid = s.responses?.templateId;
+      return tid != null && String(tid) === String(templateId);
+    }).length;
 
   return (
     <PageLayout title="Manage Surveys">
@@ -185,70 +192,38 @@ export default function ManageSurveysPage() {
         </div>
       )}
 
-      {/* Filter controls */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <div className="card-header" style={{ marginBottom: '16px' }}>
-          <h2 className="card-title">Filter Submissions</h2>
+      {/* Analytics Section */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div className="card-header">
+          <h2 className="card-title">Survey Analytics</h2>
         </div>
-
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 280px' }}>
-            <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>
-              Filter by template
-            </label>
-            <select
-              value={selectedTemplateId}
-              onChange={(e) => {
-                setSelectedTemplateId(e.target.value);
-                setSelectedSurveyId('');
-              }}
-              style={{
-                width: '100%', padding: '0.6rem 0.85rem', borderRadius: '8px',
-                border: '1px solid #E5E7EB', fontSize: '0.9rem', outline: 'none',
-              }}
-            >
-              <option value="">-- All templates and submissions --</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  #{template.id} - {template.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ flex: '1 1 280px' }}>
-            <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>
-              Select specific submission (optional)
-            </label>
-            <select
-              value={selectedSurveyId}
-              onChange={(e) => setSelectedSurveyId(e.target.value)}
-              style={{
-                width: '100%', padding: '0.6rem 0.85rem', borderRadius: '8px',
-                border: '1px solid #E5E7EB', fontSize: '0.9rem', outline: 'none',
-              }}
-            >
-              <option value="">-- Select a submission --</option>
-              {filteredSurveys.map((survey) => (
-                <option key={survey.id} value={survey.id}>
-                  #{survey.id} - {survey.name} ({survey.email})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {selectedTemplate && (
-          <div style={{ marginTop: '12px', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Selected template:</span>
-            <span style={{ fontSize: '0.9rem', color: '#111827' }}>{selectedTemplate.title}</span>
-            <button
-              className="btn-outline"
-              style={{ padding: '5px 12px', fontSize: '12px', color: '#DC2626', borderColor: '#fca5a5' }}
-              onClick={() => deleteTemplate(selectedTemplate.id)}
-            >
-              Delete template + submissions
-            </button>
+        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginTop: 0, marginBottom: '16px' }}>
+          Submission distribution across templates
+        </p>
+        {templates.length === 0 ? (
+          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1rem' }}>No templates to analyze.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {templates.map((template) => {
+              const count = responseCountByTemplate(template.id);
+              const maxCount = Math.max(...templates.map((t) => responseCountByTemplate(t.id)), 1);
+              const barWidth = Math.round((count / maxCount) * 100);
+              return (
+                <div key={template.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
+                    <span style={{ color: '#374151', fontWeight: 500 }}>{template.title}</span>
+                    <span style={{ color: '#6B7280' }}>{count} response{count !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div style={{ height: '8px', backgroundColor: '#F3F4F6', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${barWidth}%`, height: '100%',
+                      backgroundColor: '#E67E22', borderRadius: '4px',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -342,10 +317,84 @@ export default function ManageSurveysPage() {
       <div className="card" style={{ marginBottom: '20px' }}>
         <div className="card-header">
           <h2 className="card-title">Survey Submissions</h2>
-          <span style={{ fontSize: '13px', color: '#6B7280' }}>
-            {filteredSurveys.length} submission{filteredSurveys.length !== 1 ? 's' : ''}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '13px', color: '#6B7280' }}>
+              {filteredSurveys.length} submission{filteredSurveys.length !== 1 ? 's' : ''}
+            </span>
+            <button
+              className="btn-outline"
+              style={{ padding: '6px 12px', fontSize: '12px' }}
+              onClick={() => setShowFilterPanel(!showFilterPanel)}
+            >
+              {showFilterPanel ? 'Hide Filter' : 'Filter'}
+            </button>
+          </div>
         </div>
+
+        {showFilterPanel && (
+          <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', borderRadius: '8px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 280px' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>
+                  Filter by template
+                </label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    setSelectedTemplateId(e.target.value);
+                    setSelectedSurveyId('');
+                  }}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.85rem', borderRadius: '8px',
+                    border: '1px solid #E5E7EB', fontSize: '0.9rem', outline: 'none',
+                  }}
+                >
+                  <option value="">-- All templates and submissions --</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      #{template.id} - {template.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: '1 1 280px' }}>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', color: '#374151', marginBottom: '6px' }}>
+                  Select specific submission (optional)
+                </label>
+                <select
+                  value={selectedSurveyId}
+                  onChange={(e) => setSelectedSurveyId(e.target.value)}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.85rem', borderRadius: '8px',
+                    border: '1px solid #E5E7EB', fontSize: '0.9rem', outline: 'none',
+                  }}
+                >
+                  <option value="">-- Select a submission --</option>
+                  {filteredSurveys.map((survey) => (
+                    <option key={survey.id} value={survey.id}>
+                      #{survey.id} - {survey.name} ({survey.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectedTemplate && (
+              <div style={{ marginTop: '12px', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>Selected template:</span>
+                <span style={{ fontSize: '0.9rem', color: '#111827' }}>{selectedTemplate.title}</span>
+                <button
+                  className="btn-outline"
+                  style={{ padding: '5px 12px', fontSize: '12px', color: '#DC2626', borderColor: '#fca5a5' }}
+                  onClick={() => deleteTemplate(selectedTemplate.id)}
+                >
+                  Delete template + submissions
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1.5rem' }}>Loading surveys...</p>
@@ -365,7 +414,7 @@ export default function ManageSurveysPage() {
                 </tr>
               </thead>
               <tbody>
-                {surveys.map((survey) => {
+                {filteredSurveys.map((survey) => {
                   const parsedResponses = survey.responses || {};
                   return (
                     <tr key={survey.id}>
@@ -411,41 +460,6 @@ export default function ManageSurveysPage() {
         </div>
       )}
 
-      {/* Analytics Section */}
-      <div className="card" style={{ marginTop: '20px' }}>
-        <div className="card-header">
-          <h2 className="card-title">Survey Analytics</h2>
-        </div>
-        <p style={{ color: '#6B7280', fontSize: '0.9rem', marginTop: 0, marginBottom: '16px' }}>
-          Submission distribution across templates
-        </p>
-        {templates.length === 0 ? (
-          <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '1rem' }}>No templates to analyze.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {templates.map((template) => {
-              const count = responseCountByTemplate(template.id);
-              const maxCount = Math.max(...templates.map((t) => responseCountByTemplate(t.id)), 1);
-              const barWidth = Math.round((count / maxCount) * 100);
-              return (
-                <div key={template.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
-                    <span style={{ color: '#374151', fontWeight: 500 }}>{template.title}</span>
-                    <span style={{ color: '#6B7280' }}>{count} response{count !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: '#F3F4F6', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${barWidth}%`, height: '100%',
-                      backgroundColor: '#E67E22', borderRadius: '4px',
-                      transition: 'width 0.3s ease',
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
     </PageLayout>
   );
 }

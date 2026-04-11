@@ -47,7 +47,50 @@ export function createTestDb() {
       chart_data_json TEXT,
       attributes TEXT,
       questions TEXT,
-      settings TEXT
+      settings TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE submission (
+      submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL,
+      form_id INTEGER NOT NULL,
+      submitted_at TEXT DEFAULT (datetime('now')),
+      submitted_by_user_id INTEGER,
+      FOREIGN KEY (initiative_id) REFERENCES initiative(initiative_id),
+      FOREIGN KEY (form_id) REFERENCES form(form_id)
+    );
+
+    CREATE TABLE submission_value (
+      submission_value_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      submission_id INTEGER NOT NULL,
+      field_id INTEGER NOT NULL,
+      value_text TEXT,
+      value_number REAL,
+      value_date TEXT,
+      value_bool INTEGER,
+      value_json TEXT,
+      UNIQUE(submission_id, field_id),
+      FOREIGN KEY (submission_id) REFERENCES submission(submission_id) ON DELETE CASCADE,
+      FOREIGN KEY (field_id) REFERENCES field(field_id)
+    );
+
+    CREATE TABLE initiative_goal (
+      goal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id INTEGER NOT NULL,
+      goal_name TEXT NOT NULL,
+      description TEXT,
+      target_metric TEXT NOT NULL,
+      target_value REAL NOT NULL,
+      current_value REAL NOT NULL DEFAULT 0,
+      weight REAL NOT NULL DEFAULT 1.0,
+      scoring_method TEXT NOT NULL DEFAULT 'linear',
+      deadline TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      created_by_user_id INTEGER,
+      FOREIGN KEY (initiative_id) REFERENCES initiative(initiative_id) ON DELETE CASCADE
     );
 
     CREATE TABLE category (

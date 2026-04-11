@@ -96,10 +96,24 @@ function InitiativeCreationContent() {
   const fetchInitiatives = async () => {
     try {
       setIsLoadingList(true);
-      const response = await apiFetch('/api/initiatives');
-      const data = await response.json();
-      if (response.ok) {
-        setInitiatives(data.initiatives || []);
+      const [initResponse, catResponse] = await Promise.all([
+        apiFetch('/api/initiatives'),
+        apiFetch('/api/initiative-categories'),
+      ]);
+      const initData = await initResponse.json();
+      const catData = await catResponse.json();
+      if (initResponse.ok) {
+        const catMap = {};
+        if (catData.relationships) {
+          for (const rel of catData.relationships) {
+            catMap[rel.initiative_id] = rel.category_name;
+          }
+        }
+        const enriched = (initData.initiatives || []).map(init => ({
+          ...init,
+          category: catMap[init.id] || init.settings?.category || null,
+        }));
+        setInitiatives(enriched);
       }
     } catch (error) {
       console.error('Error fetching initiatives:', error);
@@ -116,14 +130,15 @@ function InitiativeCreationContent() {
   useEffect(() => {
     if (!editId) { setIsEditing(false); return; }
     setIsEditing(true);
-    apiFetch(`/api/initiatives/${editId}`)
-      .then(r => r.json())
-      .then(data => {
+    Promise.all([
+      apiFetch(`/api/initiatives/${editId}`).then(r => r.json()),
+      apiFetch(`/api/initiative-categories?initiative_id=${editId}`).then(r => r.json()),
+    ])
+      .then(([data, catData]) => {
         if (data.initiative) {
           const init = data.initiative;
           setName(init.name || '');
           setDescription(init.description || '');
-          setCategory(init.settings?.category || '');
           setSelectedAttributes(init.attributes || []);
           setStatus(init.settings?.status || 'Active');
           setIsPublic(!!init.settings?.isPublic);
@@ -131,17 +146,31 @@ function InitiativeCreationContent() {
             setAddQuestions(true);
             setQuestions(init.questions);
           }
-          // Scroll to the form
+          if (catData.relationships && catData.relationships.length > 0) {
+            setCategoryId(String(catData.relationships[0].category_id));
+          }
           setTimeout(() => document.getElementById('create-form')?.scrollIntoView({ behavior: 'smooth' }), 200);
         }
       })
       .catch(err => console.error('Error loading initiative:', err));
   }, [editId]);
 
+  // ── Categories from database ───────────────────────────
+  const [dbCategories, setDbCategories] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/categories')
+      .then(r => r.json())
+      .then(data => {
+        if (data.categories) setDbCategories(data.categories);
+      })
+      .catch(err => console.error('Error fetching categories:', err));
+  }, []);
+
   // ── Create-form state ──────────────────────────────────
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [selectedAttributes, setSelectedAttributes] = useState([]);
   const [customAttributes, setCustomAttributes] = useState([]);
   const [newAttribute, setNewAttribute] = useState('');
@@ -228,6 +257,7 @@ function InitiativeCreationContent() {
           attributes: selectedAttributes,
           questions: cleanedQuestions,
           settings: { status: effectiveStatus, isPublic },
+          categoryId: categoryId || null,
         },
       });
       setShowReasonModal(true);
@@ -244,7 +274,8 @@ function InitiativeCreationContent() {
     if (!pendingAction) return;
     setIsSubmitting(true);
     try {
-      const body = { ...pendingAction.payload, reasonType, reasonText };
+      const { categoryId: selectedCategoryId, ...rest } = pendingAction.payload;
+      const body = { ...rest, reasonType, reasonText };
       const url = isEditing ? `/api/initiatives/${editId}` : '/api/initiatives';
       const method = isEditing ? 'PUT' : 'POST';
       const response = await apiFetch(url, {
@@ -256,11 +287,44 @@ function InitiativeCreationContent() {
       const data = await response.json();
 
       if (response.ok) {
+        const initiativeId = isEditing ? Number(editId) : data.initiative?.id;
+
+        if (initiativeId && selectedCategoryId) {
+          if (isEditing) {
+            const existingCats = await apiFetch(`/api/initiative-categories?initiative_id=${initiativeId}`).then(r => r.json());
+            if (existingCats.relationships) {
+              for (const rel of existingCats.relationships) {
+                await apiFetch('/api/initiative-categories', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ initiative_id: initiativeId, category_id: rel.category_id }),
+                });
+              }
+            }
+          }
+          await apiFetch('/api/initiative-categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initiative_id: initiativeId, category_id: Number(selectedCategoryId) }),
+          });
+        } else if (initiativeId && !selectedCategoryId && isEditing) {
+          const existingCats = await apiFetch(`/api/initiative-categories?initiative_id=${initiativeId}`).then(r => r.json());
+          if (existingCats.relationships) {
+            for (const rel of existingCats.relationships) {
+              await apiFetch('/api/initiative-categories', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initiative_id: initiativeId, category_id: rel.category_id }),
+              });
+            }
+          }
+        }
+
         setMessage(isEditing ? 'Initiative updated successfully!' : 'Initiative created successfully!');
         if (!isEditing) {
           setName('');
           setDescription('');
-          setCategory('');
+          setCategoryId('');
           setSelectedAttributes([]);
           setCustomAttributes([]);
           setNewAttribute('');
@@ -454,20 +518,18 @@ function InitiativeCreationContent() {
               <div>
                 <label style={labelStyle}>Category</label>
                 <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
                   style={{ ...inputStyle, cursor: 'pointer' }}
                   onFocus={(e) => { e.target.style.borderColor = '#E67E22'; e.target.style.boxShadow = '0 0 0 3px rgba(230,126,34,.1)'; }}
                   onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
                 >
                   <option value="">Select category…</option>
-                  <option value="STEM">STEM</option>
-                  <option value="Arts">Arts</option>
-                  <option value="Sports">Sports</option>
-                  <option value="Community">Community</option>
-                  <option value="Academic">Academic</option>
-                  <option value="Career">Career</option>
-                  <option value="Other">Other</option>
+                  {dbCategories.map((cat) => (
+                    <option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

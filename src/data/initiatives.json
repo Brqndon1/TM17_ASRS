@@ -14,7 +14,10 @@
         "Completion Status"
       ],
       "questions": [],
-      "settings": {}
+      "settings": {
+        "status": "Active",
+        "isPublic": false
+      }
     },
     {
       "id": 2,

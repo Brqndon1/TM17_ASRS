@@ -708,6 +708,11 @@ export default function SurveyPage() {
 
                   {/* Survey Title & Description */}
                   <div style={{ marginBottom: '24px' }}>
+                    {surveyTemplate?.initiative_name && (
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#E67E22', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        {surveyTemplate.initiative_name}
+                      </div>
+                    )}
                     <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#111827', margin: '0 0 6px' }}>
                       {surveyTemplate ? surveyTemplate.title : 'Take a Survey'}
                     </h1>

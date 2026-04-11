@@ -11,13 +11,21 @@ function safeParseJson(value, fallback) {
 export function toInitiativeDto(row) {
   if (!row) return null;
 
+  const settings = safeParseJson(row.settings, {});
+
   return {
     id: Number(row.initiative_id),
     name: row.initiative_name || '',
     description: row.description || '',
     attributes: safeParseJson(row.attributes, []),
     questions: safeParseJson(row.questions, []),
-    settings: safeParseJson(row.settings, {}),
+    settings,
+    status: settings.status || 'Active',
+    category: row.category_name || settings.category || null,
+    participant_count: row.participant_count != null ? Number(row.participant_count) : 0,
+    avg_score: row.avg_score != null ? Number(row.avg_score) : 0,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
   };
 }
 

@@ -2,6 +2,16 @@ import db from '../../../../lib/db.js';
 import { requirePermission } from '@/lib/auth/server-auth';
 import { logAudit } from '@/lib/audit';
 
+// Map UI-only field types to valid DB types.
+// DB CHECK constraint: field_type IN ('text','number','date','boolean','select','multiselect','rating','json','choice','yesno')
+const UI_TO_DB_TYPE = {
+  textarea: 'text',
+  checkbox: 'boolean',
+  radio: 'choice',
+  email: 'text',
+  url: 'text',
+};
+
 function resolveRules(fieldRulesJson, formFieldRulesJson) {
   const base = fieldRulesJson ? JSON.parse(fieldRulesJson) : null;
   const override = formFieldRulesJson ? JSON.parse(formFieldRulesJson) : null;
@@ -38,15 +48,18 @@ export async function GET() {
       const rawOptions = (isOptionType || isYesNo)
         ? getOptions.all(q.field_id).map(opt => opt.option_value)
         : undefined;
+      const rules = resolveRules(q.field_rules, q.form_field_rules);
+      // Prefer ui_type from validation_rules (original UI type), fall back to DB field_type
+      const displayType = (rules && rules.ui_type) || q.field_type;
       return {
         id: q.field_id,
         text: {
           question: q.field_label,
-          type: q.field_type,
+          type: displayType,
           required: !!q.required,
           scope: q.scope,
           initiative_id: q.initiative_id,
-          validation_rules: resolveRules(q.field_rules, q.form_field_rules),
+          validation_rules: rules,
           ...(isOptionType && rawOptions ? { options: rawOptions } : {}),
           ...(isYesNo && rawOptions ? { subQuestions: rawOptions } : {}),
           ...(q.help_text ? { help_text: q.help_text } : {}),
@@ -111,33 +124,47 @@ export async function POST(request) {
         const textObj = typeof q === 'object' && q.text ? q.text : q;
         const fieldKey = `${title}_${displayOrder}_${Date.now()}`;
         const fieldLabel = textObj.question || '';
-        const fieldType = textObj.type || 'text';
+        const uiFieldType = textObj.type || 'text';
+        // For checkbox with options, use multiselect instead of boolean
+        let dbFieldType;
+        if (uiFieldType === 'checkbox' && Array.isArray(textObj.options) && textObj.options.length > 0) {
+          dbFieldType = 'multiselect';
+        } else {
+          dbFieldType = UI_TO_DB_TYPE[uiFieldType] || uiFieldType;
+        }
         const required = textObj.required ? 1 : 0;
         const helpText = textObj.help_text || null;
         const scope = textObj.scope || 'common';
         const fieldInitiativeId = scope === 'initiative_specific' ? effectiveInitiativeId : null;
-        const rulesJson = textObj.validation_rules ? JSON.stringify(textObj.validation_rules) : null;
+
+        // Merge ui_type into validation_rules so the renderer knows the original display type
+        const baseRules = textObj.validation_rules || {};
+        if (uiFieldType !== dbFieldType) {
+          baseRules.ui_type = uiFieldType;
+        }
+        const rulesJson = Object.keys(baseRules).length > 0 ? JSON.stringify(baseRules) : null;
         const formFieldRulesJson = textObj.form_validation_rules ? JSON.stringify(textObj.form_validation_rules) : null;
 
         let fieldId;
-        if (textObj.field_id) {
+        // Only look up existing fields by numeric ID; synthetic IDs (strings) are always new
+        if (textObj.field_id && typeof textObj.field_id === 'number') {
           const existingField = db.prepare('SELECT field_id FROM field WHERE field_id = ?').get(textObj.field_id);
           if (existingField) fieldId = existingField.field_id;
         }
         if (!fieldId) {
-          // Insert field
-          const fieldResult = insertField.run(fieldKey, fieldLabel, fieldType, scope, fieldInitiativeId, rulesJson);
+          // Insert field with the DB-safe type
+          const fieldResult = insertField.run(fieldKey, fieldLabel, dbFieldType, scope, fieldInitiativeId, rulesJson);
           fieldId = fieldResult.lastInsertRowid;
 
-          // Insert options for select/choice/multiselect types
-          if ((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && Array.isArray(textObj.options)) {
+          // Insert options for select/choice/multiselect types (use dbFieldType for the check since radio maps to choice)
+          if ((dbFieldType === 'select' || dbFieldType === 'choice' || dbFieldType === 'multiselect') && Array.isArray(textObj.options)) {
             textObj.options.forEach((opt, idx) => {
               insertOption.run(fieldId, opt, opt, idx);
             });
           }
 
           // Insert sub-questions for yesno type (stored as field_options)
-          if (fieldType === 'yesno' && Array.isArray(textObj.subQuestions)) {
+          if (dbFieldType === 'yesno' && Array.isArray(textObj.subQuestions)) {
             textObj.subQuestions.forEach((sub, idx) => {
               insertOption.run(fieldId, sub, sub, idx);
             });
@@ -151,10 +178,10 @@ export async function POST(request) {
           id: fieldId,
           text: {
             question: fieldLabel,
-            type: fieldType,
+            type: uiFieldType,
             required: !!required,
-            ...((fieldType === 'select' || fieldType === 'choice' || fieldType === 'multiselect') && textObj.options ? { options: textObj.options } : {}),
-            ...(fieldType === 'yesno' && textObj.subQuestions ? { subQuestions: textObj.subQuestions } : {}),
+            ...((dbFieldType === 'select' || dbFieldType === 'choice' || dbFieldType === 'multiselect') && textObj.options ? { options: textObj.options } : {}),
+            ...(dbFieldType === 'yesno' && textObj.subQuestions ? { subQuestions: textObj.subQuestions } : {}),
             ...(helpText ? { help_text: helpText } : {})
           }
         });

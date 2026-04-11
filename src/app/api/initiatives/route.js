@@ -31,7 +31,19 @@ export async function GET(request) {
     const auth = requireAuth(request, db);
     if (auth.error) return auth.error;
 
-    const rows = db.prepare('SELECT * FROM initiative').all();
+    const rows = db.prepare(`
+      SELECT
+        i.*,
+        c.category_name,
+        (SELECT COUNT(*) FROM submission s WHERE s.initiative_id = i.initiative_id) AS participant_count,
+        (SELECT ROUND(AVG(
+          CASE WHEN g.target_value > 0 THEN (g.current_value / g.target_value) * 100 ELSE 0 END
+        ), 1) FROM initiative_goal g WHERE g.initiative_id = i.initiative_id) AS avg_score
+      FROM initiative i
+      LEFT JOIN initiative_category ic ON ic.initiative_id = i.initiative_id
+      LEFT JOIN category c ON c.category_id = ic.category_id
+      GROUP BY i.initiative_id
+    `).all();
     const initiatives = rows.map(toInitiativeDto);
     return NextResponse.json({ initiatives });
   } catch (error) {
@@ -53,14 +65,17 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
 
+    const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
     const result = db.prepare(
-      'INSERT INTO initiative (initiative_name, description, attributes, questions, settings) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO initiative (initiative_name, description, attributes, questions, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       input.name,
       input.description,
       JSON.stringify(input.attributes),
       JSON.stringify(input.questions),
-      JSON.stringify(input.settings)
+      JSON.stringify(input.settings),
+      now,
+      now
     );
 
     const row = db.prepare('SELECT * FROM initiative WHERE initiative_id = ?').get(Number(result.lastInsertRowid));

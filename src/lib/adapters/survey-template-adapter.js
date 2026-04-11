@@ -34,6 +34,8 @@ export function toSurveyTemplateViewModel(template) {
     id: template.id,
     title: template.title || 'Untitled Survey',
     description: template.description || '',
+    initiative_id: template.initiative_id || null,
+    initiative_name: template.initiative_name || null,
     questions,
     createdAt: template.createdAt || null,
     published: Boolean(template.published),

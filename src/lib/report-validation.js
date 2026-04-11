@@ -115,16 +115,18 @@ export function validateReportUpdatePayload(body) {
   if (body.description !== undefined && typeof body.description !== 'string') {
     return { valid: false, error: 'description must be a string' };
   }
-  if (body.status !== undefined && !['generating', 'completed', 'failed'].includes(body.status)) {
-    return { valid: false, error: 'status must be one of: generating, completed, failed' };
+  if (body.status !== undefined && !['generating', 'completed', 'failed', 'published', 'draft', 'archived'].includes(body.status)) {
+    return { valid: false, error: 'status must be one of: generating, completed, failed, published, draft, archived' };
   }
   if (body.name === undefined && body.description === undefined && body.status === undefined) {
     return { valid: false, error: 'No fields to update' };
   }
 
-  // Validate reason fields
-  if (typeof body.reasonType !== 'string' || body.reasonType.trim() === '') {
-    return { valid: false, error: 'reasonType is required and must be a non-empty string' };
+  const hasNonStatusChanges = body.name !== undefined || body.description !== undefined;
+  if (hasNonStatusChanges) {
+    if (typeof body.reasonType !== 'string' || body.reasonType.trim() === '') {
+      return { valid: false, error: 'reasonType is required and must be a non-empty string' };
+    }
   }
   if (body.reasonText !== undefined && typeof body.reasonText !== 'string') {
     return { valid: false, error: 'reasonText must be a string if provided' };

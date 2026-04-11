@@ -57,12 +57,14 @@ export async function GET(request, context) {
       );
     }
 
-    // Query form by form_id
+    // Query form by form_id (with initiative name)
     const form = db.prepare(`
-      SELECT form_id AS id, form_name AS title, description, created_at,
-             is_published AS published, initiative_id
-      FROM form
-      WHERE form_id = ?
+      SELECT f.form_id AS id, f.form_name AS title, f.description, f.created_at,
+             f.is_published AS published, f.initiative_id,
+             i.initiative_name
+      FROM form f
+      LEFT JOIN initiative i ON i.initiative_id = f.initiative_id
+      WHERE f.form_id = ?
     `).get(templateId);
 
     if (!form) {
@@ -118,6 +120,7 @@ export async function GET(request, context) {
       title: form.title,
       description: form.description,
       initiative_id: form.initiative_id,
+      initiative_name: form.initiative_name || null,
       questions,
       createdAt: form.created_at,
       published: !!form.published

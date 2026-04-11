@@ -1,12 +1,9 @@
 'use client';
 
 const STEPS = [
-  { label: 'Config', icon: '1' },
-  { label: 'Filters', icon: '2' },
-  { label: 'Expressions', icon: '3' },
-  { label: 'Sorting', icon: '4' },
-  { label: 'Trends', icon: '5' },
-  { label: 'Preview', icon: '6' },
+  { label: 'Configuration', icon: '1' },
+  { label: 'Trends', icon: '2' },
+  { label: 'Preview & Generate', icon: '3' },
 ];
 
 export default function StepIndicator({ currentStep }) {

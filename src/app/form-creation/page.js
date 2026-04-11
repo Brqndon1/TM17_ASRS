@@ -18,6 +18,59 @@ const QUESTION_TYPE_DEFS = [
   { type: 'url',        label: 'URL / Link',    icon: '🔗' },
 ];
 
+// Pre-built required fields that are automatically included in every form.
+// These cannot be removed by the user.
+const REQUIRED_FIELDS = [
+  {
+    field_id: 'required-full-name',
+    field_key: 'full_name',
+    field_label: 'Full Name',
+    field_type: 'text',
+    scope: 'common',
+    required: true,
+    help_text: '',
+    validation_rules: { minLength: 2, maxLength: 100 },
+    options: [],
+    _locked: true,
+  },
+  {
+    field_id: 'required-email',
+    field_key: 'email',
+    field_label: 'Email Address',
+    field_type: 'email',
+    scope: 'common',
+    required: true,
+    help_text: '',
+    validation_rules: { pattern: 'email' },
+    options: [],
+    _locked: true,
+  },
+  {
+    field_id: 'required-phone',
+    field_key: 'phone_number',
+    field_label: 'Phone Number',
+    field_type: 'text',
+    scope: 'common',
+    required: true,
+    help_text: 'e.g. (555) 123-4567',
+    validation_rules: { pattern: 'phone' },
+    options: [],
+    _locked: true,
+  },
+  {
+    field_id: 'required-school',
+    field_key: 'school',
+    field_label: 'School',
+    field_type: 'text',
+    scope: 'common',
+    required: true,
+    help_text: '',
+    validation_rules: { minLength: 2, maxLength: 150 },
+    options: [],
+    _locked: true,
+  },
+];
+
 export default function FormCreationPage() {
   const [userRole, setUserRole] = useState('staff');
   const [initiatives, setInitiatives] = useState([]);
@@ -25,9 +78,10 @@ export default function FormCreationPage() {
   const [selectedInitiative, setSelectedInitiative] = useState('');
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [selectedFields, setSelectedFields] = useState([]);
+  const [selectedFields, setSelectedFields] = useState([...REQUIRED_FIELDS]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [questionTab, setQuestionTab] = useState('types');
 
   useEffect(() => {
     Promise.all([
@@ -52,6 +106,7 @@ export default function FormCreationPage() {
 
   const addField = (field) => {
     if (selectedFields.some(sf => sf.field_id === field.field_id)) return;
+    const needsOptions = ['select', 'radio', 'checkbox'].includes(field.field_type);
     setSelectedFields([...selectedFields, {
       field_id: field.field_id,
       field_key: field.field_key,
@@ -61,10 +116,13 @@ export default function FormCreationPage() {
       required: !!field.is_required_default,
       help_text: '',
       validation_rules: null,
+      options: needsOptions ? (field.options || ['Option 1', 'Option 2']) : [],
     }]);
   };
 
   const removeField = (fieldId) => {
+    const field = selectedFields.find(f => f.field_id === fieldId);
+    if (field?._locked) return; // Cannot remove pre-built required fields
     setSelectedFields(selectedFields.filter(f => f.field_id !== fieldId));
   };
 
@@ -94,15 +152,21 @@ export default function FormCreationPage() {
         title: formName,
         description: formDescription,
         initiative_id: Number(selectedInitiative),
-        questions: selectedFields.map(f => ({
-          field_id: f.field_id,
-          question: f.field_label,
-          type: f.field_type,
-          required: f.required,
-          help_text: f.help_text || undefined,
-          scope: f.scope,
-          form_validation_rules: f.validation_rules || undefined,
-        })),
+        questions: selectedFields.map(f => {
+          // Only send field_id for existing catalog fields (numeric IDs).
+          // Synthetic fields (string IDs like 'synthetic-text-...') are new and should be created.
+          const isSynthetic = typeof f.field_id === 'string' && f.field_id.startsWith('synthetic-');
+          return {
+            ...(isSynthetic ? {} : { field_id: f.field_id }),
+            question: f.field_label,
+            type: f.field_type,
+            required: f.required,
+            help_text: f.help_text || undefined,
+            scope: f.scope,
+            form_validation_rules: f.validation_rules || undefined,
+            ...(f.options && f.options.length > 0 ? { options: f.options } : {}),
+          };
+        }),
       };
 
       const res = await apiFetch('/api/surveys/templates', {
@@ -115,7 +179,7 @@ export default function FormCreationPage() {
       alert('Form created successfully!');
       setFormName('');
       setFormDescription('');
-      setSelectedFields([]);
+      setSelectedFields([...REQUIRED_FIELDS]);
     } catch (err) {
       alert('Error: ' + (err.message || err));
     } finally {
@@ -164,24 +228,80 @@ export default function FormCreationPage() {
 
         {/* ── Left: Canvas (60%) ── */}
         <div style={{ flex: '3 1 400px', minWidth: 0 }}>
-          {/* Empty state */}
-          {selectedFields.length === 0 && (
+
+          {/* ── Required Information Section (locked) ── */}
+          <div style={{
+            backgroundColor: '#FEFCE8',
+            border: '1px solid #FDE68A',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '14px' }}>🔒</span>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#92400E', margin: 0 }}>Required Information</h3>
+              <span style={{ fontSize: '11px', color: '#92400E', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>Auto-included</span>
+            </div>
+            {selectedFields.filter(f => f._locked).map((sf) => {
+              const typeDef = QUESTION_TYPE_DEFS.find(t => t.type === sf.field_type) || { label: sf.field_type, icon: '?' };
+              return (
+                <div
+                  key={sf.field_id}
+                  style={{
+                    backgroundColor: 'white',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '600', padding: '1px 6px', borderRadius: '9999px', backgroundColor: '#FFF7ED', color: '#E67E22', border: '1px solid #FED7AA' }}>
+                        {typeDef.icon} {typeDef.label}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: '600' }}>required</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#111827' }}>{sf.field_label}</div>
+                    {sf.help_text && (
+                      <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>{sf.help_text}</div>
+                    )}
+                  </div>
+                  <div style={{ height: '28px', flex: '0 0 180px', border: '1px solid #E5E7EB', borderRadius: '6px', backgroundColor: '#F9FAFB' }} />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Custom Questions Section ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827', margin: 0 }}>Custom Questions</h3>
+            <span style={{ fontSize: '11px', color: '#6B7280' }}>
+              {selectedFields.filter(f => !f._locked).length} added
+            </span>
+          </div>
+
+          {/* Empty state — only show when no custom questions added */}
+          {selectedFields.every(f => f._locked) && (
             <div style={{
               border: '2px dashed #E5E7EB',
               borderRadius: '12px',
-              padding: '48px 24px',
+              padding: '24px',
               textAlign: 'center',
               color: '#9CA3AF',
               marginBottom: '16px',
             }}>
-              <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
-              <p style={{ fontWeight: '600', margin: '0 0 4px' }}>No questions yet</p>
-              <p style={{ fontSize: '13px', margin: 0 }}>Add question types from the palette on the right</p>
+              <p style={{ fontWeight: '600', margin: '0 0 4px', fontSize: '13px' }}>Add custom questions from the palette on the right</p>
+              <p style={{ fontSize: '12px', margin: 0 }}>Required information fields are already included above</p>
             </div>
           )}
 
-          {/* Question blocks */}
-          {selectedFields.map((sf, idx) => {
+          {/* Custom question blocks (non-locked only) */}
+          {selectedFields.filter(f => !f._locked).map((sf) => {
+            const idx = selectedFields.indexOf(sf);
             const typeDef = QUESTION_TYPE_DEFS.find(t => t.type === sf.field_type) || { label: sf.field_type, icon: '?' };
             return (
               <div
@@ -228,9 +348,27 @@ export default function FormCreationPage() {
                     )}
                   </div>
 
-                  <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827', marginBottom: '6px' }}>
-                    {sf.field_label}
-                  </div>
+                  <input
+                    value={sf.field_label}
+                    onChange={e => updateFieldConfig(sf.field_id, 'field_label', e.target.value)}
+                    placeholder="Enter question text..."
+                    style={{
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      color: '#111827',
+                      marginBottom: '6px',
+                      width: '100%',
+                      border: '1px solid transparent',
+                      borderRadius: '6px',
+                      padding: '4px 6px',
+                      outline: 'none',
+                      backgroundColor: 'transparent',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.15s, background-color 0.15s',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.backgroundColor = '#F9FAFB'; }}
+                    onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.backgroundColor = 'transparent'; }}
+                  />
 
                   {/* Preview field */}
                   {(sf.field_type === 'text' || sf.field_type === 'email' || sf.field_type === 'url' || sf.field_type === 'number' || sf.field_type === 'date') && (
@@ -242,6 +380,47 @@ export default function FormCreationPage() {
                   {sf.field_type === 'rating' && (
                     <div style={{ display: 'flex', gap: '4px' }}>
                       {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: '18px', color: '#D1D5DB' }}>★</span>)}
+                    </div>
+                  )}
+
+                  {/* Options editor for select/radio/checkbox */}
+                  {['select', 'radio', 'checkbox'].includes(sf.field_type) && (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#6B7280', marginBottom: '6px' }}>
+                        Answer Options
+                      </div>
+                      {(sf.options || []).map((opt, optIdx) => (
+                        <div key={optIdx} style={{ display: 'flex', gap: '6px', marginBottom: '4px', alignItems: 'center' }}>
+                          <span style={{ color: '#D1D5DB', fontSize: '14px', flexShrink: 0 }}>
+                            {sf.field_type === 'radio' ? '○' : sf.field_type === 'checkbox' ? '☐' : '•'}
+                          </span>
+                          <input
+                            value={opt}
+                            onChange={(e) => {
+                              const newOpts = [...(sf.options || [])];
+                              newOpts[optIdx] = e.target.value;
+                              updateFieldConfig(sf.field_id, 'options', newOpts);
+                            }}
+                            style={{ flex: 1, padding: '4px 8px', borderRadius: '6px', border: '1px solid #E5E7EB', fontSize: '13px', outline: 'none' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newOpts = (sf.options || []).filter((_, i) => i !== optIdx);
+                              updateFieldConfig(sf.field_id, 'options', newOpts);
+                            }}
+                            style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: '16px', padding: '0 2px' }}
+                          >x</button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newOpts = [...(sf.options || []), `Option ${(sf.options || []).length + 1}`];
+                          updateFieldConfig(sf.field_id, 'options', newOpts);
+                        }}
+                        style={{ fontSize: '12px', color: '#E67E22', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', fontWeight: 500 }}
+                      >+ Add Option</button>
                     </div>
                   )}
 
@@ -264,7 +443,6 @@ export default function FormCreationPage() {
                   </div>
                 </div>
 
-                {/* Delete button */}
                 <button
                   type="button"
                   onClick={() => removeField(sf.field_id)}
@@ -351,103 +529,146 @@ export default function FormCreationPage() {
             )}
           </div>
 
-          {/* Add a Question */}
+          {/* Add a Question — tabbed interface */}
           <div className="card" style={{ padding: '20px' }}>
-            <div className="card-header" style={{ marginBottom: '4px' }}>
-              <span className="card-title">Add a Question</span>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #E5E7EB', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setQuestionTab('types')}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: questionTab === 'types' ? '#E67E22' : '#6B7280',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: questionTab === 'types' ? '2px solid #E67E22' : '2px solid transparent',
+                  cursor: 'pointer',
+                  marginBottom: '-1px',
+                }}
+              >Question Types</button>
+              <button
+                type="button"
+                onClick={() => setQuestionTab('saved')}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: questionTab === 'saved' ? '#E67E22' : '#6B7280',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: questionTab === 'saved' ? '2px solid #E67E22' : '2px solid transparent',
+                  cursor: 'pointer',
+                  marginBottom: '-1px',
+                }}
+              >Saved Questions</button>
             </div>
-            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
-              Click a type below to add it to your form
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {QUESTION_TYPE_DEFS.map((t) => (
-                <button
-                  key={t.type}
-                  type="button"
-                  onClick={() => {
-                    const catalogField = availableFields.find(f => f.field_type === t.type);
-                    if (catalogField) {
-                      addField(catalogField);
-                    } else {
-                      const syntheticId = `synthetic-${t.type}-${Date.now()}`;
-                      setSelectedFields(prev => [...prev, {
-                        field_id: syntheticId,
-                        field_key: t.type,
-                        field_label: t.label,
-                        field_type: t.type,
-                        scope: 'common',
-                        required: false,
-                        help_text: '',
-                        validation_rules: null,
-                      }]);
-                    }
-                  }}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#F9FAFB',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'background-color 0.15s, border-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.color = '#E67E22'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}
-                >
-                  <span>{t.icon}</span>
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Saved Questions — only show if catalog has fields */}
-          {availableFields.length > 0 && (
-            <div className="card" style={{ padding: '20px' }}>
-              <div className="card-header" style={{ marginBottom: '4px' }}>
-                <span className="card-title">Saved Questions</span>
-              </div>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
-                Pre-configured questions from your organization. Click to add.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {availableFields.map(f => {
-                  const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
-                  return (
+            {/* Question Types tab */}
+            {questionTab === 'types' && (
+              <>
+                <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
+                  Click a type below to add it to your form
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {QUESTION_TYPE_DEFS.map((t) => (
                     <button
-                      key={f.field_id}
+                      key={t.type}
                       type="button"
-                      onClick={() => addField(f)}
-                      disabled={isAdded}
+                      onClick={() => {
+                        const catalogField = availableFields.find(f => f.field_type === t.type);
+                        if (catalogField) {
+                          addField(catalogField);
+                        } else {
+                          const syntheticId = `synthetic-${t.type}-${Date.now()}`;
+                          const needsOptions = ['select', 'radio', 'checkbox'].includes(t.type);
+                          setSelectedFields(prev => [...prev, {
+                            field_id: syntheticId,
+                            field_key: t.type,
+                            field_label: t.label,
+                            field_type: t.type,
+                            scope: 'common',
+                            required: false,
+                            help_text: '',
+                            validation_rules: null,
+                            options: needsOptions ? ['Option 1', 'Option 2'] : [],
+                          }]);
+                        }
+                      }}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '9999px',
+                        padding: '10px 8px',
+                        borderRadius: '8px',
+                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#F9FAFB',
+                        cursor: 'pointer',
                         fontSize: '12px',
-                        cursor: isAdded ? 'default' : 'pointer',
-                        border: `1px solid ${isAdded ? '#E5E7EB' : f.scope === 'common' ? '#BFDBFE' : '#FED7AA'}`,
-                        backgroundColor: isAdded ? '#F3F4F6' : f.scope === 'common' ? '#EFF6FF' : '#FFF7ED',
-                        color: isAdded ? '#9CA3AF' : f.scope === 'common' ? '#2563EB' : '#E67E22',
-                        opacity: isAdded ? 0.6 : 1,
                         fontWeight: '500',
+                        color: '#374151',
+                        textAlign: 'left',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: '6px',
+                        transition: 'background-color 0.15s, border-color 0.15s',
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFF7ED'; e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.color = '#E67E22'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}
                     >
-                      {isAdded && <span>&#10003;</span>}
-                      {f.field_label}
+                      <span>{t.icon}</span>
+                      <span>{t.label}</span>
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Saved Questions tab */}
+            {questionTab === 'saved' && (
+              <>
+                {availableFields.length > 0 ? (
+                  <>
+                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px' }}>
+                      Pre-configured questions from your organization. Click to add.
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {availableFields.map(f => {
+                        const isAdded = selectedFields.some(sf => sf.field_id === f.field_id);
+                        return (
+                          <button
+                            key={f.field_id}
+                            type="button"
+                            onClick={() => addField(f)}
+                            disabled={isAdded}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '9999px',
+                              fontSize: '12px',
+                              cursor: isAdded ? 'default' : 'pointer',
+                              border: `1px solid ${isAdded ? '#E5E7EB' : f.scope === 'common' ? '#BFDBFE' : '#FED7AA'}`,
+                              backgroundColor: isAdded ? '#F3F4F6' : f.scope === 'common' ? '#EFF6FF' : '#FFF7ED',
+                              color: isAdded ? '#9CA3AF' : f.scope === 'common' ? '#2563EB' : '#E67E22',
+                              opacity: isAdded ? 0.6 : 1,
+                              fontWeight: '500',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            {isAdded && <span>&#10003;</span>}
+                            {f.field_label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p style={{ fontSize: '13px', color: '#9CA3AF', textAlign: 'center', padding: '16px 0', margin: 0 }}>
+                    No saved questions available
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </PageLayout>

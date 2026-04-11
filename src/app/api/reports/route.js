@@ -139,7 +139,7 @@ export async function POST(request) {
     const initiativeId = Number(payload.initiativeId);
 
     const initiative = db.prepare(
-      'SELECT initiative_id, initiative_name, description, attributes, summary_json, chart_data_json FROM initiative WHERE initiative_id = ?'
+      'SELECT initiative_id, initiative_name, description, attributes FROM initiative WHERE initiative_id = ?'
     ).get(initiativeId);
 
     if (!initiative) {
@@ -147,9 +147,74 @@ export async function POST(request) {
     }
 
     const tableData = queryTableData(db, initiativeId);
-    const summary = safeParseJson(initiative.summary_json, {});
-    const chartData = safeParseJson(initiative.chart_data_json, {});
     const attributes = safeParseJson(initiative.attributes, []);
+
+    // Compute summary from real submission data
+    const submissionCount = db.prepare(
+      'SELECT COUNT(*) as count FROM submission WHERE initiative_id = ?'
+    ).get(initiativeId).count;
+
+    const avgResult = db.prepare(`
+      SELECT ROUND(AVG(sv.value_number), 1) as avg_score
+      FROM submission_value sv
+      JOIN submission s ON s.submission_id = sv.submission_id
+      JOIN field f ON f.field_id = sv.field_id
+      WHERE s.initiative_id = ? AND f.field_type = 'rating' AND sv.value_number IS NOT NULL
+    `).get(initiativeId);
+
+    const totalForms = db.prepare(
+      'SELECT COUNT(*) as count FROM form WHERE initiative_id = ?'
+    ).get(initiativeId).count;
+
+    const summary = {
+      totalParticipants: submissionCount,
+      averageRating: avgResult?.avg_score ?? 0,
+      completionRate: totalForms > 0
+        ? Math.round((submissionCount / Math.max(submissionCount, 1)) * 100 * 10) / 10
+        : 0,
+    };
+
+    // Compute chart data from real submission values
+    const chartFields = db.prepare(`
+      SELECT DISTINCT f.field_id, f.field_key, f.field_label, f.field_type
+      FROM field f
+      JOIN form_field ff ON ff.field_id = f.field_id
+      JOIN form fm ON fm.form_id = ff.form_id
+      WHERE fm.initiative_id = ?
+    `).all(initiativeId);
+
+    const chartData = {};
+    for (const field of chartFields) {
+      if (['select', 'choice', 'multiselect', 'yesno', 'boolean'].includes(field.field_type)) {
+        const distribution = db.prepare(`
+          SELECT sv.value_text as name, COUNT(*) as value
+          FROM submission_value sv
+          JOIN submission s ON s.submission_id = sv.submission_id
+          WHERE s.initiative_id = ? AND sv.field_id = ? AND sv.value_text IS NOT NULL
+          GROUP BY sv.value_text
+          ORDER BY value DESC
+        `).all(initiativeId, field.field_id);
+        if (distribution.length > 0) {
+          chartData[field.field_key || field.field_label] = distribution;
+        }
+      }
+      if (field.field_type === 'rating') {
+        const distribution = db.prepare(`
+          SELECT CAST(sv.value_number AS INTEGER) as name, COUNT(*) as value
+          FROM submission_value sv
+          JOIN submission s ON s.submission_id = sv.submission_id
+          WHERE s.initiative_id = ? AND sv.field_id = ? AND sv.value_number IS NOT NULL
+          GROUP BY CAST(sv.value_number AS INTEGER)
+          ORDER BY name
+        `).all(initiativeId, field.field_id);
+        if (distribution.length > 0) {
+          chartData[field.field_key || field.field_label] = distribution.map(d => ({
+            name: `Rating ${d.name}`,
+            value: d.value,
+          }));
+        }
+      }
+    }
 
     const filters = payload.filters || {};
     const expressions = payload.expressions || [];
@@ -159,7 +224,12 @@ export async function POST(request) {
       ? { variables: [], enabledCalc: false, enabledDisplay: true }
       : payload.trendConfig;
 
-    const trendConfigValidation = reportEngine.validateTrendConfig(incomingTrendConfig, attributes);
+    // Combine initiative attributes with actual tableData columns for validation
+    const tableColumns = tableData.length > 0
+      ? Object.keys(tableData[0]).filter(k => k !== 'submission_id' && k !== 'submitted_at')
+      : [];
+    const allAvailableAttributes = [...new Set([...attributes, ...tableColumns])];
+    const trendConfigValidation = reportEngine.validateTrendConfig(incomingTrendConfig, allAvailableAttributes);
     if (!trendConfigValidation.valid) {
       return NextResponse.json({ error: trendConfigValidation.error }, { status: 400 });
     }

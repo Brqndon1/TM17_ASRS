@@ -20,7 +20,6 @@ const navGroups = [
       { href: '/goals', label: 'Goals & Scoring', icon: 'target', permission: 'goals.manage' },
       { href: '/performance/goals', label: 'Progress', icon: 'trending-up', permission: 'performance.view' },
       { href: '/categories', label: 'Categories', icon: 'grid', permission: 'initiatives.manage' },
-      { href: '/historical-reports', label: 'Historical', icon: 'clock', permission: 'reporting.view' },
     ],
   },
   {

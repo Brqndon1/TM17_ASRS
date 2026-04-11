@@ -8,13 +8,36 @@
  * Props:
  * - data: Array — The filtered & sorted rows to display.
  * - columns: Array<string> — The column keys from the data objects.
+ * - totalRowCount: number — Total row count before inline filters (optional).
+ * - columnFilters: Object — Current inline filter values keyed by column (optional).
+ * - onColumnFilterChange: Function — Callback(column, value) for inline filters (optional).
+ * - onClearFilters: Function — Callback to clear all inline filters (optional).
+ * - sortColumn: string — Currently sorted column key (optional).
+ * - sortDirection: string — 'asc' | 'desc' | null (optional).
+ * - onSortChange: Function — Callback(column) to toggle sort (optional).
+ * - showDataTools: boolean — Whether the Data Tools section is expanded (optional).
+ * - onToggleDataTools: Function — Callback to toggle Data Tools visibility (optional).
+ * - computedSummary: Object — Computed numeric summaries keyed by column (optional).
  * ============================================================================
  */
 'use client';
 
 import { useMemo, useState } from 'react';
 
-export default function DataTable({ data, columns }) {
+export default function DataTable({
+  data,
+  columns,
+  totalRowCount,
+  columnFilters,
+  onColumnFilterChange,
+  onClearFilters,
+  sortColumn,
+  sortDirection,
+  onSortChange,
+  showDataTools,
+  onToggleDataTools,
+  computedSummary,
+}) {
   const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const safeColumns = useMemo(() => (Array.isArray(columns) ? columns : []), [columns]);
   const displayColumns = safeColumns.filter(col => col !== 'id');
@@ -30,7 +53,7 @@ export default function DataTable({ data, columns }) {
 
   /**
    * formatColumnName — Converts camelCase keys to human-readable labels.
-   * Example: "sessionRating" → "Session Rating"
+   * Example: "sessionRating" -> "Session Rating"
    */
   function formatColumnName(key) {
     return key
@@ -39,18 +62,30 @@ export default function DataTable({ data, columns }) {
       .trim();
   }
 
-  if (safeData.length === 0) {
+  /** Returns the sort indicator arrow for a column header */
+  function renderSortArrow(col) {
+    if (!onSortChange) return null;
+    if (sortColumn !== col) {
+      // Show a subtle indicator that the column is sortable
+      return (
+        <span style={{ marginLeft: '4px', opacity: 0.3, fontSize: '0.7rem' }}>
+          &#x25B2;&#x25BC;
+        </span>
+      );
+    }
     return (
-      <div className="asrs-card" style={{ textAlign: 'center', padding: '2rem' }}>
-        <p style={{ color: 'var(--color-text-light)' }}>
-          No data matches your current filters.
-        </p>
-      </div>
+      <span style={{ marginLeft: '4px', fontSize: '0.75rem', color: '#E67E22' }}>
+        {sortDirection === 'asc' ? '\u25B2' : '\u25BC'}
+      </span>
     );
   }
 
+  const hasActiveFilters = columnFilters && Object.values(columnFilters).some(v => v);
+  const effectiveTotalRowCount = totalRowCount ?? safeData.length;
+
   return (
     <div className="asrs-card" style={{ overflow: 'hidden', padding: '0' }}>
+      {/* ---- HEADER ---- */}
       <div style={{
         padding: '1rem 1.5rem',
         borderBottom: '1px solid var(--color-bg-tertiary)',
@@ -60,9 +95,103 @@ export default function DataTable({ data, columns }) {
           Data Table
         </h3>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-text-light)' }}>
-          {safeData.length} record{safeData.length !== 1 ? 's' : ''}
+          {hasActiveFilters
+            ? `Showing ${safeData.length} of ${effectiveTotalRowCount} rows`
+            : `${safeData.length} record${safeData.length !== 1 ? 's' : ''}`}
         </span>
       </div>
+
+      {/* ---- DATA TOOLS TOGGLE ---- */}
+      {onToggleDataTools && (
+        <div
+          onClick={onToggleDataTools}
+          style={{
+            padding: '0.5rem 1.5rem',
+            borderBottom: '1px solid var(--color-bg-tertiary)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            cursor: 'pointer',
+            backgroundColor: showDataTools ? '#FDF2E9' : 'transparent',
+            userSelect: 'none',
+            transition: 'background-color 0.15s ease',
+          }}
+        >
+          <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#E67E22' }}>
+            {showDataTools ? '\u25BC' : '\u25B6'} Data Tools
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+            {showDataTools ? 'Click to collapse' : 'Filters, sorting & calculations'}
+          </span>
+        </div>
+      )}
+
+      {/* ---- INLINE FILTER ROW (inside Data Tools) ---- */}
+      {showDataTools && onColumnFilterChange && displayColumns.length > 0 && (
+        <div style={{
+          padding: '0.5rem 1.5rem',
+          borderBottom: '1px solid var(--color-bg-tertiary)',
+          backgroundColor: '#FAFAFA',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '0.4rem',
+          }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-secondary)' }}>
+              Column Filters
+            </span>
+            {hasActiveFilters && onClearFilters && (
+              <button
+                onClick={onClearFilters}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.2rem 0.6rem',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#E67E22',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+            {displayColumns.map(col => (
+              <div key={col} style={{ minWidth: '100px', flex: '1 1 0' }}>
+                <label style={{
+                  display: 'block', fontSize: '0.65rem',
+                  color: 'var(--color-text-light)', marginBottom: '2px',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {formatColumnName(col)}
+                </label>
+                <input
+                  type="text"
+                  value={columnFilters?.[col] || ''}
+                  onChange={(e) => onColumnFilterChange(col, e.target.value)}
+                  placeholder="Filter..."
+                  style={{
+                    width: '100%',
+                    padding: '0.2rem 0.4rem',
+                    fontSize: '0.75rem',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    backgroundColor: columnFilters?.[col] ? '#FFF7ED' : '#fff',
+                    transition: 'border-color 0.15s ease, background-color 0.15s ease',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#E67E22'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- PAGINATION CONTROLS ---- */}
       <div style={{ padding: '0.6rem 1.5rem', borderBottom: '1px solid var(--color-bg-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem' }}>
           Rows per page
@@ -102,51 +231,182 @@ export default function DataTable({ data, columns }) {
         </div>
       </div>
 
-      {/* Scrollable container for wide tables */}
-      <div style={{ overflowX: 'auto' }}>
-        <table className="responsive-table" style={{
-          width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem'
-        }}>
-          <thead>
-            <tr style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
-              {displayColumns.map(col => (
-                <th key={col} style={{
-                  padding: '0.75rem 1rem', textAlign: 'left',
-                  fontWeight: '600', color: 'var(--color-text-secondary)',
-                  fontSize: '0.8rem', whiteSpace: 'nowrap',
-                  borderBottom: '2px solid var(--color-bg-tertiary)'
-                }}>
-                  {formatColumnName(col)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {pagedData.map((row, rowIndex) => (
-              <tr key={row.id || rowIndex} style={{
-                borderBottom: '1px solid var(--color-bg-secondary)',
-                transition: 'background-color 0.15s ease'
-              }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                {displayColumns.map(col => (
-                  <td
-                    key={col}
-                    data-label={formatColumnName(col)}
-                    style={{
-                      padding: '0.65rem 1rem',
-                      whiteSpace: 'nowrap'
-                    }}
+      {/* ---- EMPTY STATE ---- */}
+      {safeData.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <p style={{ color: 'var(--color-text-light)' }}>
+            No data matches your current filters.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Scrollable container for wide tables */}
+          <div style={{ overflowX: 'auto' }}>
+            <table className="responsive-table" style={{
+              width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem'
+            }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
+                  {displayColumns.map(col => (
+                    <th
+                      key={col}
+                      onClick={onSortChange ? () => onSortChange(col) : undefined}
+                      style={{
+                        padding: '0.75rem 1rem', textAlign: 'left',
+                        fontWeight: '600', color: 'var(--color-text-secondary)',
+                        fontSize: '0.8rem', whiteSpace: 'nowrap',
+                        borderBottom: '2px solid var(--color-bg-tertiary)',
+                        cursor: onSortChange ? 'pointer' : 'default',
+                        userSelect: onSortChange ? 'none' : 'auto',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={onSortChange ? (e) => { e.currentTarget.style.backgroundColor = '#F0F0F0'; } : undefined}
+                      onMouseLeave={onSortChange ? (e) => { e.currentTarget.style.backgroundColor = ''; } : undefined}
+                    >
+                      {formatColumnName(col)}
+                      {renderSortArrow(col)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedData.map((row, rowIndex) => (
+                  <tr key={row.id || rowIndex} style={{
+                    borderBottom: '1px solid var(--color-bg-secondary)',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    {row[col] !== undefined ? String(row[col]) : '—'}
-                  </td>
+                    {displayColumns.map(col => (
+                      <td
+                        key={col}
+                        data-label={formatColumnName(col)}
+                        style={{
+                          padding: '0.65rem 1rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {row[col] !== undefined ? String(row[col]) : '\u2014'}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ---- COMPUTED SUMMARY ROW ---- */}
+          {showDataTools && computedSummary && Object.keys(computedSummary).length > 0 && (
+            <div style={{
+              padding: '0.75rem 1.5rem',
+              borderTop: '2px solid #E5E7EB',
+              backgroundColor: '#F9FAFB',
+            }}>
+              <h4 style={{
+                fontSize: '0.8rem', fontWeight: '600',
+                color: 'var(--color-text-secondary)', margin: '0 0 0.5rem 0',
+              }}>
+                Calculations (on filtered data)
+              </h4>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem',
+                }}>
+                  <thead>
+                    <tr>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'left',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Column
+                      </th>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'right',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Sum
+                      </th>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'right',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Average
+                      </th>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'right',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Min
+                      </th>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'right',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Max
+                      </th>
+                      <th style={{
+                        padding: '0.35rem 0.75rem', textAlign: 'right',
+                        fontWeight: '600', color: 'var(--color-text-light)',
+                        fontSize: '0.7rem', borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        Count
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(computedSummary).map(([col, stats]) => (
+                      <tr key={col}>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', fontWeight: '500',
+                          borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {formatColumnName(col)}
+                        </td>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', textAlign: 'right',
+                          fontFamily: 'monospace', borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {stats.sum}
+                        </td>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', textAlign: 'right',
+                          fontFamily: 'monospace', borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {stats.avg}
+                        </td>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', textAlign: 'right',
+                          fontFamily: 'monospace', borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {stats.min}
+                        </td>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', textAlign: 'right',
+                          fontFamily: 'monospace', borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {stats.max}
+                        </td>
+                        <td style={{
+                          padding: '0.35rem 0.75rem', textAlign: 'right',
+                          fontFamily: 'monospace', borderBottom: '1px solid #F3F4F6',
+                        }}>
+                          {stats.count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

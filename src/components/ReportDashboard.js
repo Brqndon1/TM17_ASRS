@@ -44,6 +44,15 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
   // Track which view tab is active: 'charts', 'table', or 'both'
   const [activeView, setActiveView] = useState('both');
 
+  // ---- STATE for inline Data Tools (filters, sort, calculations) ----
+  // Inline column filters — keyed by column name, value is the filter text
+  const [columnFilters, setColumnFilters] = useState({});
+  // Inline sort — single column sort via clickable headers
+  const [inlineSortColumn, setInlineSortColumn] = useState(null);
+  const [inlineSortDirection, setInlineSortDirection] = useState('asc');
+  // Whether the Data Tools section is expanded
+  const [showDataTools, setShowDataTools] = useState(false);
+
   /**
    * useMemo — Recalculates filtered & sorted table data only when
    * the filters, sorts, or base report data change. This prevents
@@ -125,6 +134,104 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
     };
   }, [reportData, processedTableData, activeFilters]);
 
+  /**
+   * Inline-filtered & sorted table data — applies the Data Tools column
+   * filters and inline sort on top of the already-processed data from the
+   * main Filter/Sort panels. All client-side, local to this component.
+   */
+  const inlineProcessedData = useMemo(() => {
+    let data = processedTableData;
+
+    // Apply inline column filters
+    Object.entries(columnFilters).forEach(([col, val]) => {
+      if (val) {
+        data = data.filter(row =>
+          String(row[col] ?? '').toLowerCase().includes(val.toLowerCase())
+        );
+      }
+    });
+
+    // Apply inline sort
+    if (inlineSortColumn) {
+      data = [...data].sort((a, b) => {
+        const aVal = a[inlineSortColumn];
+        const bVal = b[inlineSortColumn];
+        // Handle nulls — push them to the end
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        // Numeric comparison
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return inlineSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        // String comparison
+        return inlineSortDirection === 'asc'
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      });
+    }
+
+    return data;
+  }, [processedTableData, columnFilters, inlineSortColumn, inlineSortDirection]);
+
+  /**
+   * Computed summary — calculates sum, average, min, max, count for each
+   * numeric column in the inline-filtered data. Updates reactively when
+   * filters change.
+   */
+  const computedSummary = useMemo(() => {
+    if (!inlineProcessedData || inlineProcessedData.length === 0) return {};
+
+    const columns = Object.keys(inlineProcessedData[0] || {}).filter(c => c !== 'id');
+    const summary = {};
+
+    columns.forEach(col => {
+      const numericValues = inlineProcessedData
+        .map(row => row[col])
+        .filter(v => typeof v === 'number' && !isNaN(v));
+
+      if (numericValues.length > 0) {
+        const sum = numericValues.reduce((a, b) => a + b, 0);
+        const avg = sum / numericValues.length;
+        summary[col] = {
+          sum: Number.isInteger(sum) ? sum : sum.toFixed(2),
+          avg: avg.toFixed(2),
+          min: Math.min(...numericValues),
+          max: Math.max(...numericValues),
+          count: numericValues.length,
+        };
+      }
+    });
+
+    return summary;
+  }, [inlineProcessedData]);
+
+  /** Handle inline sort toggle: asc -> desc -> no sort */
+  function handleInlineSortChange(col) {
+    if (inlineSortColumn === col) {
+      if (inlineSortDirection === 'asc') {
+        setInlineSortDirection('desc');
+      } else {
+        // Already desc, clear sort
+        setInlineSortColumn(null);
+        setInlineSortDirection('asc');
+      }
+    } else {
+      setInlineSortColumn(col);
+      setInlineSortDirection('asc');
+    }
+  }
+
+  /** Handle inline column filter change */
+  function handleColumnFilterChange(col, value) {
+    setColumnFilters(prev => ({ ...prev, [col]: value }));
+  }
+
+  /** Clear all inline column filters */
+  function handleClearFilters() {
+    setColumnFilters({});
+  }
+
   // If no report data exists, show a message
   if (!reportData) {
     return (
@@ -179,7 +286,7 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
             fontSize: '2rem', fontWeight: '700',
             color: 'var(--color-asrs-red)', margin: '0.25rem 0 0 0'
           }}>
-            {reportData.summary.totalParticipants}
+            {reportData.summary?.totalParticipants ?? 0}
           </p>
         </div>
         <div className="asrs-card" style={{ textAlign: 'center' }}>
@@ -190,7 +297,7 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
             fontSize: '2rem', fontWeight: '700',
             color: 'var(--color-asrs-orange)', margin: '0.25rem 0 0 0'
           }}>
-            {reportData.summary.averageRating}/5
+            {reportData.summary?.averageRating ?? 0}/5
           </p>
         </div>
         <div className="asrs-card" style={{ textAlign: 'center' }}>
@@ -201,7 +308,7 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
             fontSize: '2rem', fontWeight: '700',
             color: 'var(--color-asrs-yellow)', margin: '0.25rem 0 0 0'
           }}>
-            {reportData.summary.completionRate}%
+            {reportData.summary?.completionRate ?? 0}%
           </p>
         </div>
       </div>
@@ -256,11 +363,21 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
         <ChartDisplay chartData={processedChartData} />
       )}
 
-      {/* ---- DATA TABLE ---- */}
+      {/* ---- DATA TABLE (with Data Tools: inline filters, sort, calculations) ---- */}
       {(activeView === 'table' || activeView === 'both') && (
         <DataTable
-          data={processedTableData}
+          data={inlineProcessedData}
           columns={reportData.tableData.length > 0 ? Object.keys(reportData.tableData[0]) : []}
+          totalRowCount={processedTableData.length}
+          columnFilters={columnFilters}
+          onColumnFilterChange={handleColumnFilterChange}
+          onClearFilters={handleClearFilters}
+          sortColumn={inlineSortColumn}
+          sortDirection={inlineSortDirection}
+          onSortChange={handleInlineSortChange}
+          showDataTools={showDataTools}
+          onToggleDataTools={() => setShowDataTools(prev => !prev)}
+          computedSummary={computedSummary}
         />
       )}
 

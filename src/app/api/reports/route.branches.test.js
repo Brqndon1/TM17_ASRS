@@ -88,7 +88,11 @@ describe('/api/reports branch coverage', () => {
 
     prepareMock.mockImplementation((sql) => {
       const query = String(sql || '');
-      if (query.includes('FROM initiative WHERE initiative_id = ?')) return { get: () => ({ initiative_id: 2, initiative_name: 'I', summary_json: '{}', chart_data_json: '{}', attributes: '[]' }) };
+      if (query.includes('FROM initiative WHERE initiative_id = ?')) return { get: () => ({ initiative_id: 2, initiative_name: 'I', attributes: '[]' }) };
+      if (query.includes('COUNT(*) as count FROM submission')) return { get: () => ({ count: 3 }) };
+      if (query.includes('AVG(sv.value_number)')) return { get: () => ({ avg_score: 4.2 }) };
+      if (query.includes('COUNT(*) as count FROM form')) return { get: () => ({ count: 1 }) };
+      if (query.includes('DISTINCT f.field_id')) return { all: () => [] };
       if (query.includes('INSERT INTO report_generation_log')) return { run: () => ({ lastInsertRowid: 99 }) };
       if (query.includes('UPDATE report_generation_log')) return { run: vi.fn() };
       if (query.includes('INSERT INTO reports')) return { run: () => ({ lastInsertRowid: 7 }) };

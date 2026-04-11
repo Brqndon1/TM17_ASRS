@@ -72,7 +72,7 @@ function getActivityIcon(type) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, setUser, clearUser } = useAuthStore();
+  const { user, hydrated, setUser, clearUser } = useAuthStore();
 
   const [profile, setProfile]   = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -103,8 +103,8 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (user === null) router.push('/login');
-  }, [user, router]);
+    if (hydrated && user === null) router.push('/login');
+  }, [user, hydrated, router]);
 
   useEffect(() => {
     if (!user) return;

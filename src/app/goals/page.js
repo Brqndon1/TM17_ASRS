@@ -269,18 +269,19 @@ export default function GoalsPage() {
 
   return (
     <PageLayout title="Goals & Scoring">
-      {/* Initiative selector — clickable cards */}
-      {!selectedInitiative && (
-        <div style={{ marginBottom: 24 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Select an Initiative</h2>
-          <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Choose an initiative to view and manage its scoring goals</p>
-          {initiatives.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9CA3AF', fontSize: 14 }}>
-              No initiatives found. Create one first.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-              {initiatives.map((init) => (
+      {/* Initiative selector — always visible */}
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Initiatives</h2>
+        <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>Choose an initiative to view and manage its scoring goals</p>
+        {initiatives.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9CA3AF', fontSize: 14 }}>
+            No initiatives found. Create one first.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            {initiatives.map((init) => {
+              const isSelected = selectedInitiative === String(init.initiative_id);
+              return (
                 <button
                   key={init.initiative_id}
                   onClick={() => setSelectedInitiative(String(init.initiative_id))}
@@ -288,28 +289,29 @@ export default function GoalsPage() {
                     textAlign: 'left',
                     padding: '16px 20px',
                     borderRadius: 12,
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#fff',
+                    border: isSelected ? '2px solid #E67E22' : '1px solid #E5E7EB',
+                    backgroundColor: isSelected ? '#FFF7ED' : '#fff',
                     cursor: 'pointer',
                     transition: 'border-color 150ms, box-shadow 150ms',
+                    boxShadow: isSelected ? '0 2px 8px rgba(230,126,34,.15)' : 'none',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,.12)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onMouseEnter={(e) => { if (!isSelected) { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,.12)'; } }}
+                  onMouseLeave={(e) => { if (!isSelected) { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; } }}
                 >
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 4 }}>
                     {init.initiative_name}
                   </div>
-                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>
-                    Click to manage goals
+                  <div style={{ fontSize: 12, color: isSelected ? '#E67E22' : '#9CA3AF' }}>
+                    {isSelected ? 'Selected' : 'Click to manage goals'}
                   </div>
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Selected initiative header */}
+      {/* Manage Goals header */}
       {selectedInitiative && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
           <button
@@ -317,11 +319,11 @@ export default function GoalsPage() {
             className="btn-outline"
             style={{ padding: '6px 12px', fontSize: 12 }}
           >
-            ← Back
+            ← Deselect
           </button>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#111827', margin: 0 }}>
-              {initiatives.find(i => String(i.initiative_id) === selectedInitiative)?.initiative_name || 'Initiative'}
+              Manage Goals: {initiatives.find(i => String(i.initiative_id) === selectedInitiative)?.initiative_name || 'Initiative'}
             </h2>
           </div>
 
@@ -340,6 +342,13 @@ export default function GoalsPage() {
           >
             {showAddForm ? 'Cancel' : '+ Add Goal'}
           </button>
+        </div>
+      )}
+
+      {/* Placeholder when no initiative selected */}
+      {!selectedInitiative && initiatives.length > 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 60, color: '#9CA3AF', fontSize: 15 }}>
+          Click an initiative above to manage goals
         </div>
       )}
 

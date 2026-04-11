@@ -39,9 +39,9 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
     }
     const processed = processReportData(
       tableData,
-      reportConfig.filters,
-      reportConfig.expressions,
-      reportConfig.sorts,
+      reportConfig.filters || {},
+      reportConfig.expressions || [],
+      reportConfig.sorts || [],
       attributes
     );
     const trendValidation = validateTrendConfig(trendConfig, attributes);
@@ -57,9 +57,9 @@ export default function StepPreview({ reportConfig, tableData, onGenerate, isSub
   }, [tableData, reportConfig.filters, reportConfig.expressions, reportConfig.sorts, selectedAttributes, rawTrendConfig, selectedInitiativeId, reportName]);
 
   // Build human-readable config summary
-  const activeFilterEntries = Object.entries(reportConfig.filters).filter(([, v]) => v && v !== 'All');
-  const hasExpressions = reportConfig.expressions.length > 0;
-  const hasSorts = reportConfig.sorts.length > 0;
+  const activeFilterEntries = Object.entries(reportConfig.filters || {}).filter(([, v]) => v && v !== 'All');
+  const hasExpressions = (reportConfig.expressions || []).length > 0;
+  const hasSorts = (reportConfig.sorts || []).length > 0;
 
   // Preview limited to 20 rows
   const previewData = filteredData.slice(0, 20);

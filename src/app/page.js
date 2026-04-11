@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
 ];
 
 function statusPill(status) {
-  if (!status) return <span className="pill pill-gray">Unknown</span>;
+  if (!status) return <span className="pill pill-gray">Draft</span>;
   const s = status.toLowerCase();
   if (s === 'active')    return <span className="pill pill-green">Active</span>;
   if (s === 'in review') return <span className="pill pill-yellow">In Review</span>;
@@ -38,7 +38,7 @@ export default function Home() {
   const router = useRouter();
   const [initiatives, setInitiatives] = useState([]);
   const [reports, setReports]         = useState([]);
-  const [responseCount, setResponseCount] = useState(null);
+  const [surveyTotal, setSurveyTotal] = useState(0);
   const [isHydrated, setIsHydrated]   = useState(false);
   const [activeSurveys, setActiveSurveys] = useState([]);
   const [surveysLoading, setSurveysLoading] = useState(true);
@@ -65,9 +65,9 @@ export default function Home() {
       .then(r => r.json())
       .then(d => setReports(d.reports || []))
       .catch(() => {});
-    apiFetch('/api/surveys/responses?initiativeId=all')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setResponseCount(d.total ?? d.count ?? null); })
+    apiFetch('/api/surveys')
+      .then(r => r.ok ? r.json() : { surveys: [] })
+      .then(d => setSurveyTotal((d.surveys || []).length))
       .catch(() => {});
   }, [isHydrated, user]);
 
@@ -180,9 +180,9 @@ export default function Home() {
   }
 
   /* ── Staff / Admin dashboard ── */
-  const activeCount    = initiatives.filter(i => i.status === 'active' || !i.status).length;
-  const surveyCount    = responseCount ?? 0;
-  const reportCount    = reports.length;
+  const activeCount    = initiatives.filter(i => (i.status || '').toLowerCase() === 'active').length;
+  const surveyCount    = surveyTotal;
+  const reportCount    = reports.filter(r => r.status === 'published').length;
 
   const tableInitiatives = initiatives.slice(0, 8);
 
@@ -258,8 +258,8 @@ export default function Home() {
                       </Link>
                     </td>
                     <td>{initiative.category || '—'}</td>
-                    <td>{initiative.participant_count ?? '—'}</td>
-                    <td>{initiative.avg_score != null ? initiative.avg_score.toFixed(1) : '—'}</td>
+                    <td>{initiative.participant_count ?? 0}</td>
+                    <td>{(initiative.avg_score ?? 0).toFixed(1)}</td>
                     <td>{statusPill(initiative.status)}</td>
                     <td style={{ color: '#6B7280' }}>{formatDate(initiative.updated_at || initiative.created_at)}</td>
                   </tr>
