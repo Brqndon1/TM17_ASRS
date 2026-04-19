@@ -1,51 +1,199 @@
 'use client';
 
 import PageLayout from '@/components/PageLayout';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
+
+// ── Payload helpers ───────────────────────────────────────────────────────────
+
+function parsePayload(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function getPayloadSummary(event, payload) {
+  if (!payload) return null;
+  const ev = (event || '').toLowerCase();
+
+  if (ev === 'user.updated') {
+    const parts = [];
+    if (payload.email) parts.push(payload.email);
+    if (payload.changes?.role) {
+      const { from, to } = payload.changes.role;
+      parts.push(`role: ${from} → ${to}`);
+    }
+    return parts.join(' — ') || null;
+  }
+
+  if (ev === 'user.created') {
+    const parts = [];
+    if (payload.email) parts.push(payload.email);
+    if (payload.role) parts.push(`role: ${payload.role}`);
+    return parts.join(' — ') || null;
+  }
+
+  if (ev === 'survey.created' || ev === 'survey.deleted') {
+    let s = payload.title || null;
+    if (s && payload.questionCount != null) s += ` (${payload.questionCount} questions)`;
+    return s;
+  }
+
+  if (ev === 'report.created' || ev === 'report.updated' || ev === 'report.deleted') {
+    const parts = [];
+    if (payload.name) parts.push(payload.name);
+    if (payload.initiative_name) parts.push(payload.initiative_name);
+    return parts.join(' — ') || null;
+  }
+
+  if (ev === 'goal.created' || ev === 'goal.updated' || ev === 'goal.deleted') {
+    const parts = [];
+    if (payload.goal_name) parts.push(payload.goal_name);
+    if (payload.target_metric) parts.push(`${payload.target_metric}: ${payload.target_value}`);
+    return parts.join(' — ') || null;
+  }
+
+  const firstStr = Object.values(payload).find(v => typeof v === 'string' && v.length > 0);
+  return firstStr || null;
+}
+
+function PayloadDetail({ payload }) {
+  if (!payload) return <span style={{ color: '#9CA3AF', fontSize: '0.8rem' }}>No additional data</span>;
+
+  const renderValue = (val, depth = 0) => {
+    if (val === null || val === undefined) return <span style={{ color: '#9CA3AF' }}>—</span>;
+    if (typeof val === 'object' && !Array.isArray(val)) {
+      return (
+        <table style={{ borderCollapse: 'collapse', marginLeft: depth ? '1rem' : 0 }}>
+          <tbody>
+            {Object.entries(val).map(([k, v]) => (
+              <tr key={k}>
+                <td style={{ color: '#6B7280', fontSize: '0.8rem', fontWeight: 500, paddingRight: '1.25rem', paddingTop: '2px', paddingBottom: '2px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>{k}</td>
+                <td style={{ fontSize: '0.8rem', color: '#111827', paddingTop: '2px', paddingBottom: '2px' }}>{renderValue(v, depth + 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+    return <span>{String(val)}</span>;
+  };
+
+  return renderValue(payload);
+}
+
+// ── Action pill ───────────────────────────────────────────────────────────────
+
+function ActionPill({ event }) {
+  if (!event) return <span className="pill-gray">—</span>;
+  const ev = event.toLowerCase();
+  if (ev.includes('creat') || ev.includes('insert')) return <span className="pill-green">{event}</span>;
+  if (ev.includes('updat') || ev.includes('edit'))   return <span className="pill-orange">{event}</span>;
+  if (ev.includes('delet') || ev.includes('remov'))  return <span className="pill-red">{event}</span>;
+  if (ev.includes('login') || ev.includes('auth'))   return <span className="pill-blue">{event}</span>;
+  return <span className="pill-gray">{event}</span>;
+}
+
+// ── Expandable row ────────────────────────────────────────────────────────────
+
+function AuditRow({ r }) {
+  const [open, setOpen] = useState(false);
+  const payload = parsePayload(r.payload);
+  const summary = getPayloadSummary(r.event, payload);
+
+  return (
+    <>
+      <tr
+        onClick={() => setOpen(o => !o)}
+        style={{ cursor: 'pointer' }}
+        className={open ? 'audit-row-open' : 'audit-row'}
+      >
+        <td style={{ width: 28, paddingRight: 0 }}>
+          <span style={{
+            display: 'inline-block',
+            fontSize: '0.6rem',
+            color: '#9CA3AF',
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s',
+          }}>▶</span>
+        </td>
+        <td style={{ color: '#6B7280', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+          {new Date(r.created_at).toLocaleString()}
+        </td>
+        <td style={{ fontSize: '0.875rem' }}>{r.user_email || '—'}</td>
+        <td><ActionPill event={r.event} /></td>
+        <td style={{ fontSize: '0.875rem' }}>
+          {r.target_type
+            ? <span style={{ textTransform: 'capitalize' }}>{r.target_type}{r.target_id ? ` #${r.target_id}` : ''}</span>
+            : '—'}
+        </td>
+        <td style={{ fontSize: '0.8rem', color: '#6B7280', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {summary || <span style={{ color: '#D1D5DB' }}>—</span>}
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={6} style={{ padding: 0, borderBottom: '1px solid #F3F4F6' }}>
+            <div style={{
+              padding: '0.875rem 1rem 0.875rem 2.5rem',
+              backgroundColor: '#F9FAFB',
+              borderLeft: '3px solid #E5810A',
+            }}>
+              <PayloadDetail payload={payload} />
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminAuditPage() {
   const router = useRouter();
   const { user, hydrated } = useAuthStore();
 
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [q, setQ] = useState('');
-  const [eventFilter, setEventFilter] = useState('');
-  const [targetTypeFilter, setTargetTypeFilter] = useState('');
+  const [rows, setRows]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
+  const [q, setQ]               = useState('');
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [limit, setLimit] = useState(50);
-  const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [payloadModal, setPayloadModal] = useState(null);
+  const [dateTo, setDateTo]     = useState('');
+  const [limit]                 = useState(50);
+  const [offset, setOffset]     = useState(0);
+  const [total, setTotal]       = useState(0);
+
+  // Debounced search value — fires fetch 300ms after the user stops typing
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const debounceTimer = useRef(null);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    if (user.user_type !== 'admin') {
-      router.push('/');
-    }
+    if (!user) { router.push('/login'); return; }
+    if (user.user_type !== 'admin') router.push('/');
   }, [router, user, hydrated]);
 
-  const fetchLogs = async () => {
+  const handleQChange = (val) => {
+    setQ(val);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setOffset(0);
+      setDebouncedQ(val);
+    }, 300);
+  };
+
+  const fetchLogs = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
-      if (q) params.set('q', q);
-      if (eventFilter) params.set('event', eventFilter);
-      if (targetTypeFilter) params.set('target_type', targetTypeFilter);
-      if (dateFrom) params.set('date_from', dateFrom);
-      if (dateTo) params.set('date_to', dateTo);
-      params.set('limit', String(limit));
+      if (debouncedQ) params.set('q', debouncedQ);
+      if (dateFrom)   params.set('date_from', dateFrom);
+      if (dateTo)     params.set('date_to', dateTo);
+      params.set('limit',  String(limit));
       params.set('offset', String(offset));
 
       const resp = await apiFetch(`/api/admin/audit?${params.toString()}`);
@@ -56,35 +204,22 @@ export default function AdminAuditPage() {
       } else {
         setError(data.error || 'Failed to load audit logs');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, debouncedQ, dateFrom, dateTo, limit, offset]);
 
-  useEffect(() => { fetchLogs(); }, [user, q, eventFilter, targetTypeFilter, dateFrom, dateTo, limit, offset]);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   const exportCsv = () => {
     const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    if (eventFilter) params.set('event', eventFilter);
-    if (targetTypeFilter) params.set('target_type', targetTypeFilter);
-    if (dateFrom) params.set('date_from', dateFrom);
-    if (dateTo) params.set('date_to', dateTo);
+    if (debouncedQ) params.set('q', debouncedQ);
+    if (dateFrom)   params.set('date_from', dateFrom);
+    if (dateTo)     params.set('date_to', dateTo);
     params.set('export', 'csv');
-    const url = `/api/admin/audit?${params.toString()}`;
-    window.open(url, '_blank');
-  };
-
-  const getActionPill = (event) => {
-    if (!event) return <span className="pill-gray">—</span>;
-    const ev = event.toLowerCase();
-    if (ev.includes('create') || ev.includes('insert')) return <span className="pill-green">{event}</span>;
-    if (ev.includes('update') || ev.includes('edit')) return <span className="pill-orange">{event}</span>;
-    if (ev.includes('delete') || ev.includes('remove')) return <span className="pill-red">{event}</span>;
-    if (ev.includes('login') || ev.includes('auth')) return <span className="pill-blue">{event}</span>;
-    return <span className="pill-gray">{event}</span>;
+    window.open(`/api/admin/audit?${params.toString()}`, '_blank');
   };
 
   const inputSt = {
@@ -98,47 +233,22 @@ export default function AdminAuditPage() {
 
   return (
     <PageLayout title="Audit Logs">
+      <style>{`
+        .audit-row:hover td { background: #F9FAFB; }
+        .audit-row-open td  { background: #FFF7ED; }
+      `}</style>
+
       {/* Filter Bar */}
       <div className="card" style={{ display: 'flex', gap: '0.75rem', padding: '1rem 1.25rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
-          placeholder="Search by user, event, or payload..."
+          placeholder="Search users, actions, details..."
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{ ...inputSt, flex: '1 1 260px' }}
+          onChange={(e) => handleQChange(e.target.value)}
+          style={{ ...inputSt, flex: '1 1 300px' }}
         />
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          style={inputSt}
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          style={inputSt}
-        />
-        <input
-          placeholder="Event (exact)"
-          value={eventFilter}
-          onChange={(e) => setEventFilter(e.target.value)}
-          style={inputSt}
-        />
-        <input
-          placeholder="Target type"
-          value={targetTypeFilter}
-          onChange={(e) => setTargetTypeFilter(e.target.value)}
-          style={inputSt}
-        />
-        <button onClick={() => { setOffset(0); fetchLogs(); }} className="btn-primary">
-          Search
-        </button>
-        <button
-          onClick={exportCsv}
-          className="btn-outline"
-        >
-          Export CSV
-        </button>
+        <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setOffset(0); }} style={inputSt} />
+        <input type="date" value={dateTo}   onChange={(e) => { setDateTo(e.target.value);   setOffset(0); }} style={inputSt} />
+        <button onClick={exportCsv} className="btn-outline">Export CSV</button>
       </div>
 
       {error && (
@@ -147,7 +257,7 @@ export default function AdminAuditPage() {
         </div>
       )}
 
-      {/* Audit Table */}
+      {/* Table */}
       {loading ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>Loading audit logs...</div>
       ) : (
@@ -156,40 +266,21 @@ export default function AdminAuditPage() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th style={{ width: 28 }} />
                   <th>Timestamp</th>
                   <th>User</th>
                   <th>Action</th>
-                  <th>Resource</th>
+                  <th>Target</th>
                   <th>Details</th>
-                  <th>IP Address</th>
-                  <th>View</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>No audit logs found.</td>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>No audit logs found.</td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
-                    <tr key={r.audit_id}>
-                      <td style={{ color: '#6B7280', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleString()}</td>
-                      <td>{r.user_email || '—'}</td>
-                      <td>{getActionPill(r.event)}</td>
-                      <td>{r.target_type || '—'}{r.target_id ? ` #${r.target_id}` : ''}</td>
-                      <td>{r.reason_type || ''}{r.reason_text ? ` — ${r.reason_text}` : ''}</td>
-                      <td style={{ color: '#6B7280', fontSize: '0.8rem' }}>—</td>
-                      <td>
-                        <button
-                          onClick={() => setPayloadModal(r)}
-                          className="btn-outline"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  rows.map((r) => <AuditRow key={r.audit_id} r={r} />)
                 )}
               </tbody>
             </table>
@@ -200,7 +291,9 @@ export default function AdminAuditPage() {
       {/* Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
         <div style={{ color: '#6B7280', fontSize: '0.875rem' }}>
-          {total === 0 ? '0 results' : `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} of ${total}`}
+          {total === 0
+            ? '0 results'
+            : `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} of ${total}`}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
@@ -221,28 +314,6 @@ export default function AdminAuditPage() {
           </button>
         </div>
       </div>
-
-      {/* Payload modal */}
-      {payloadModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}
-          onClick={() => setPayloadModal(null)}
-        >
-          <div
-            style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', width: '90%', maxWidth: '800px', maxHeight: '80%', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0, fontSize: '1.15rem', fontWeight: '700', color: '#111827' }}>Audit Entry #{payloadModal.audit_id}</h2>
-            <div style={{ color: '#6B7280', marginBottom: '0.75rem', fontSize: '0.875rem' }}>{new Date(payloadModal.created_at).toLocaleString()}</div>
-            <pre style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', padding: '1rem', borderRadius: '8px', overflowX: 'auto', fontSize: '0.8rem' }}>
-              {payloadModal.payload ? JSON.stringify(JSON.parse(payloadModal.payload), null, 2) : 'No payload'}
-            </pre>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-              <button onClick={() => setPayloadModal(null)} className="btn-outline" style={{ padding: '0.5rem 1rem' }}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
     </PageLayout>
   );
 }
