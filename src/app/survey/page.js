@@ -19,6 +19,11 @@ export default function SurveyPage() {
     if (typeof window === 'undefined') return false;
     return Boolean(new URLSearchParams(window.location.search).get('template'));
   });
+  const [hasDistributionAccess] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(params.get('qr') || params.get('dist') || params.get('token') || params.get('template'));
+  });
   const isPublicView = isQrAccess || userRole === 'public' || isPreviewMode;
 
   // Form fields
@@ -67,9 +72,25 @@ export default function SurveyPage() {
   useEffect(() => {
     if (!isPublicView) return;
 
-    // Bypass distribution check when arriving via QR code link
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('qr')) {
+    const hasQr = urlParams.get('qr');
+    const hasDist = urlParams.get('dist');
+    const hasToken = urlParams.get('token');
+    const hasTemplate = urlParams.get('template');
+
+    if (hasQr) {
+      setSurveyOpen(true);
+      return;
+    }
+
+    // Surveys must be accessed via a distribution link
+    if (!hasQr && !hasDist && !hasToken && !hasTemplate) {
+      setSurveyOpen(false);
+      return;
+    }
+
+    // If accessed via template link (from distribution), load that specific template
+    if (hasTemplate) {
       setSurveyOpen(true);
       return;
     }
@@ -82,7 +103,6 @@ export default function SurveyPage() {
       .then((data) => {
         const surveys = data.surveys || [];
 
-        // Map to distribution-like shape for compatibility
         const activeDists = surveys.map((s) => ({
           distribution_id: s.id,
           survey_template_id: s.templateId,
@@ -102,8 +122,7 @@ export default function SurveyPage() {
         }
       })
       .catch(() => {
-        // If the API fails, default to allowing the survey (graceful degradation)
-        setSurveyOpen(true);
+        setSurveyOpen(false);
       });
   }, [isPublicView]);
 
@@ -510,15 +529,17 @@ export default function SurveyPage() {
               </p>
             </div>
           ) : !surveyOpen ? (
-            /* ---- Survey Closed State ---- */
+            /* ---- Survey Unavailable State ---- */
             <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
               <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: '#111827', marginBottom: '0.5rem' }}>
-                Survey Closed
+                {hasDistributionAccess ? 'Survey Closed' : 'Survey Access Required'}
               </h2>
               <p style={{ color: '#6B7280', marginBottom: '0.5rem', lineHeight: 1.6 }}>
-                This survey is no longer accepting responses.<br />
-                The submission deadline has passed.
+                {hasDistributionAccess
+                  ? <>This survey is no longer accepting responses.<br />The submission deadline has passed.</>
+                  : <>Surveys must be sent to you directly in order to participate.<br />Please use the link provided in your invitation email.</>
+                }
               </p>
               <p style={{ color: '#9CA3AF', fontSize: '0.85rem' }}>
                 If you believe this is an error, please contact the survey administrator.

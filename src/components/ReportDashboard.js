@@ -331,12 +331,12 @@ export default function ReportDashboard({ reportData, trendData, selectedInitiat
         </div>
 
         {/* Export and Share panels — only visible to Staff and Admin (per REP033) */}
-        <div className="action-buttons-group">
-          {(userRole === 'staff' || userRole === 'admin') && (
+        {(userRole === 'staff' || userRole === 'admin') && (
+          <div className="action-buttons-group">
             <ExportPanel reportData={reportData} />
-          )}
-          <SharePanel reportId={reportData.reportId} />
-        </div>
+            <SharePanel reportId={reportData.reportId} />
+          </div>
+        )}
       </div>
 
       {/* ---- FILTER & SORT PANELS ---- */}

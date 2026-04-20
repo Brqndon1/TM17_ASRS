@@ -14,7 +14,13 @@
  */
 'use client';
 
-export default function InitiativeSelector({ initiatives, selectedInitiative, onSelect }) {
+export default function InitiativeSelector({
+  initiatives,
+  selectedInitiative,
+  onSelect,
+  heading = 'Select initiative',
+  description = null,
+}) {
   /**
    * Short name abbreviations for the initiative cards.
    * These are displayed on small screens where the full name won't fit.
@@ -41,13 +47,29 @@ export default function InitiativeSelector({ initiatives, selectedInitiative, on
   return (
     <div>
       {/* Section title */}
-      <h2 style={{
-        fontSize: '1.1rem', fontWeight: '600',
-        color: 'var(--color-text-secondary)',
-        marginBottom: '0.75rem'
-      }}>
-        Select Initiative
+      <h2
+        className="initiative-selector-heading"
+        style={{
+          fontSize: '1rem',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
+          margin: '0 0 0.35rem',
+        }}
+      >
+        {heading}
       </h2>
+      {description ? (
+        <p
+          style={{
+            fontSize: '0.875rem',
+            color: 'var(--color-text-secondary)',
+            margin: '0 0 0.75rem',
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </p>
+      ) : null}
 
       {/* Grid of initiative cards — responsive via .initiative-grid CSS class */}
       <div className="initiative-grid">

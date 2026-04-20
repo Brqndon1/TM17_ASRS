@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
+import PublicSiteHeader from '@/components/PublicSiteHeader';
 import { useAuthStore } from '@/lib/auth/use-auth-store';
 import { apiFetch } from '@/lib/api/client';
 
@@ -40,21 +41,18 @@ export default function Home() {
   const [reports, setReports]         = useState([]);
   const [surveyTotal, setSurveyTotal] = useState(0);
   const [isHydrated, setIsHydrated]   = useState(false);
-  const [activeSurveys, setActiveSurveys] = useState([]);
-  const [surveysLoading, setSurveysLoading] = useState(true);
 
   useEffect(() => { setIsHydrated(true); }, []);
 
   useEffect(() => {
     if (!isHydrated || !user) return;
 
-    // Public users: fetch active surveys from public endpoint
     if (user.user_type === 'public') {
-      fetch('/api/surveys/active')
-        .then(r => r.ok ? r.json() : { surveys: [] })
-        .then(d => setActiveSurveys(d.surveys || []))
-        .catch(() => setActiveSurveys([]))
-        .finally(() => setSurveysLoading(false));
+      fetch('/api/reports/public')
+        .then(r => r.ok ? r.json() : { reports: [] })
+        .then(d => setReports(d.reports || []))
+        .catch(() => {});
+      return;
     }
 
     apiFetch('/api/initiatives')
@@ -101,48 +99,7 @@ export default function Home() {
             <p style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>{dateStr}</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/survey" className="btn-primary">Take Survey</Link>
-            <Link href="/reporting" className="btn-outline">View Reports</Link>
-          </div>
-        </div>
-
-        {/* ── Available Surveys ── */}
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">
-            <span className="card-title">Available Surveys</span>
-          </div>
-          <div style={{ padding: '8px 0' }}>
-            {surveysLoading ? (
-              <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '16px 0' }}>Loading surveys...</p>
-            ) : activeSurveys.length === 0 ? (
-              <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '16px 0' }}>No surveys are currently open.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {activeSurveys.map((survey) => (
-                  <Link
-                    key={survey.id}
-                    href={`/survey?template=${survey.templateId}`}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '12px 16px', borderRadius: 8, border: '1px solid #E5E7EB',
-                      textDecoration: 'none', color: '#111827',
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,0.1)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{survey.title}</div>
-                      {survey.initiativeName && (
-                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{survey.initiativeName}</div>
-                      )}
-                      <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Open until {survey.endDate}</div>
-                    </div>
-                    <span style={{ color: '#E67E22', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>Take Survey &rarr;</span>
-                  </Link>
-                ))}
-              </div>
-            )}
+            <Link href="/reporting" className="btn-primary">View Reports</Link>
           </div>
         </div>
 
@@ -283,60 +240,18 @@ export default function Home() {
 }
 
 function LandingPage() {
-  const [activeSurveys, setActiveSurveys] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/surveys/active')
-      .then(r => r.ok ? r.json() : { surveys: [] })
-      .then(d => setActiveSurveys(d.surveys || []))
-      .catch(() => setActiveSurveys([]))
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <img src="/asrs-logo.png" alt="ASRS" style={{ width: 64, height: 64, borderRadius: 12, marginBottom: 24 }} />
-      <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', marginBottom: 8 }}>ASRS Initiatives Reporting System</h1>
-      <p style={{ color: '#6B7280', marginBottom: 24 }}>Empowering communities through data-driven initiatives.</p>
-      <Link href="/login" className="btn-primary" style={{ marginBottom: 32 }}>Sign In</Link>
-
-      <div style={{ width: '100%', maxWidth: 520, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 4px' }}>Take a Survey</h2>
-        <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 16px' }}>No account needed. Choose a survey below to participate.</p>
-
-        {loading ? (
-          <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>Loading available surveys...</p>
-        ) : activeSurveys.length === 0 ? (
-          <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>No surveys are currently open.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {activeSurveys.map((survey) => (
-              <Link
-                key={survey.id}
-                href={`/survey?template=${survey.templateId}`}
-                style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '12px 16px', borderRadius: 8, border: '1px solid #E5E7EB',
-                  textDecoration: 'none', color: '#111827',
-                  transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{survey.title}</div>
-                  {survey.initiativeName && (
-                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{survey.initiativeName}</div>
-                  )}
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Open until {survey.endDate}</div>
-                </div>
-                <span style={{ color: '#E67E22', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>Take Survey &rarr;</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+    <div className="public-site-root">
+      <PublicSiteHeader />
+      <main className="public-site-hero">
+        <h1 className="public-site-hero-title">ASRS Initiatives Reporting System</h1>
+        <p className="public-site-hero-lede">
+          Browse published initiative reports. Staff and administrators can log in above for the full workspace.
+        </p>
+        <Link href="/reporting" className="btn-primary public-site-hero-cta">
+          View published reports
+        </Link>
+      </main>
     </div>
   );
 }

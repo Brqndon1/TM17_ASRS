@@ -11,7 +11,7 @@ const navGroups = [
       { href: '/', label: 'Dashboard', icon: 'home', permission: null },
       { href: '/initiative-creation', label: 'Initiatives', icon: 'briefcase', permission: 'initiatives.manage' },
       { href: '/reporting', label: 'Reports', icon: 'bar-chart', permission: 'reporting.view' },
-      { href: '/survey', label: 'Surveys', icon: 'clipboard', permission: 'surveys.take', staffHref: '/manage-surveys', staffPermission: 'surveys.distribute' },
+      { href: '/manage-surveys', label: 'Surveys', icon: 'clipboard', permission: 'surveys.distribute' },
     ],
   },
   {

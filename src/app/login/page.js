@@ -19,17 +19,6 @@ export default function LoginPage() {
       : '';
   });
 
-  // Active surveys for public access
-  const [activeSurveys, setActiveSurveys] = useState([]);
-  const [surveysLoading, setSurveysLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/surveys/active')
-      .then((res) => res.ok ? res.json() : { surveys: [] })
-      .then((data) => setActiveSurveys(data.surveys || []))
-      .catch(() => setActiveSurveys([]))
-      .finally(() => setSurveysLoading(false));
-  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -75,7 +64,13 @@ export default function LoginPage() {
           border: '1px solid #E5E7EB', borderRadius: 12, padding: 32, marginBottom: 20,
         }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <img src="/asrs-logo.png" alt="ASRS" style={{ width: 48, height: 48, borderRadius: 8, marginBottom: 16 }} />
+            <Link
+              href="/"
+              aria-label="Go to home"
+              style={{ display: 'inline-block', marginBottom: 16, lineHeight: 0, borderRadius: 8 }}
+            >
+              <img src="/asrs-logo.png" alt="ASRS" style={{ width: 48, height: 48, borderRadius: 8, display: 'block' }} />
+            </Link>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827' }}>ASRS Initiatives</h1>
             <p style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>Reporting System</p>
           </div>
@@ -178,50 +173,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Available Surveys Card */}
-        <div style={{
-          background: '#fff', width: '100%',
-          border: '1px solid #E5E7EB', borderRadius: 12, padding: 24,
-        }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 4px' }}>
-            Take a Survey
-          </h2>
-          <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 16px' }}>
-            No account needed. Choose a survey below to participate.
-          </p>
-
-          {surveysLoading ? (
-            <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>Loading available surveys...</p>
-          ) : activeSurveys.length === 0 ? (
-            <p style={{ color: '#9CA3AF', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>No surveys are currently open.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activeSurveys.map((survey) => (
-                <Link
-                  key={survey.id}
-                  href={`/survey?template=${survey.templateId}`}
-                  style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '12px 16px', borderRadius: 8, border: '1px solid #E5E7EB',
-                    textDecoration: 'none', color: '#111827',
-                    transition: 'border-color 0.15s, box-shadow 0.15s',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E67E22'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(230,126,34,0.1)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none'; }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{survey.title}</div>
-                    {survey.initiativeName && (
-                      <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{survey.initiativeName}</div>
-                    )}
-                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Open until {survey.endDate}</div>
-                  </div>
-                  <span style={{ color: '#E67E22', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>Take Survey &rarr;</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

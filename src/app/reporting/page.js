@@ -85,12 +85,8 @@ export default function ReportingPage() {
   useEffect(() => {
     if (hydrated && authUser) {
       setUserRole(authUser.user_type || 'public');
-    } else {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setUserRole(parsed.user_type || 'public');
-      }
+    } else if (hydrated) {
+      setUserRole('public');
     }
   }, [hydrated, authUser]);
 
@@ -101,12 +97,32 @@ export default function ReportingPage() {
   async function loadInitialData() {
     setIsLoading(true);
     try {
-      const [initiativesRes, reportsRes] = await Promise.all([
-        apiFetch('/api/initiatives'),
-        apiFetch('/api/reports'),
-      ]);
-      const initiativesData = await initiativesRes.json();
-      const reportsData = await reportsRes.json();
+      let role = 'public';
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          role = parsed.user_type || 'public';
+        }
+      } catch {}
+      const isStaff = role === 'staff' || role === 'admin';
+
+      let initiativesData, reportsData;
+      if (isStaff) {
+        const [initiativesRes, reportsRes] = await Promise.all([
+          apiFetch('/api/initiatives'),
+          apiFetch('/api/reports'),
+        ]);
+        initiativesData = await initiativesRes.json();
+        reportsData = await reportsRes.json();
+      } else {
+        const [initiativesRes, reportsRes] = await Promise.all([
+          fetch('/api/initiatives/public'),
+          fetch('/api/reports/public'),
+        ]);
+        initiativesData = await initiativesRes.json();
+        reportsData = await reportsRes.json();
+      }
 
       const initiativesList = initiativesData.initiatives || [];
       setInitiatives(initiativesList);
@@ -128,19 +144,8 @@ export default function ReportingPage() {
       setReportMap(map);
       setPublishedReportMap(pubMap);
 
-      // Determine role from localStorage to decide which map to use for initial load
-      let role = 'public';
-      try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
-          role = parsed.user_type || 'public';
-        }
-      } catch {}
-      const isStaff = role === 'staff' || role === 'admin';
       const activeMap = isStaff ? map : pubMap;
 
-      // For public users, filter initiatives to only those with published reports
       const visibleInitiatives = isStaff
         ? initiativesList
         : initiativesList.filter(i => pubMap[i.id]);
@@ -844,9 +849,10 @@ export default function ReportingPage() {
   }
 
   const isStaffOrAdmin = userRole === 'staff' || userRole === 'admin';
+  const layoutTitle = hydrated && !authUser ? 'Published reports' : 'Reports';
 
   return (
-    <PageLayout title="Reports">
+    <PageLayout title={layoutTitle} requireAuth={false}>
       {isStaffOrAdmin && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{
@@ -982,29 +988,67 @@ export default function ReportingPage() {
 
           {!isStaffOrAdmin && (
             <>
-              <section style={{ marginBottom: '1.5rem' }}>
-                <InitiativeSelector
-                  initiatives={initiatives}
-                  selectedInitiative={selectedInitiative}
-                  onSelect={handleInitiativeSelect}
-                />
+              <section className="card public-reporting-intro" aria-labelledby="public-reporting-heading">
+                <p className="public-reporting-intro-eyebrow">Community access</p>
+                <h1 id="public-reporting-heading" className="public-reporting-intro-title">
+                  Published initiative reports
+                </h1>
+                <p className="public-reporting-intro-body">
+                  These reports are published by ASRS staff. Select an initiative to view charts and tables in your browser. Downloads and staff tools are available after you log in.
+                </p>
               </section>
 
-              {reportData && (
-                <ReportDashboard
-                  reportData={reportData}
-                  trendData={trendData}
-                  selectedInitiative={selectedInitiative}
-                  userRole={userRole}
-                  reportDbId={reportDbId}
-                  preloadedInsights={aiInsights}
-                />
-              )}
-
-              {!reportData && !isLoading && (
-                <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>
-                  <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Report has not been published yet</p>
+              {isLoading ? (
+                <div className="public-reporting-loading" role="status" aria-live="polite">
+                  <div className="public-reporting-loading-spinner" aria-hidden />
+                  <span>Loading published reports…</span>
                 </div>
+              ) : initiatives.length === 0 ? (
+                <div className="asrs-card" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                  <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 0.5rem' }}>
+                    No published reports yet
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.55, maxWidth: '28rem', marginLeft: 'auto', marginRight: 'auto' }}>
+                    When staff publish a report for an initiative, it will appear here. You can still use the home page or check back later.
+                  </p>
+                  <Link href="/" className="btn-outline" style={{ marginTop: '1.25rem', display: 'inline-flex' }}>
+                    Back to home
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <section style={{ marginBottom: '1.5rem' }}>
+                    <InitiativeSelector
+                      initiatives={initiatives}
+                      selectedInitiative={selectedInitiative}
+                      onSelect={handleInitiativeSelect}
+                      heading="Choose an initiative"
+                      description="Each card is an initiative with a published report. Your selection loads below."
+                    />
+                  </section>
+
+                  {reportData && (
+                    <ReportDashboard
+                      reportData={reportData}
+                      trendData={trendData}
+                      selectedInitiative={selectedInitiative}
+                      userRole={userRole}
+                      reportDbId={reportDbId}
+                      preloadedInsights={aiInsights}
+                    />
+                  )}
+
+                  {!reportData && (
+                    <div className="asrs-card" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                      <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 0.5rem' }}>
+                        Report not available for this initiative
+                      </p>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.55 }}>
+                        Try another initiative, or check back after staff have published a report.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
