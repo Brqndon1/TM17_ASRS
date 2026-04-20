@@ -32,11 +32,11 @@ export function seedEgamingSurvey(db) {
           'multiselect', 'initiative_specific', 1, CHECKBOX],
 
         ['liked_most',
-          'What part of the E-Gaming and Career program did you like the most? Tell us why.',
+          'What part of the E-Gaming and Career program did you like the most? Tell us why. (You can comment on the content of the workshops, activities, and/or speakers)',
           'text', 'initiative_specific', 0, TEXTAREA],
 
         ['liked_least',
-          'What part of the E-Gaming and Career program did you like the least? Tell us why.',
+          'What part of the E-Gaming and Career program did you like the least? Tell us why. (You can comment on the content of the workshops, activities, and/or speakers)',
           'text', 'initiative_specific', 0, TEXTAREA],
 
         ['new_learnings',
@@ -44,7 +44,7 @@ export function seedEgamingSurvey(db) {
           'text', 'initiative_specific', 0, TEXTAREA],
 
         ['improvements',
-          'What would have made this class better?',
+          'What would have made this class better?  (You can comment on the content of the workshops, activities, and/or speakers) ',
           'text', 'initiative_specific', 0, TEXTAREA],
 
         ['egaming_yesno',
