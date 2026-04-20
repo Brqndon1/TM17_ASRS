@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { hashPassword, isPasswordHash } from '@/lib/auth/passwords';
 import { alertDb } from '@/lib/db-alerts';
+import { seedEgamingSurvey } from '@/app/manage-surveys/mauricesurvey';
 
 // Store the database file in <project>/data/asrs.db
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -1021,6 +1022,8 @@ function initializeDatabase() {
       );
     }
   }
+  // ── Survey seeds ───────────────────────────────────────────────────────────
+  seedEgamingSurvey(db);
 
   const insertFeature = db.prepare(
     'INSERT OR IGNORE INTO feature (key, name, description) VALUES (?, ?, ?)'
