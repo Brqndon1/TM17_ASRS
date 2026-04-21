@@ -1,6 +1,7 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 /**
  * GET /api/categories/[id]
@@ -98,6 +99,23 @@ export async function PUT(request, { params }) {
       .prepare('SELECT * FROM category WHERE category_id = ?')
       .get(categoryId);
 
+    // Audit log for update
+    try {
+      const changes = {};
+      if (updateName !== existing.category_name) changes.category_name = { from: existing.category_name, to: updateName };
+      if (updateDesc !== existing.description) changes.description = { from: existing.description, to: updateDesc };
+
+      logAudit(db, {
+        event: 'category.updated',
+        userEmail: auth.user.email,
+        targetType: 'category',
+        targetId: String(categoryId),
+        payload: { changes },
+      });
+    } catch (err) {
+      console.error('Audit log failed for category.update', err?.message || err);
+    }
+
     return NextResponse.json({
       success: true,
       category: updated,
@@ -134,6 +152,12 @@ export async function DELETE(_request, { params }) {
         { error: 'Category not found' },
         { status: 404 }
       );
+    }
+
+    // Prevent deletion if linked initiatives exist
+    const rels = db.prepare('SELECT ic.initiative_id, i.initiative_name FROM initiative_category ic JOIN initiative i ON ic.initiative_id = i.initiative_id WHERE ic.category_id = ?').all(categoryId);
+    if (rels && rels.length > 0) {
+      return NextResponse.json({ error: 'Category has linked initiatives', linked: rels }, { status: 400 });
     }
 
     // Delete category

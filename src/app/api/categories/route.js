@@ -1,6 +1,7 @@
 import { db, initializeDatabase } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth/server-auth';
+import { logAudit } from '@/lib/audit';
 
 const MAX_CATEGORIES = 7;
 
@@ -91,6 +92,20 @@ export async function POST(request) {
     const newCategory = db
       .prepare('SELECT * FROM category WHERE category_id = ?')
       .get(result.lastInsertRowid);
+
+    // Audit log
+    try {
+      logAudit(db, {
+        event: 'category.created',
+        userEmail: auth.user.email,
+        targetType: 'category',
+        targetId: String(newCategory.category_id),
+        payload: { category_name: trimmedName, description: description || null },
+      });
+    } catch (err) {
+      // non-fatal
+      console.error('Audit log failed for category.create', err?.message || err);
+    }
 
     return NextResponse.json(
       {

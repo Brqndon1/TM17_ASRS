@@ -16,6 +16,8 @@ export default function CategoriesPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteInitiatives, setDeleteInitiatives] = useState([]);
+  const [reassignTargetId, setReassignTargetId] = useState(null);
   const [formData, setFormData] = useState({
     category_name: '',
     description: '',
@@ -142,7 +144,14 @@ export default function CategoriesPage() {
         setFormData({ category_name: '', description: '' });
         setTimeout(() => fetchCategories(), 500);
       } else {
-        setMessage(`${data.error || 'Failed to save category'}`);
+        // Provide friendlier messages for common errors
+        if (response.status === 409) {
+          setMessage('Category name already exists. Choose a different name.');
+        } else if (response.status === 400 && data.error && data.error.includes('Cannot create more than')) {
+          setMessage(data.error);
+        } else {
+          setMessage(`${data.error || 'Failed to save category'}`);
+        }
       }
     } catch (error) {
       console.error('Error saving category:', error);
@@ -156,6 +165,11 @@ export default function CategoriesPage() {
     setMessage('');
     setIsSubmitting(true);
 
+    if (deleteInitiatives && deleteInitiatives.length > 0) {
+      setMessage('Cannot delete category: it has linked initiatives. Remove assignments first.');
+      setIsSubmitting(false);
+      return;
+    }
     try {
       const response = await apiFetch(`/api/categories/${deleteTarget.category_id}`, {
         method: 'DELETE',
@@ -199,6 +213,60 @@ export default function CategoriesPage() {
     } catch (error) {
       console.error('Error removing initiative:', error);
       setMessage('Connection error. Please try again.');
+    }
+  };
+
+  const openDeleteModal = async (category) => {
+    setDeleteTarget(category);
+    setMessage('');
+    // Fetch linked initiatives for this category to show in the modal
+    try {
+      const resp = await apiFetch(`/api/initiative-categories?category_id=${category.category_id}`);
+      const data = await resp.json();
+      if (resp.ok) {
+        setDeleteInitiatives(data.relationships || []);
+      } else {
+        setDeleteInitiatives([]);
+      }
+    } catch (err) {
+      console.error('Error fetching linked initiatives for delete modal', err);
+      setDeleteInitiatives([]);
+    }
+    // reset reassign target when opening
+    setReassignTargetId(null);
+  };
+
+  const handleReassignAndDelete = async () => {
+    if (!reassignTargetId) {
+      setMessage('Please select a category to reassign initiatives to.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      const resp = await apiFetch(`/api/categories/${deleteTarget.category_id}/reassign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reassign_to_category_id: Number(reassignTargetId) }),
+      });
+
+      const data = await resp.json();
+      if (resp.ok) {
+        setMessage(data.message || 'Reassigned initiatives and deleted category');
+        setDeleteTarget(null);
+        setDeleteInitiatives([]);
+        setReassignTargetId(null);
+        setTimeout(() => fetchCategories(), 500);
+      } else {
+        setMessage(data.error || 'Failed to reassign and delete category');
+      }
+    } catch (err) {
+      console.error('Error reassigning and deleting category', err);
+      setMessage('Connection error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -324,7 +392,7 @@ export default function CategoriesPage() {
                     Edit
                   </button>
                   <button
-                    onClick={() => setDeleteTarget(category)}
+                    onClick={() => openDeleteModal(category)}
                     style={{ fontSize: '12px', fontWeight: '600', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', padding: '0', textDecoration: 'underline' }}
                   >
                     Delete
@@ -454,32 +522,68 @@ export default function CategoriesPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div style={overlayStyle} onClick={() => setDeleteTarget(null)}>
+        <div style={overlayStyle} onClick={() => { setDeleteTarget(null); setDeleteInitiatives([]); }}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ marginBottom: '1rem', color: '#111827', fontSize: '18px', fontWeight: '700' }}>
               Confirm Deletion
             </h2>
-            <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#6B7280', marginBottom: '1rem' }}>
               Are you sure you want to delete the category &quot;
               <strong>{deleteTarget.category_name}</strong>
               &quot;? This action cannot be undone.
             </p>
+
+            {deleteInitiatives.length > 0 ? (
+              <div style={{ marginBottom: '1rem', color: '#374151' }}>
+                <p style={{ margin: 0, fontWeight: 600 }}>Linked initiatives</p>
+                <ul style={{ marginTop: '0.5rem', marginBottom: '0.75rem', color: '#6B7280' }}>
+                  {deleteInitiatives.map((rel) => (
+                    <li key={rel.initiative_id} style={{ marginBottom: '6px' }}>{rel.initiative_name}</li>
+                  ))}
+                </ul>
+                <p style={{ color: '#DC2626', margin: 0 }}>Cannot delete a category that has linked initiatives. Remove the assignments first.</p>
+                <div style={{ marginTop: '0.75rem' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', fontWeight: 600, marginBottom: '6px' }}>Or reassign initiatives to another category</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      value={reassignTargetId || ''}
+                      onChange={(e) => setReassignTargetId(e.target.value ? Number(e.target.value) : null)}
+                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid #E5E7EB', background: 'white' }}
+                    >
+                      <option value="">Select a category…</option>
+                      {categories.filter(c => c.category_id !== deleteTarget.category_id).map(c => (
+                        <option key={c.category_id} value={c.category_id}>{c.category_name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleReassignAndDelete}
+                      disabled={!reassignTargetId || isSubmitting}
+                      className="btn-primary"
+                      style={{ padding: '8px 12px', borderRadius: '8px', cursor: !reassignTargetId || isSubmitting ? 'not-allowed' : 'pointer' }}
+                    >
+                      {isSubmitting ? 'Working...' : 'Reassign & Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline">
+              <button onClick={() => { setDeleteTarget(null); setDeleteInitiatives([]); }} className="btn-outline">
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                disabled={isSubmitting}
+                disabled={isSubmitting || deleteInitiatives.length > 0}
                 style={{
                   padding: '9px 18px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#DC2626',
+                  background: deleteInitiatives.length > 0 ? '#FCA5A5' : '#DC2626',
                   color: 'white',
                   fontWeight: '600',
                   fontSize: '13px',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  cursor: isSubmitting || deleteInitiatives.length > 0 ? 'not-allowed' : 'pointer',
                   opacity: isSubmitting ? 0.6 : 1,
                 }}
               >
