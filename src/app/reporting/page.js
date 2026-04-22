@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import PageLayout from '@/components/PageLayout';
 import InitiativeSelector from '@/components/InitiativeSelector';
@@ -51,6 +51,9 @@ export default function ReportingPage() {
 
   const [allReports, setAllReports] = useState([]);
   const [expandedReportId, setExpandedReportId] = useState(null);
+  const [publicSelectedInitiativeId, setPublicSelectedInitiativeId] = useState('');
+  const [publicSelectedYear, setPublicSelectedYear] = useState('');
+  const [publicSelectedReportId, setPublicSelectedReportId] = useState('');
 
   const [mgmtReports, setMgmtReports] = useState([]);
   const [mgmtLoading, setMgmtLoading] = useState(false);
@@ -154,8 +157,24 @@ export default function ReportingPage() {
       }
 
       if (visibleInitiatives.length > 0) {
-        setSelectedInitiative(visibleInitiatives[0]);
-        loadReportForInitiative(visibleInitiatives[0], activeMap);
+        if (isStaff) {
+          setSelectedInitiative(visibleInitiatives[0]);
+          loadReportForInitiative(visibleInitiatives[0], activeMap);
+        } else {
+          const publishedOnly = reportsList
+            .filter((r) => (r.status || '').toLowerCase() === 'published')
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+          const first = publishedOnly[0] || null;
+          if (first) {
+            const firstYear = String(new Date(first.created_at || Date.now()).getFullYear());
+            setPublicSelectedInitiativeId(String(first.initiative_id || ''));
+            setPublicSelectedYear(firstYear);
+            setPublicSelectedReportId(String(first.id));
+            loadReportFromRecord(first);
+          } else {
+            setReportData(null);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -191,6 +210,40 @@ export default function ReportingPage() {
       loadMgmtData();
     }
   }, [activeTab, selectedInitiativeId, startDate, endDate, loadMgmtData]);
+
+  function loadReportFromRecord(report) {
+    if (!report) {
+      setReportData(null);
+      setTrendData([]);
+      setReportDbId(null);
+      setAiInsights(null);
+      setNoReport(true);
+      return;
+    }
+
+    if (reportDbId != null && String(reportDbId) === String(report.id)) {
+      return;
+    }
+
+    setNoReport(false);
+    setReportDbId(report.id ?? null);
+    const parsed = parseReportForDashboard(report);
+    if (parsed.reportData) {
+      const matchedInitiative = initiatives.find(
+        (initiative) => String(initiative.id) === String(parsed.initiative?.id)
+      );
+      setSelectedInitiative(matchedInitiative || parsed.initiative);
+      setReportData(parsed.reportData);
+      setTrendData(parsed.trendData || []);
+      setAiInsights(null);
+      return;
+    }
+
+    setReportData(null);
+    setTrendData([]);
+    setAiInsights(null);
+    setNoReport(true);
+  }
 
   function loadReportForInitiative(initiative, map) {
     const rMap = map || reportMap;
@@ -240,14 +293,6 @@ export default function ReportingPage() {
     }
   }
 
-  async function handleInitiativeSelect(initiative) {
-    setIsLoading(true);
-    setSelectedInitiative(initiative);
-    const isStaff = userRole === 'staff' || userRole === 'admin';
-    loadReportForInitiative(initiative, isStaff ? reportMap : publishedReportMap);
-    setIsLoading(false);
-  }
-
   function parseReportForDashboard(report) {
     let parsed = null;
     try {
@@ -281,9 +326,54 @@ export default function ReportingPage() {
     };
   }
 
-  const publishedReports = allReports.filter(
-    (r) => (r.status || '').toLowerCase() === 'published'
+  const publishedReports = useMemo(
+    () => allReports.filter((r) => (r.status || '').toLowerCase() === 'published'),
+    [allReports]
   );
+  const isStaffOrAdmin = userRole === 'staff' || userRole === 'admin';
+  const publicPublishedReports = useMemo(
+    () => (isStaffOrAdmin ? [] : publishedReports),
+    [isStaffOrAdmin, publishedReports]
+  );
+  const publicReportsByInitiative = useMemo(() => {
+    const grouped = {};
+    for (const report of publicPublishedReports) {
+      const initiativeId = String(report.initiative_id || '');
+      if (!initiativeId) continue;
+      const initiativeName = report.initiative_name || getInitiativeName(report.initiative_id) || 'Unnamed initiative';
+      if (!grouped[initiativeId]) {
+        grouped[initiativeId] = { initiativeId, initiativeName, years: {} };
+      }
+      const year = String(new Date(report.created_at || Date.now()).getFullYear());
+      if (!grouped[initiativeId].years[year]) {
+        grouped[initiativeId].years[year] = [];
+      }
+      grouped[initiativeId].years[year].push(report);
+    }
+
+    for (const initiative of Object.values(grouped)) {
+      for (const year of Object.keys(initiative.years)) {
+        initiative.years[year].sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        );
+      }
+    }
+    return grouped;
+  }, [publicPublishedReports]);
+  const publicInitiativeOptions = useMemo(
+    () => Object.values(publicReportsByInitiative).sort((a, b) => a.initiativeName.localeCompare(b.initiativeName)),
+    [publicReportsByInitiative]
+  );
+  const publicYearOptions = useMemo(() => {
+    const initiative = publicReportsByInitiative[publicSelectedInitiativeId];
+    if (!initiative) return [];
+    return Object.keys(initiative.years).sort((a, b) => Number(b) - Number(a));
+  }, [publicReportsByInitiative, publicSelectedInitiativeId]);
+  const publicReportOptions = useMemo(() => {
+    const initiative = publicReportsByInitiative[publicSelectedInitiativeId];
+    if (!initiative) return [];
+    return initiative.years[publicSelectedYear] || [];
+  }, [publicReportsByInitiative, publicSelectedInitiativeId, publicSelectedYear]);
 
   function formatDate(dateStr) {
     if (!dateStr) return '\u2014';
@@ -473,6 +563,53 @@ export default function ReportingPage() {
   const comparedReports = showComparison
     ? selectedIds.map((id) => mgmtReports.find((r) => r.id === id)).filter(Boolean)
     : [];
+
+  useEffect(() => {
+    if (isStaffOrAdmin) return;
+    if (publicInitiativeOptions.length === 0) {
+      setPublicSelectedInitiativeId('');
+      setPublicSelectedYear('');
+      setPublicSelectedReportId('');
+      setReportData(null);
+      return;
+    }
+
+    const hasInitiative = publicReportsByInitiative[publicSelectedInitiativeId];
+    const initiativeId = hasInitiative ? publicSelectedInitiativeId : publicInitiativeOptions[0].initiativeId;
+    if (initiativeId !== publicSelectedInitiativeId) {
+      setPublicSelectedInitiativeId(initiativeId);
+      return;
+    }
+
+    const years = Object.keys(publicReportsByInitiative[initiativeId].years).sort((a, b) => Number(b) - Number(a));
+    if (!years.length) return;
+    const year = years.includes(publicSelectedYear) ? publicSelectedYear : years[0];
+    if (year !== publicSelectedYear) {
+      setPublicSelectedYear(year);
+      return;
+    }
+
+    const reports = publicReportsByInitiative[initiativeId].years[year] || [];
+    if (!reports.length) return;
+    const selectedExists = reports.some((r) => String(r.id) === publicSelectedReportId);
+    const reportId = selectedExists ? publicSelectedReportId : String(reports[0].id);
+    if (reportId !== publicSelectedReportId) {
+      setPublicSelectedReportId(reportId);
+      return;
+    }
+
+    const selectedReport = reports.find((r) => String(r.id) === reportId) || null;
+    loadReportFromRecord(selectedReport);
+  }, [
+    isStaffOrAdmin,
+    reportDbId,
+    initiatives,
+    publicInitiativeOptions,
+    publicReportsByInitiative,
+    publicSelectedInitiativeId,
+    publicSelectedYear,
+    publicSelectedReportId,
+  ]);
 
   function togglePlatform(platform) {
     setSelectedPlatforms((prev) =>
@@ -848,7 +985,6 @@ export default function ReportingPage() {
     }
   }
 
-  const isStaffOrAdmin = userRole === 'staff' || userRole === 'admin';
   const layoutTitle = hydrated && !authUser ? 'Published reports' : 'Reports';
 
   return (
@@ -1017,14 +1153,65 @@ export default function ReportingPage() {
                 </div>
               ) : (
                 <>
-                  <section style={{ marginBottom: '1.5rem' }}>
-                    <InitiativeSelector
-                      initiatives={initiatives}
-                      selectedInitiative={selectedInitiative}
-                      onSelect={handleInitiativeSelect}
-                      heading="Choose an initiative"
-                      description="Each card is an initiative with a published report. Your selection loads below."
-                    />
+                  <section className="asrs-card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
+                    <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1rem' }}>Choose report</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', marginBottom: '0.3rem' }}>
+                          Initiative
+                        </label>
+                        <select
+                          value={publicSelectedInitiativeId}
+                          onChange={(e) => {
+                            setPublicSelectedInitiativeId(e.target.value);
+                            setPublicSelectedYear('');
+                            setPublicSelectedReportId('');
+                          }}
+                          style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff' }}
+                        >
+                          {publicInitiativeOptions.map((initiative) => (
+                            <option key={initiative.initiativeId} value={initiative.initiativeId}>
+                              {initiative.initiativeName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', marginBottom: '0.3rem' }}>
+                          Year
+                        </label>
+                        <select
+                          value={publicSelectedYear}
+                          onChange={(e) => {
+                            setPublicSelectedYear(e.target.value);
+                            setPublicSelectedReportId('');
+                          }}
+                          style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff' }}
+                        >
+                          {publicYearOptions.map((year) => (
+                            <option key={year} value={year}>{year}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#6B7280', marginBottom: '0.3rem' }}>
+                          Report
+                        </label>
+                        <select
+                          value={publicSelectedReportId}
+                          onChange={(e) => setPublicSelectedReportId(e.target.value)}
+                          style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '6px', border: '1px solid #E5E7EB', backgroundColor: '#fff' }}
+                        >
+                          {publicReportOptions.map((report) => (
+                            <option key={report.id} value={String(report.id)}>
+                              {(report.name || '(Untitled)')} - {formatDate(report.created_at)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </section>
 
                   {reportData && (

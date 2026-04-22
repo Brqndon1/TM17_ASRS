@@ -7,7 +7,7 @@ export async function GET() {
 
     const rows = db.prepare(`
       SELECT DISTINCT i.initiative_id, i.initiative_name, i.description,
-             i.attributes, i.created_at, i.updated_at, i.status
+             i.attributes, i.created_at, i.updated_at
       FROM initiative i
       INNER JOIN reports r ON r.initiative_id = i.initiative_id
         AND LOWER(r.status) = 'published'
@@ -20,7 +20,7 @@ export async function GET() {
       attributes: (() => {
         try { return JSON.parse(row.attributes || '[]'); } catch { return []; }
       })(),
-      status: row.status || 'active',
+      status: 'active',
       created_at: row.created_at || null,
       updated_at: row.updated_at || null,
     }));

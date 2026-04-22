@@ -1,11 +1,5 @@
 'use client';
 
-import {
-  PieChart, Pie, Cell,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer
-} from 'recharts';
-
 const COLORS = ['#C0392B', '#E67E22', '#F39C12', '#27AE60', '#2980B9', '#8E44AD', '#1ABC9C', '#34495E'];
 
 export default function ChartDisplay({ chartData }) {
@@ -26,10 +20,21 @@ export default function ChartDisplay({ chartData }) {
   return (
     <div className="chart-grid">
       {entries.map(([label, data]) => {
+        const normalizedData = data
+          .map((entry, index) => ({
+            name: String(entry?.name ?? `Item ${index + 1}`),
+            value: Number(entry?.value),
+          }))
+          .filter((entry) => Number.isFinite(entry.value));
+
+        if (normalizedData.length === 0) return null;
+
         // Use bar chart when values are numeric/ordered or there are many items
-        const allNumeric = data.every(d => !isNaN(Number(d.name)));
+        const allNumeric = normalizedData.every((d) => !isNaN(Number(d.name)));
         const looksNumeric = /\b(score|rating|count|size|number|hours|days|amount)\b/i.test(label);
-        const usePie = !allNumeric && !looksNumeric && data.length <= 6;
+        const usePie = !allNumeric && !looksNumeric && normalizedData.length <= 6;
+        const total = normalizedData.reduce((sum, d) => sum + d.value, 0);
+        const maxValue = Math.max(...normalizedData.map((d) => d.value), 0);
 
         return (
           <div key={label} className="asrs-card">
@@ -39,63 +44,53 @@ export default function ChartDisplay({ chartData }) {
 
             {usePie ? (
               <>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={data}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={90}
-                      dataKey="value"
-                      nameKey="name"
-                    >
-                      {data.map((_, index) => (
-                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value, name) => [value, name]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem 1rem', marginTop: '0.5rem' }}>
-                  {(() => {
-                    const total = data.reduce((sum, d) => sum + (d.value || 0), 0);
-                    return data.map((entry, index) => (
-                      <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}>
-                        <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: COLORS[index % COLORS.length], flexShrink: 0 }} />
-                        {entry.name} ({total > 0 ? Math.round((entry.value / total) * 100) : 0}%)
+                <div style={{ display: 'grid', gap: '0.6rem' }}>
+                  {normalizedData.map((entry, index) => {
+                    const percent = total > 0 ? Math.round((entry.value / total) * 100) : 0;
+                    return (
+                      <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) minmax(0, 3fr) auto', alignItems: 'center', gap: '0.6rem' }}>
+                        <div style={{ fontSize: '0.82rem', color: '#374151' }}>{entry.name}</div>
+                        <div style={{ height: '10px', borderRadius: '999px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                          <div style={{ width: `${percent}%`, height: '100%', backgroundColor: COLORS[index % COLORS.length] }} />
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: '#6B7280', minWidth: '44px', textAlign: 'right' }}>{percent}%</div>
                       </div>
-                    ));
-                  })()}
+                    );
+                  })}
                 </div>
               </>
             ) : allNumeric ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="value" name="Count" radius={[4, 4, 0, 0]} fill="#E67E22">
-                    {data.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div style={{ display: 'grid', gap: '0.65rem' }}>
+                {normalizedData.map((entry, index) => {
+                  const width = maxValue > 0 ? Math.max((entry.value / maxValue) * 100, 2) : 0;
+                  return (
+                    <div key={index} style={{ display: 'grid', gap: '0.25rem' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#374151', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{entry.name}</span>
+                        <span>{entry.value}</span>
+                      </div>
+                      <div style={{ height: '10px', borderRadius: '999px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                        <div style={{ width: `${width}%`, height: '100%', backgroundColor: COLORS[index % COLORS.length] }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <ResponsiveContainer width="100%" height={Math.max(200, data.length * 35)}>
-                <BarChart data={data} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />
-                  <Tooltip />
-                  <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]}>
-                    {data.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div style={{ display: 'grid', gap: '0.65rem' }}>
+                {normalizedData.map((entry, index) => {
+                  const width = maxValue > 0 ? Math.max((entry.value / maxValue) * 100, 2) : 0;
+                  return (
+                    <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) minmax(0, 3fr) auto', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#374151' }}>{entry.name}</div>
+                      <div style={{ height: '10px', borderRadius: '999px', backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                        <div style={{ width: `${width}%`, height: '100%', backgroundColor: COLORS[index % COLORS.length] }} />
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: '#6B7280', minWidth: '44px', textAlign: 'right' }}>{entry.value}</div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         );
